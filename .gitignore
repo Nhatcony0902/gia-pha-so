@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+
+# Build output
+dist/
+build/
+out/
+target/
+*.class
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
