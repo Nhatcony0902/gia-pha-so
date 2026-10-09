@@ -1,0 +1,28 @@
+{
+  "name": "digital-family-tree",
+  "private": true,
+  "version": "0.1.0",
+  "description": "He thong quan ly gia pha so",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c blue,green \"npm run dev -w @family-tree/api\" \"npm run dev -w @family-tree/web\"",
+    "typecheck": "npm run typecheck -w @family-tree/shared-types && npm run typecheck -w @family-tree/api && npm run typecheck -w @family-tree/web",
+    "db:generate": "npm run prisma:generate -w @family-tree/api",
+    "db:migrate": "npm run prisma:migrate -w @family-tree/api",
+    "db:studio": "npm run prisma:studio -w @family-tree/api",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.3",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

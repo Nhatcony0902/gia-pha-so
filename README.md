@@ -22,3 +22,4 @@ Tài liệu gốc: `docs/tai-lieu-du-an-gia-pha-so.docx` (v1.0).
 - Đọc `AGENTS.md` để nắm luật chơi cho AI & team.
 - Đọc `specs/product-vision.md` để hiểu mục tiêu sản phẩm.
 - Đọc `planning/team-plan.md` để nắm kế hoạch 14 tuần và phân công FE/BE.
+- Xem hướng dẫn chạy dự án trong thư mục `docs/`.
