@@ -1,10 +1,11 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject, Logger } from '@nestjs/common';
 import type { HealthResponse } from '@family-tree/shared-types';
 import { PrismaService } from '../database/prisma.service.js';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(HealthController.name);
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   @Get()
   async getHealth(): Promise<HealthResponse> {
@@ -12,7 +13,8 @@ export class HealthController {
 
     try {
       await this.prisma.user.count();
-    } catch {
+    } catch (error: unknown) {
+      this.logger.error(error instanceof Error ? error.message : String(error));
       status = 'degraded';
     }
 
