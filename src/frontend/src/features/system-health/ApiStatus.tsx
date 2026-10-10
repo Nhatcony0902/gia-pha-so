@@ -7,11 +7,16 @@ export function ApiStatus() {
     queryFn: getHealth,
   });
   const status = health.isError ? 'error' : health.data?.status ?? 'loading';
-  const dotClass = status === 'ok' ? 'bg-[#83d3a2]' : status === 'error' ? 'bg-[#ed806d]' : 'bg-[#d7a95d]';
+  const dotClass =
+    status === 'ok'
+      ? 'bg-status-success'
+      : status === 'error'
+        ? 'bg-status-danger'
+        : 'bg-status-pending';
 
   return (
-    <div role="status" aria-live="polite" className="mt-8 inline-flex max-w-full items-center gap-2 border border-[#52796e] px-4 py-3 font-sans text-sm text-[#dbe8dc]" data-status={status}>
-      <span className={`size-2 shrink-0 rounded-full ${dotClass}`} />
+    <div role="status" aria-live="polite" className="border-outline text-content-on-outline mt-8 inline-flex max-w-full items-center gap-2 border px-4 py-3 font-sans text-sm" data-status={status}>
+      <span className={`rounded-pill size-2 shrink-0 ${dotClass}`} />
       {health.isLoading && 'Đang kết nối API...'}
       {health.isError && 'API chưa sẵn sàng'}
       {health.isSuccess && health.data.status === 'degraded' && 'API hoạt động, DB chưa kết nối'}
