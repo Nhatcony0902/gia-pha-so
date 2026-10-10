@@ -2,7 +2,7 @@
 
 > **Bản nháp.** Request/response chi tiết được chốt **đầu mỗi sprint** (contract-first), qua PR sửa file này. Cả BE và FE cùng review.
 
-- Base URL: `/api/v1`
+- Base URL: `/api`
 - Định dạng: JSON. Riêng upload dùng presigned URL (S3-compatible).
 - Xác thực: `Authorization: Bearer <access token>`
 - Phân trang: `?page=1&pageSize=20` → `{ "items": [...], "total": 0, "page": 1, "pageSize": 20 }`
@@ -12,6 +12,24 @@
   ```
   Mã HTTP: 400 validate · 401 chưa đăng nhập · 403 thiếu quyền · 404 không tồn tại · 409 xung đột (ví dụ quan hệ tạo chu trình).
 - Ghi dữ liệu với vai trò Editor: trả `202 Accepted` + `{ "changeRequestId": "..." }` thay vì áp dụng ngay (xem D2).
+
+## Health check
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/health` | Kiểm tra backend và truy vấn bảng `User` qua Prisma |
+
+Response `200 OK` khi backend và database hoạt động:
+
+```json
+{
+  "status": "ok",
+  "service": "family-tree-api",
+  "timestamp": "2026-10-09T10:00:00.000Z"
+}
+```
+
+Nếu truy vấn database thất bại, endpoint vẫn trả HTTP `200` nhưng `status` là `degraded`.
 
 ## Auth – Sprint 01
 | Method | Endpoint | Mô tả |
