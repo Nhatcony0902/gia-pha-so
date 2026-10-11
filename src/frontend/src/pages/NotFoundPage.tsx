@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 
 export function NotFoundPage() {
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Không tìm thấy trang | Gia phả số';
+    document.title = "Không tìm thấy trang | Gia phả số";
 
     return () => {
       document.title = previousTitle;
@@ -16,7 +16,9 @@ export function NotFoundPage() {
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-8 sm:px-8 lg:px-12">
         <section className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)] lg:py-20">
           <div className="max-w-2xl">
-            <p className="text-accent tracking-eyebrow font-sans text-xs font-bold">LỖI 404</p>
+            <p className="text-accent tracking-eyebrow font-sans text-xs font-bold">
+              LỖI 404
+            </p>
             <h1 className="mt-5 font-display text-5xl leading-tight font-semibold text-balance sm:text-6xl lg:text-7xl">
               Không tìm thấy trang
             </h1>
@@ -34,7 +36,10 @@ export function NotFoundPage() {
             </div>
           </div>
 
-          <div className="relative mx-auto aspect-square w-full max-w-md" aria-hidden="true">
+          <div
+            className="relative mx-auto aspect-square w-full max-w-md"
+            aria-hidden="true"
+          >
             <span className="absolute inset-0 grid place-items-center font-display text-[8rem] leading-none font-semibold opacity-10 sm:text-[10rem]">
               404
             </span>

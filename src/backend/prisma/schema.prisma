@@ -8,8 +8,63 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now())
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String
+  passwordHash    String?
+  googleSubject   String?          @unique
+  emailVerifiedAt DateTime?
+  avatarUrl       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  refreshSessions RefreshSession[]
+  resetTokens     PasswordResetToken[]
+}
+
+enum VerificationPurpose {
+  REGISTER
+  PASSWORD_RESET
+}
+
+model VerificationChallenge {
+  id                  String              @id @default(cuid())
+  email               String
+  purpose             VerificationPurpose
+  codeHash            String
+  pendingName         String?
+  pendingPasswordHash String?
+  attempts            Int                 @default(0)
+  expiresAt           DateTime
+  resendAvailableAt   DateTime
+  usedAt              DateTime?
+  createdAt           DateTime            @default(now())
+
+  @@index([email, purpose, createdAt])
+}
+
+model RefreshSession {
+  id         String    @id @default(cuid())
+  userId     String
+  familyId   String
+  secretHash String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model PasswordResetToken {
+  id        String    @id
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

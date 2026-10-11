@@ -31,7 +31,7 @@ Mở PowerShell tại thư mục gốc của repo.
    npm run dev
    ```
 
-4. Mở frontend tại http://localhost:5173. Trang sẽ báo API và database đã kết nối hay chưa. API health check: http://localhost:3000/api/health.
+4. Mở frontend tại http://localhost:5173. Mailpit local: http://localhost:8025. API health check: http://localhost:3000/api/health.
 
 ## Dừng dự án
 
