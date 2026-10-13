@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { primaryButtonClass, secondaryButtonClass } from "../../lib/ui-classes";
 
 type Tone = "success" | "info" | "warning" | "error";
 type Toast = { id: number; message: string; tone: Tone; expiresAt: number };
@@ -28,6 +29,13 @@ type NotificationContextValue = {
 const NotificationContext = createContext<NotificationContextValue | null>(
   null,
 );
+
+const toastToneClass: Record<Tone, string> = {
+  success: "border-l-[#3f9b63]",
+  info: "border-l-outline",
+  warning: "border-l-[#c28b32]",
+  error: "border-l-[#c84d3c]",
+};
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -121,15 +129,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       {children}
       {createPortal(
         <>
-          <div className="toast-region" aria-live="polite">
+          <div
+            className="fixed top-[5.5rem] right-4 z-100 grid w-[min(23rem,calc(100vw-2rem))] gap-[0.65rem]"
+            aria-live="polite"
+          >
             {toasts.map((item) => (
-              <div key={item.id} className={`toast toast-${item.tone}`}>
-                <span className="toast-message">{item.message}</span>
-                <span className="toast-countdown">
+              <div
+                key={item.id}
+                className={`grid animate-[toast-in_0.2s_ease-out] grid-cols-[1fr_auto_auto] items-center gap-[0.7rem] rounded-[0.65rem] border-l-4 bg-white px-4 py-[0.95rem] text-[#18332e] shadow-[0_12px_35px_rgba(0,0,0,0.22)] ${toastToneClass[item.tone]}`}
+              >
+                <span>{item.message}</span>
+                <span className="min-w-[1.8rem] text-[0.78rem] text-[#687a71] tabular-nums">
                   {Math.max(0, Math.ceil((item.expiresAt - now) / 1000))}s
                 </span>
                 <button
-                  className="toast-close"
+                  className="size-7 cursor-pointer rounded-full border-0 bg-[#e7ede9] text-xl leading-none text-[#31473e] hover:bg-[#d6e1db] focus-visible:bg-[#d6e1db]"
                   type="button"
                   aria-label="Đóng thông báo"
                   onClick={() => dismissToast(item.id)}
@@ -140,25 +154,35 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             ))}
           </div>
           {active && (
-            <div className="dialog-backdrop">
+            <div className="fixed inset-0 z-110 grid place-items-center bg-[rgba(4,15,13,0.7)] p-4 backdrop-blur-xs">
               <div
                 ref={panelRef}
-                className="dialog-panel"
+                className="w-[min(28rem,100%)] rounded-[0.85rem] bg-[#f9fbfa] p-[1.6rem] text-[#18332e] shadow-[0_24px_70px_rgba(0,0,0,0.4)]"
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby="dialog-title"
                 aria-describedby="dialog-description"
               >
-                <p className="dialog-kicker">
+                <p className="text-xs font-bold tracking-[0.14em] text-accent">
                   {active.kind === "confirm" ? "XÁC NHẬN" : "THÔNG BÁO"}
                 </p>
-                <h2 id="dialog-title">{active.title}</h2>
-                <p id="dialog-description">{active.message}</p>
-                <div className="dialog-actions">
+                <h2
+                  id="dialog-title"
+                  className="mt-1.5 mb-[0.7rem] font-display"
+                >
+                  {active.title}
+                </h2>
+                <p
+                  id="dialog-description"
+                  className="leading-[1.55] text-[#61736a]"
+                >
+                  {active.message}
+                </p>
+                <div className="mt-[1.4rem] flex justify-end gap-[0.7rem]">
                   {active.kind === "confirm" && (
                     <button
                       type="button"
-                      className="button-secondary"
+                      className={`${secondaryButtonClass} text-[#18332e]`}
                       onClick={() => close(false)}
                     >
                       Hủy
@@ -167,7 +191,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   <button
                     ref={actionRef}
                     type="button"
-                    className="button-primary"
+                    className={primaryButtonClass}
                     onClick={() => close(true)}
                   >
                     {active.kind === "confirm" ? "Xác nhận" : "Đã hiểu"}

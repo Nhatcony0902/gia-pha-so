@@ -8,17 +8,138 @@ datasource db {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  email           String           @unique
+  id              String               @id @default(cuid())
+  email           String               @unique
   name            String
   passwordHash    String?
-  googleSubject   String?          @unique
+  googleSubject   String?              @unique
   emailVerifiedAt DateTime?
   avatarUrl       String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
   refreshSessions RefreshSession[]
   resetTokens     PasswordResetToken[]
+  familyTrees     FamilyTree[]
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+}
+
+enum DatePrecision {
+  YEAR
+  MONTH
+  DAY
+}
+
+enum ParentKind {
+  BIOLOGICAL
+  ADOPTIVE
+}
+
+enum MarriageStatus {
+  MARRIED
+  DIVORCED
+  SEPARATED
+  WIDOWED
+}
+
+model FamilyTree {
+  id            String             @id @default(cuid())
+  name          String
+  description   String?
+  coverUrl      String?
+  originPlace   String?
+  createdById   String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  createdBy     User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  persons       FamilyTreePerson[]
+  relationships Relationship[]
+
+  @@index([createdById, updatedAt])
+}
+
+model Person {
+  id                 String             @id @default(cuid())
+  fullName           String
+  preferredName      String?
+  aliases            String[]           @default([])
+  gender             Gender             @default(UNKNOWN)
+  birthDate          DateTime?
+  birthDatePrecision DatePrecision?
+  birthPlace         String?
+  deathDate          DateTime?
+  deathDatePrecision DatePrecision?
+  deathPlace         String?
+  isDeceased         Boolean            @default(false)
+  hometown           String?
+  currentResidence   String?
+  nationality        String?
+  ethnicity          String?
+  religion           String?
+  occupation         String?
+  biography          String?
+  avatarUrl          String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  familyTrees        FamilyTreePerson[]
+  relationshipsFrom  Relationship[]     @relation("RelationshipFrom")
+  relationshipsTo    Relationship[]     @relation("RelationshipTo")
+
+  @@index([fullName])
+}
+
+model FamilyTreePerson {
+  treeId                String
+  personId              String
+  joinedAt              DateTime       @default(now())
+  tree                  FamilyTree     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  person                Person         @relation(fields: [personId], references: [id], onDelete: Restrict)
+  outgoingRelationships Relationship[] @relation("RelationshipFromMembership")
+  incomingRelationships Relationship[] @relation("RelationshipToMembership")
+
+  @@id([treeId, personId])
+  @@index([personId])
+}
+
+model RelationshipType {
+  code          String         @id
+  label         String
+  isDirected    Boolean
+  relationships Relationship[]
+}
+
+model Relationship {
+  id                 String           @id @default(cuid())
+  treeId             String
+  typeCode           String
+  fromPersonId       String
+  toPersonId         String
+  parentKind         ParentKind?
+  birthOrder         Int?
+  marriageStatus     MarriageStatus?
+  marriageOrder      Int?
+  startedAt          DateTime?
+  startedAtPrecision DatePrecision?
+  endedAt            DateTime?
+  endedAtPrecision   DatePrecision?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  tree               FamilyTree       @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  type               RelationshipType @relation(fields: [typeCode], references: [code], onDelete: Restrict)
+  fromPerson         Person           @relation("RelationshipFrom", fields: [fromPersonId], references: [id], onDelete: Restrict)
+  toPerson           Person           @relation("RelationshipTo", fields: [toPersonId], references: [id], onDelete: Restrict)
+  fromMembership     FamilyTreePerson @relation("RelationshipFromMembership", fields: [treeId, fromPersonId], references: [treeId, personId], onDelete: Cascade)
+  toMembership       FamilyTreePerson @relation("RelationshipToMembership", fields: [treeId, toPersonId], references: [treeId, personId], onDelete: Cascade)
+
+  @@unique([treeId, typeCode, fromPersonId, toPersonId])
+  @@index([treeId, typeCode])
+  @@index([fromPersonId])
+  @@index([toPersonId])
 }
 
 enum VerificationPurpose {

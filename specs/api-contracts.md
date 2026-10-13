@@ -1,117 +1,99 @@
 # API Contracts
-
-> **Bản nháp.** Request/response chi tiết được chốt **đầu mỗi sprint** (contract-first), qua PR sửa file này. Cả BE và FE cùng review.
-
-- Base URL: `/api`
-- Định dạng: JSON. Riêng upload dùng presigned URL (S3-compatible).
-- Xác thực: `Authorization: Bearer <access token>`
-- Phân trang: `?page=1&pageSize=20` → `{ "items": [...], "total": 0, "page": 1, "pageSize": 20 }`
-- Lỗi (dùng chung cho mọi API):
-  ```json
-  { "error": { "code": "VALIDATION_ERROR", "message": "...", "details": [{ "field": "email", "message": "..." }] } }
-  ```
-  Mã HTTP: 400 validate · 401 chưa đăng nhập · 403 thiếu quyền · 404 không tồn tại · 409 xung đột · 429 thao tác quá nhanh.
-- Ghi dữ liệu với vai trò Editor: trả `202 Accepted` + `{ "changeRequestId": "..." }` thay vì áp dụng ngay (xem D2).
+Base URL: `/api`
 
 ## Health check
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/health` | Kiểm tra backend và truy vấn bảng `User` qua Prisma |
+| GET | `/health` | Kiểm tra trạng thái backend và database |
 
-Response `200 OK` khi backend và database hoạt động:
+## Xác thực
 
-```json
-{
-  "status": "ok",
-  "service": "family-tree-api",
-  "timestamp": "2026-10-09T10:00:00.000Z",
-  "authenticated": false
-}
-```
-
-Nếu truy vấn database thất bại, endpoint vẫn trả HTTP `200` nhưng `status` là `degraded`.
-
-## Auth – Sprint 01
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| POST | `/auth/register` | Bắt đầu đăng ký và gửi OTP email |
-| POST | `/auth/register/verify` | Xác thực OTP, tạo user và phiên đăng nhập |
+| POST | `/auth/register` | Đăng ký tài khoản |
+| POST | `/auth/register/verify` | Xác thực OTP đăng ký |
 | POST | `/auth/register/resend` | Gửi lại OTP đăng ký |
-| POST | `/auth/login` | Đăng nhập form, trả access token; refresh token nằm trong HttpOnly cookie |
-| POST | `/auth/google` | Đăng nhập hoặc đăng ký bằng Google ID token |
-| POST | `/auth/refresh` | Rotate refresh cookie và lấy access token mới |
-| POST | `/auth/logout` | Thu hồi phiên hiện tại và xóa refresh cookie |
-| GET | `/auth/me` | Thông tin user hiện tại + danh sách dòng họ đã tham gia |
-| POST | `/auth/password-reset/request` | Kiểm tra tài khoản form và gửi OTP; trả lỗi nếu email không hỗ trợ đăng nhập bằng mật khẩu |
-| POST | `/auth/password-reset/verify` | Xác thực OTP và trả reset token một lần |
-| POST | `/auth/password-reset/confirm` | Đặt mật khẩu mới và thu hồi mọi phiên cũ |
+| POST | `/auth/login` | Đăng nhập bằng email và mật khẩu |
+| POST | `/auth/google` | Đăng nhập bằng Google |
+| POST | `/auth/refresh` | Làm mới access token |
+| POST | `/auth/logout` | Đăng xuất |
+| GET | `/auth/me` | Lấy thông tin người dùng hiện tại |
+| POST | `/auth/password-reset/request` | Yêu cầu đặt lại mật khẩu |
+| POST | `/auth/password-reset/verify` | Xác thực OTP đặt lại mật khẩu |
+| POST | `/auth/password-reset/confirm` | Đặt mật khẩu mới |
 
-### Payload chính
+## Cây gia phả
 
-| Endpoint | Body | Response chính |
-|---|---|---|
-| `/auth/register` | `name`, `email`, `password`, `passwordConfirmation` | `message`, `expiresInSeconds` |
-| `/auth/register/verify` | `email`, `code` | `accessToken`, `user`; đặt refresh cookie |
-| `/auth/login` | `email`, `password` | `accessToken`, `user`; đặt refresh cookie |
-| `/auth/google` | `credential` (Google ID token) | `accessToken`, `user`; đặt refresh cookie |
-| `/auth/refresh` | — | `accessToken`, `user`; rotate refresh cookie |
-| `/auth/me` | Bearer access token | `id`, `email`, `name`, `avatarUrl`, `hasPassword`, `memberships` |
-| `/auth/password-reset/verify` | `email`, `code` | `resetToken`, `expiresInSeconds` |
-| `/auth/password-reset/confirm` | `resetToken`, `password`, `passwordConfirmation` | `message` |
-
-OTP gồm 6 chữ số. Refresh cookie `HttpOnly` được rotate sau mỗi lần sử dụng. Tài khoản Google-only không thể đăng ký form hoặc đặt mật khẩu qua luồng quên mật khẩu.
-
-## Dòng họ, người, quan hệ – Sprint 02
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET / POST | `/trees` | Danh sách dòng họ của tôi / tạo dòng họ (người tạo thành Admin) |
-| GET / PATCH / DELETE | `/trees/{treeId}` | Chi tiết / sửa / xóa dòng họ |
-| GET / POST | `/trees/{treeId}/persons` | Danh sách (tìm theo tên) / thêm người |
-| GET / PATCH / DELETE | `/trees/{treeId}/persons/{personId}` | Chi tiết / sửa / xóa người |
-| GET / POST | `/trees/{treeId}/relationships` | Danh sách / thêm quan hệ (`PARENT_CHILD`, `SPOUSE`) |
+| GET | `/trees` | Danh sách cây gia phả |
+| POST | `/trees` | Tạo cây gia phả |
+| GET | `/trees/{treeId}` | Chi tiết cây gia phả |
+| PATCH | `/trees/{treeId}` | Cập nhật cây gia phả |
+| DELETE | `/trees/{treeId}` | Xóa cây gia phả |
+| GET | `/trees/{treeId}/graph` | Dữ liệu sơ đồ gia phả |
+
+## Thành viên và quan hệ
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/trees/{treeId}/persons` | Danh sách thành viên |
+| POST | `/trees/{treeId}/persons` | Thêm thành viên |
+| GET | `/trees/{treeId}/persons/{personId}` | Chi tiết thành viên |
+| PATCH | `/trees/{treeId}/persons/{personId}` | Cập nhật thành viên |
+| DELETE | `/trees/{treeId}/persons/{personId}` | Xóa thành viên |
+| GET | `/trees/{treeId}/relationships` | Danh sách quan hệ |
+| POST | `/trees/{treeId}/relationships` | Thêm quan hệ |
 | DELETE | `/trees/{treeId}/relationships/{relId}` | Xóa quan hệ |
-| GET | `/trees/{treeId}/graph` | Toàn bộ `{ nodes, edges }` để vẽ cây |
+| GET | `/trees/{treeId}/relationship-finder?from={id}&to={id}` | Tìm quan hệ giữa hai người |
 
-## Hồ sơ, tệp, timeline – Sprint 03
+## Hồ sơ, tệp và timeline
+
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| POST | `/trees/{treeId}/uploads` | Xin presigned URL để upload |
-| GET / POST | `/trees/{treeId}/persons/{personId}/attachments` | Tài liệu đính kèm |
-| DELETE | `/trees/{treeId}/persons/{personId}/attachments/{id}` | Xóa tài liệu |
-| GET | `/trees/{treeId}/timeline` | Timeline cả dòng họ |
-| GET | `/trees/{treeId}/persons/{personId}/timeline` | Timeline cá nhân |
-| POST / PATCH / DELETE | `/trees/{treeId}/persons/{personId}/life-events[/{id}]` | Sự kiện nhập tay |
+| POST | `/trees/{treeId}/uploads` | Tạo presigned upload URL |
+| GET | `/trees/{treeId}/persons/{personId}/attachments` | Danh sách tệp đính kèm |
+| POST | `/trees/{treeId}/persons/{personId}/attachments` | Thêm tệp đính kèm |
+| DELETE | `/trees/{treeId}/persons/{personId}/attachments/{id}` | Xóa tệp đính kèm |
+| GET | `/trees/{treeId}/timeline` | Timeline cây gia phả |
+| GET | `/trees/{treeId}/persons/{personId}/timeline` | Timeline thành viên |
+| POST | `/trees/{treeId}/persons/{personId}/life-events` | Thêm sự kiện cuộc đời |
+| PATCH | `/trees/{treeId}/persons/{personId}/life-events/{id}` | Cập nhật sự kiện cuộc đời |
+| DELETE | `/trees/{treeId}/persons/{personId}/life-events/{id}` | Xóa sự kiện cuộc đời |
+| GET | `/trees/{treeId}/stats` | Thống kê cây gia phả |
 
-## Quan hệ & thống kê – Sprint 03–04
+## Cộng tác
+
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/trees/{treeId}/relationship-finder?from={id}&to={id}` | `{ path: [...], aCallsB, bCallsA, description }` |
-| GET | `/trees/{treeId}/stats` | Số liệu cho dashboard |
-
-## Cộng tác – Sprint 05
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| GET | `/trees/{treeId}/members` | Danh sách user trong dòng họ + vai trò |
-| PATCH / DELETE | `/trees/{treeId}/members/{userId}` | Đổi vai trò, giao nhánh / xóa khỏi dòng họ |
-| POST | `/trees/{treeId}/invitations` | Tạo lời mời (link hoặc email) |
+| GET | `/trees/{treeId}/members` | Danh sách cộng tác viên |
+| PATCH | `/trees/{treeId}/members/{userId}` | Cập nhật quyền cộng tác viên |
+| DELETE | `/trees/{treeId}/members/{userId}` | Xóa cộng tác viên |
+| POST | `/trees/{treeId}/invitations` | Tạo lời mời |
 | POST | `/invitations/{token}/accept` | Chấp nhận lời mời |
-| GET | `/trees/{treeId}/change-requests?status=PENDING` | Hàng chờ duyệt |
-| GET | `/trees/{treeId}/change-requests/{id}` | Chi tiết + diff |
-| POST | `/trees/{treeId}/change-requests/{id}/approve` | Duyệt |
-| POST | `/trees/{treeId}/change-requests/{id}/reject` | Từ chối (kèm lý do) |
-| GET | `/trees/{treeId}/audit-logs` | Lịch sử thay đổi |
-| GET / POST | `/trees/{treeId}/persons/{personId}/comments` | Bình luận |
+| GET | `/trees/{treeId}/change-requests?status=PENDING` | Danh sách yêu cầu thay đổi |
+| GET | `/trees/{treeId}/change-requests/{id}` | Chi tiết yêu cầu thay đổi |
+| POST | `/trees/{treeId}/change-requests/{id}/approve` | Duyệt yêu cầu thay đổi |
+| POST | `/trees/{treeId}/change-requests/{id}/reject` | Từ chối yêu cầu thay đổi |
+| GET | `/trees/{treeId}/audit-logs` | Nhật ký thay đổi |
+| GET | `/trees/{treeId}/persons/{personId}/comments` | Danh sách bình luận |
+| POST | `/trees/{treeId}/persons/{personId}/comments` | Thêm bình luận |
 | DELETE | `/trees/{treeId}/comments/{id}` | Xóa bình luận |
-| GET / PATCH | `/notifications`, `/notifications/{id}/read` | Thông báo / đánh dấu đã đọc |
-| WS | `/ws` | Sự kiện realtime: `comment.created`, `change-request.created`, `notification.created` |
+| GET | `/notifications` | Danh sách thông báo |
+| PATCH | `/notifications/{id}/read` | Đánh dấu thông báo đã đọc |
+| WS | `/ws` | Kết nối realtime |
 
-## Memory Wall, sự kiện, AI – Sprint 06–07
+## Kỷ niệm, sự kiện và AI
+
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET / POST | `/trees/{treeId}/persons/{personId}/memories` | Ký ức (ảnh / video / audio / câu chuyện) |
-| DELETE | `/trees/{treeId}/memories/{id}` | Xóa ký ức |
-| GET / POST | `/trees/{treeId}/events` | Sự kiện dòng họ (lọc theo khoảng ngày) |
-| PATCH / DELETE | `/trees/{treeId}/events/{id}` | Sửa / xóa sự kiện |
-| POST | `/trees/{treeId}/persons/{personId}/biography/generate` | Sinh bản nháp tiểu sử (không tự lưu) |
-| POST | `/trees/{treeId}/chat` | Hỏi chatbot, trả về dạng stream (SSE) |
+| GET | `/trees/{treeId}/persons/{personId}/memories` | Danh sách kỷ niệm |
+| POST | `/trees/{treeId}/persons/{personId}/memories` | Thêm kỷ niệm |
+| DELETE | `/trees/{treeId}/memories/{id}` | Xóa kỷ niệm |
+| GET | `/trees/{treeId}/events` | Danh sách sự kiện dòng họ |
+| POST | `/trees/{treeId}/events` | Thêm sự kiện dòng họ |
+| PATCH | `/trees/{treeId}/events/{id}` | Cập nhật sự kiện dòng họ |
+| DELETE | `/trees/{treeId}/events/{id}` | Xóa sự kiện dòng họ |
+| POST | `/trees/{treeId}/persons/{personId}/biography/generate` | Tạo bản nháp tiểu sử |
+| POST | `/trees/{treeId}/chat` | Chatbot gia phả |

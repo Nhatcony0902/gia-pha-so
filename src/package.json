@@ -11,9 +11,11 @@
   "scripts": {
     "dev": "concurrently -n API,WEB -c blue,green \"npm run dev -w @family-tree/api\" \"npm run dev -w @family-tree/web\"",
     "typecheck": "npm run typecheck -w @family-tree/shared-types && npm run typecheck -w @family-tree/api && npm run typecheck -w @family-tree/web",
-    "db:generate": "npm run prisma:generate -w @family-tree/api",
-    "db:migrate": "npm run prisma:migrate -w @family-tree/api",
-    "db:studio": "npm run prisma:studio -w @family-tree/api",
+    "db:generate": "npm run db:generate -w @family-tree/api",
+    "db:migrate": "npm run db:migrate -w @family-tree/api",
+    "db:seed": "npm run db:seed -w @family-tree/api",
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "db:studio": "npm run db:studio -w @family-tree/api",
     "postinstall": "npm run db:generate",
     "format": "prettier --write ."
   },

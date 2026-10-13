@@ -7,7 +7,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   if (isInitializing)
     return (
-      <div role="status" className="route-loading">
+      <div
+        role="status"
+        className="grid min-h-[calc(100vh-4.5rem)] place-items-center text-content-secondary"
+      >
         Đang kiểm tra phiên đăng nhập…
       </div>
     );
