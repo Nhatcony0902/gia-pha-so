@@ -10,6 +10,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { TreesPage } from "../pages/TreesPage";
 import { FamilyTreePage } from "../pages/FamilyTreePage";
+import { PersonDetailPage } from "../pages/PersonDetailPage";
 
 export function App() {
   return (
@@ -37,6 +38,14 @@ export function App() {
                     element={
                       <ProtectedRoute>
                         <FamilyTreePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/persons/:personId"
+                    element={
+                      <ProtectedRoute>
+                        <PersonDetailPage />
                       </ProtectedRoute>
                     }
                   />

@@ -306,14 +306,12 @@ export function PersonSidebar({
               ))}
             </div>
           </section>
-          <button
-            className={`${primaryButtonClass} mt-[1.4rem] w-full`}
-            type="button"
-            disabled
-            title="Sắp ra mắt"
+          <Link
+            className={`${primaryButtonClass} mt-[1.4rem] flex w-full justify-center no-underline`}
+            to={`persons/${person.id}`}
           >
-            Xem chi tiết · Sắp ra mắt
-          </button>
+            Xem chi tiết
+          </Link>
         </>
       )}
     </aside>
