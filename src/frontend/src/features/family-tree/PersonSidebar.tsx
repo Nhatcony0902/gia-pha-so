@@ -5,19 +5,22 @@ import type {
   PersonSidebarDetail,
   RelatedPerson,
 } from "@family-tree/shared-types";
+import { X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { primaryButtonClass } from "../../lib/ui-classes";
 
 const sidebarClass =
   "absolute right-0 bottom-0 left-0 top-[38%] z-10 overflow-y-auto rounded-t-2xl border-t border-[#c8d5ce] bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
 const closeButtonClass =
-  "absolute top-[0.8rem] right-[0.9rem] size-8 cursor-pointer rounded-full border-0 bg-[#e6ece8] text-xl text-[#314a42]";
+  "absolute top-[0.8rem] right-[0.9rem] grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-[#e6ece8] text-[#314a42]";
 const profileClass =
   "px-[1.8rem] pt-[0.8rem] pb-[1.25rem] text-center [&>p]:mt-[0.8rem] [&>p]:mb-[0.35rem] [&>p]:text-[0.67rem] [&>p]:font-bold [&>p]:tracking-[0.12em] [&>p]:text-[#a06e2b] [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.55rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-[#65786e]";
 const sectionClass =
   "mt-[1.3rem] [&>h3]:mt-0 [&>h3]:mb-[0.6rem] [&>h3]:font-display [&>h3]:font-semibold [&>p]:leading-[1.55] [&>p]:text-[#61736a]";
 const treeListClass =
   "grid gap-[0.45rem] [&>a]:rounded-[0.4rem] [&>a]:bg-[#edf2ef] [&>a]:p-[0.65rem] [&>a]:text-[0.82rem] [&>a]:font-bold [&>a]:text-[#47665c] [&>a]:no-underline";
+const relationshipListClass =
+  "grid gap-0 overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]";
 const emptyClass = "my-[0.35rem] text-[0.82rem]! text-[#71827a]!";
 const genderBorderClass: Record<RelatedPerson["gender"], string> = {
   MALE: "border-l-[#4f8aa5]",
@@ -198,11 +201,10 @@ function FamilyConnections({
                   key={key}
                   person={child}
                   onSelect={onSelectPerson}
-                  role="Con"
                   context={
                     partner
                       ? `Con với ${partner.preferredName ?? partner.fullName}`
-                      : "Chưa xác định người còn lại"
+                      : undefined
                   }
                 />
               ))}
@@ -254,7 +256,7 @@ export function PersonSidebar({
         onClick={onClose}
         aria-label="Đóng"
       >
-        ×
+        <X size={16} aria-hidden="true" />
       </button>
       {loading && (
         <div className="grid min-h-60 place-items-center text-[#61736a]">
@@ -341,7 +343,7 @@ export function RelationshipSidebar({
         onClick={onClose}
         aria-label="Đóng"
       >
-        ×
+        <X size={16} aria-hidden="true" />
       </button>
       <div className={`${profileClass} pt-[2.4rem]`}>
         <p>MỐI QUAN HỆ</p>
@@ -349,31 +351,25 @@ export function RelationshipSidebar({
       </div>
       <section className={sectionClass}>
         <h3>Vợ/chồng</h3>
-        <div
-          className={`${treeListClass} overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]`}
-        >
+        <div className={relationshipListClass}>
           <PersonButton person={first} onSelect={onSelectPerson} />
           <PersonButton person={second} onSelect={onSelectPerson} />
         </div>
       </section>
-      <section className={sectionClass}>
-        <h3>Con chung</h3>
-        <div
-          className={`${treeListClass} overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]`}
-        >
-          {children.length ? (
-            children.map((child) => (
+      {children.length > 0 && (
+        <section className={sectionClass}>
+          <h3>Con cái</h3>
+          <div className={relationshipListClass}>
+            {children.map((child) => (
               <PersonButton
                 key={child.id}
                 person={child}
                 onSelect={onSelectPerson}
               />
-            ))
-          ) : (
-            <p className={emptyClass}>Chưa có thông tin con chung.</p>
-          )}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </aside>
   );
 }
