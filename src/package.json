@@ -14,6 +14,7 @@
     "db:generate": "npm run prisma:generate -w @family-tree/api",
     "db:migrate": "npm run prisma:migrate -w @family-tree/api",
     "db:studio": "npm run prisma:studio -w @family-tree/api",
+    "postinstall": "npm run db:generate",
     "format": "prettier --write ."
   },
   "devDependencies": {
