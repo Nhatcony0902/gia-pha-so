@@ -8,10 +8,7 @@ import { z } from "zod";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import { ApiError, publicApi } from "../lib/api/client";
-import {
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "../lib/ui-classes";
+import { primaryButtonClass, secondaryButtonClass } from "../lib/ui-classes";
 
 type Mode = "login" | "register" | "forgot-password";
 const emailSchema = z.string().email("Email không hợp lệ");

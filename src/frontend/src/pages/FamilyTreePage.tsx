@@ -177,7 +177,10 @@ export function FamilyTreePage() {
           className="flex min-w-0 items-center gap-[0.55rem]"
           aria-label="Breadcrumb"
         >
-          <Link className="whitespace-nowrap text-[#8a5c22] no-underline" to="/trees">
+          <Link
+            className="whitespace-nowrap text-[#8a5c22] no-underline"
+            to="/trees"
+          >
             Danh sách gia phả
           </Link>
           <span>/</span>
@@ -230,13 +233,22 @@ export function FamilyTreePage() {
                 <i className={`${legendLineClass} border-[#a96f25]`} /> Kết hôn
               </span>
               <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i className={`${legendLineClass} border-dashed border-[#b85b4b]`} /> Ly hôn
+                <i
+                  className={`${legendLineClass} border-dashed border-[#b85b4b]`}
+                />{" "}
+                Ly hôn
               </span>
               <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i className={`${legendLineClass} border-dotted border-[#c1842f]`} /> Ly thân
+                <i
+                  className={`${legendLineClass} border-dotted border-[#c1842f]`}
+                />{" "}
+                Ly thân
               </span>
               <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i className={`${legendLineClass} border-dotted border-[#788982]`} /> Có con chung
+                <i
+                  className={`${legendLineClass} border-dotted border-[#788982]`}
+                />{" "}
+                Có con chung
               </span>
             </div>
           </details>

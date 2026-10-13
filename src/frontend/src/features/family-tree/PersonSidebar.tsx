@@ -336,10 +336,7 @@ export function RelationshipSidebar({
   onSelectPerson: (personId: string) => void;
 }) {
   return (
-    <aside
-      className={sidebarClass}
-      aria-label="Thông tin mối quan hệ"
-    >
+    <aside className={sidebarClass} aria-label="Thông tin mối quan hệ">
       <button
         className={closeButtonClass}
         type="button"
@@ -357,14 +354,8 @@ export function RelationshipSidebar({
         <div
           className={`${treeListClass} overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]`}
         >
-          <PersonButton
-            person={first}
-            onSelect={onSelectPerson}
-          />
-          <PersonButton
-            person={second}
-            onSelect={onSelectPerson}
-          />
+          <PersonButton person={first} onSelect={onSelectPerson} />
+          <PersonButton person={second} onSelect={onSelectPerson} />
         </div>
       </section>
       <section className={sectionClass}>

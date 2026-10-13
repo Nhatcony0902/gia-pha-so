@@ -9,10 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  primaryButtonClass,
-  secondaryButtonClass,
-} from "../../lib/ui-classes";
+import { primaryButtonClass, secondaryButtonClass } from "../../lib/ui-classes";
 
 type Tone = "success" | "info" | "warning" | "error";
 type Toast = { id: number; message: string; tone: Tone; expiresAt: number };

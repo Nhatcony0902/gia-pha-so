@@ -37,11 +37,7 @@ export function Navbar() {
           to="/"
           className="inline-flex items-center gap-[0.7rem] font-display font-bold text-inherit no-underline"
         >
-          <img
-            className="size-9 rounded-full object-cover"
-            src={logo}
-            alt=""
-          />
+          <img className="size-9 rounded-full object-cover" src={logo} alt="" />
           <span>Gia Phả Số</span>
         </Link>
         <button

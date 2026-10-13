@@ -78,8 +78,8 @@ export function TreesPage() {
                   {tree.description ?? "Chưa có mô tả"}
                 </span>
                 <footer className="mt-auto flex items-baseline gap-[0.35rem] pt-4 text-sm text-content-muted">
-                  <strong className="text-white">{tree.personCount}</strong> thành
-                  viên <b className="ml-auto text-accent">Khám phá →</b>
+                  <strong className="text-white">{tree.personCount}</strong>{" "}
+                  thành viên <b className="ml-auto text-accent">Khám phá →</b>
                 </footer>
               </div>
             </Link>
