@@ -119,9 +119,6 @@ export interface PersonSidebarDetail extends PersonNode {
   occupation: string | null;
   title: string | null;
   maidenName: string | null;
-  clanBranch: string | null;
-  generationName: string | null;
-  familyPosition: string | null;
   education: string | null;
   employer: string | null;
   phone: string | null;
@@ -169,9 +166,6 @@ export interface PersonListItem {
   ethnicity: string | null;
   religion: string | null;
   occupation: string | null;
-  clanBranch: string | null;
-  generationName: string | null;
-  familyPosition: string | null;
   phone: string | null;
   email: string | null;
 }
@@ -201,9 +195,6 @@ export type PersonUpdateInput = Partial<{
   occupation: string | null;
   title: string | null;
   maidenName: string | null;
-  clanBranch: string | null;
-  generationName: string | null;
-  familyPosition: string | null;
   education: string | null;
   employer: string | null;
   phone: string | null;

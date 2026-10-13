@@ -54,9 +54,6 @@ const columns: Column[] = [
   { key: "ethnicity", label: "Dân tộc" },
   { key: "religion", label: "Tôn giáo" },
   { key: "occupation", label: "Nghề nghiệp", default: true },
-  { key: "clanBranch", label: "Chi họ" },
-  { key: "generationName", label: "Đời / thế hệ" },
-  { key: "familyPosition", label: "Vai vế" },
   { key: "phone", label: "Điện thoại" },
   { key: "email", label: "Email" },
 ];
@@ -71,10 +68,10 @@ const isFilterActive = (filter?: Filter) => {
   if (!filter) return false;
   return Boolean(
     filter.sort ||
-      filter.mode === "empty" ||
-      filter.mode === "not-empty" ||
-      filter.values?.length ||
-      ((filter.mode ?? "contains") === "contains" && filter.text?.trim()),
+    filter.mode === "empty" ||
+    filter.mode === "not-empty" ||
+    filter.values?.length ||
+    ((filter.mode ?? "contains") === "contains" && filter.text?.trim()),
   );
 };
 const valueOf = (person: PersonListItem, key: Key) => person[key];
@@ -101,48 +98,48 @@ const normalizeSearch = (value: unknown) =>
     .toLocaleLowerCase("vi")
     .trim();
 
-  const defaultColumnWidth = (key: Key) => (key === "fullName" ? 320 : 180);
-  const minColumnWidth = (key: Key) => (key === "fullName" ? 200 : 112);
+const defaultColumnWidth = (key: Key) => (key === "fullName" ? 320 : 180);
+const minColumnWidth = (key: Key) => (key === "fullName" ? 200 : 112);
 
-  function StyledCheckbox({
-    checked,
-    indeterminate = false,
-    onChange,
-    label,
-    className,
-  }: {
-    checked: boolean;
-    indeterminate?: boolean;
-    onChange: () => void;
-    label: ReactNode;
-    className: string;
-  }) {
-    return (
-      <label className={`flex cursor-pointer items-center gap-2 ${className}`}>
-        <input
-          type="checkbox"
-          checked={checked}
-          aria-checked={indeterminate ? "mixed" : checked}
-          ref={(input) => {
-            if (input) input.indeterminate = indeterminate;
-          }}
-          onChange={onChange}
-          className="peer sr-only"
-        />
-        <span
-          aria-hidden="true"
-          className={`grid size-4 shrink-0 place-items-center rounded-[4px] border border-[#8fa198] transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#52796e] ${checked || indeterminate ? "border-[#29473f] bg-[#29473f] text-white" : "bg-white text-transparent"}`}
-        >
-          {indeterminate ? (
-            <Minus size={12} strokeWidth={3} />
-          ) : (
-            <Check size={12} strokeWidth={3} />
-          )}
-        </span>
-        <span className="min-w-0">{label}</span>
-      </label>
-    );
-  }
+function StyledCheckbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  label,
+  className,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  label: ReactNode;
+  className: string;
+}) {
+  return (
+    <label className={`flex cursor-pointer items-center gap-2 ${className}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        aria-checked={indeterminate ? "mixed" : checked}
+        ref={(input) => {
+          if (input) input.indeterminate = indeterminate;
+        }}
+        onChange={onChange}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className={`grid size-4 shrink-0 place-items-center rounded-[4px] border border-[#8fa198] transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#52796e] ${checked || indeterminate ? "border-[#29473f] bg-[#29473f] text-white" : "bg-white text-transparent"}`}
+      >
+        {indeterminate ? (
+          <Minus size={12} strokeWidth={3} />
+        ) : (
+          <Check size={12} strokeWidth={3} />
+        )}
+      </span>
+      <span className="min-w-0">{label}</span>
+    </label>
+  );
+}
 
 export function MemberList({
   treeId,
@@ -161,10 +158,11 @@ export function MemberList({
     columns.filter((column) => column.default).map((column) => column.key),
   );
   const [draftVisible, setDraftVisible] = useState<Key[]>(visible);
-  const [columnWidths, setColumnWidths] = useState<Record<Key, number>>(() =>
-    Object.fromEntries(
-      columns.map((column) => [column.key, defaultColumnWidth(column.key)]),
-    ) as Record<Key, number>,
+  const [columnWidths, setColumnWidths] = useState<Record<Key, number>>(
+    () =>
+      Object.fromEntries(
+        columns.map((column) => [column.key, defaultColumnWidth(column.key)]),
+      ) as Record<Key, number>,
   );
   const [filters, setFilters] = useState<Partial<Record<Key, Filter>>>({});
   const [open, setOpen] = useState<string | null>(null);
@@ -188,7 +186,11 @@ export function MemberList({
     isFilterActive(filters[column.key]),
   ).length;
   const tableWidth =
-    64 + activeColumns.reduce((total, column) => total + columnWidths[column.key], 0);
+    64 +
+    activeColumns.reduce(
+      (total, column) => total + columnWidths[column.key],
+      0,
+    );
   const rows = useMemo(() => {
     let result = [...(query.data?.persons ?? [])];
     for (const column of columns) {
@@ -273,59 +275,60 @@ export function MemberList({
               </button>
               {open === "columns" && (
                 <div className="absolute top-full right-0 z-20 mt-2 flex max-h-96 w-72 flex-col rounded-xl border border-[#c8d5ce] bg-white p-2 shadow-xl">
-                <div className="grid min-h-0 gap-1 overflow-auto">
-                  <StyledCheckbox
-                    className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-[#edf2ef]"
-                    checked={draftVisible.length === columns.length}
-                    indeterminate={
-                      draftVisible.length > 0 && draftVisible.length < columns.length
-                    }
-                    onChange={() =>
-                      setDraftVisible(
-                        draftVisible.length === columns.length
-                          ? []
-                          : columns.map((column) => column.key),
-                      )
-                    }
-                    label="Chọn tất cả"
-                  />
-                  {columns.map((column) => (
+                  <div className="grid min-h-0 gap-1 overflow-auto">
                     <StyledCheckbox
-                      key={column.key}
-                      className="rounded-lg px-2 py-2 text-sm hover:bg-[#edf2ef]"
-                      checked={draftVisible.includes(column.key)}
+                      className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-[#edf2ef]"
+                      checked={draftVisible.length === columns.length}
+                      indeterminate={
+                        draftVisible.length > 0 &&
+                        draftVisible.length < columns.length
+                      }
                       onChange={() =>
-                        setDraftVisible((current) =>
-                          current.includes(column.key)
-                            ? current.filter((key) => key !== column.key)
-                            : [...current, column.key],
+                        setDraftVisible(
+                          draftVisible.length === columns.length
+                            ? []
+                            : columns.map((column) => column.key),
                         )
                       }
-                      label={column.label}
+                      label="Chọn tất cả"
                     />
-                  ))}
-                </div>
-                <div className="mt-2 flex justify-end border-t border-[#e4ebe7] pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVisible(draftVisible);
-                      setFilters((current) => {
-                        const next = { ...current };
-                        for (const column of columns) {
-                          if (!draftVisible.includes(column.key)) {
-                            delete next[column.key];
-                          }
+                    {columns.map((column) => (
+                      <StyledCheckbox
+                        key={column.key}
+                        className="rounded-lg px-2 py-2 text-sm hover:bg-[#edf2ef]"
+                        checked={draftVisible.includes(column.key)}
+                        onChange={() =>
+                          setDraftVisible((current) =>
+                            current.includes(column.key)
+                              ? current.filter((key) => key !== column.key)
+                              : [...current, column.key],
+                          )
                         }
-                        return next;
-                      });
-                      setOpen(null);
-                    }}
-                    className="rounded-lg bg-[#29473f] px-4 py-2 text-sm font-bold text-white hover:bg-[#203b34]"
-                  >
-                    Áp dụng
-                  </button>
-                </div>
+                        label={column.label}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-2 flex justify-end border-t border-[#e4ebe7] pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVisible(draftVisible);
+                        setFilters((current) => {
+                          const next = { ...current };
+                          for (const column of columns) {
+                            if (!draftVisible.includes(column.key)) {
+                              delete next[column.key];
+                            }
+                          }
+                          return next;
+                        });
+                        setOpen(null);
+                      }}
+                      className="rounded-lg bg-[#29473f] px-4 py-2 text-sm font-bold text-white hover:bg-[#203b34]"
+                    >
+                      Áp dụng
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -351,7 +354,10 @@ export function MemberList({
             <colgroup>
               <col style={{ width: 64 }} />
               {activeColumns.map((column) => (
-                <col key={column.key} style={{ width: columnWidths[column.key] }} />
+                <col
+                  key={column.key}
+                  style={{ width: columnWidths[column.key] }}
+                />
               ))}
             </colgroup>
             <thead className="sticky top-0 z-10 bg-[#e3ebe7] text-[#29473f]">
@@ -409,7 +415,10 @@ export function MemberList({
                         resizingColumn.current = null;
                       }}
                       onKeyDown={(event) => {
-                        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight")
+                        if (
+                          event.key !== "ArrowLeft" &&
+                          event.key !== "ArrowRight"
+                        )
                           return;
                         event.preventDefault();
                         const delta = event.key === "ArrowRight" ? 16 : -16;
@@ -493,7 +502,10 @@ export function MemberList({
                               {person.fullName[0]}
                             </span>
                           )}
-                          <strong className="min-w-0 truncate" title={person.fullName}>
+                          <strong
+                            className="min-w-0 truncate"
+                            title={person.fullName}
+                          >
                             {person.fullName}
                           </strong>
                         </span>
@@ -581,7 +593,7 @@ function ColumnPopup({
                     ? draft.values.filter((item) => item !== key)
                     : [...(draft.values ?? []), key],
                 })
-                }
+              }
               label={label}
             />
           ))}

@@ -84,9 +84,6 @@ model Person {
   occupation         String?
   title              String?
   maidenName         String?
-  clanBranch         String?
-  generationName     String?
-  familyPosition     String?
   education          String?
   employer           String?
   phone              String?

@@ -37,9 +37,6 @@ export class UpdatePersonDto {
   @IsOptional() @IsString() occupation?: string | null;
   @IsOptional() @IsString() title?: string | null;
   @IsOptional() @IsString() maidenName?: string | null;
-  @IsOptional() @IsString() clanBranch?: string | null;
-  @IsOptional() @IsString() generationName?: string | null;
-  @IsOptional() @IsString() familyPosition?: string | null;
   @IsOptional() @IsString() education?: string | null;
   @IsOptional() @IsString() employer?: string | null;
   @IsOptional() @IsString() phone?: string | null;

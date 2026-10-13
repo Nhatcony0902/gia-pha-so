@@ -9,7 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { primaryButtonClass, secondaryButtonClass } from "../../lib/ui-classes";
+import {
+  compactPrimaryButtonClass,
+  compactSecondaryButtonClass,
+} from "../../lib/ui-classes";
 
 type Tone = "success" | "info" | "warning" | "error";
 type Toast = { id: number; message: string; tone: Tone; expiresAt: number };
@@ -182,7 +185,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   {active.kind === "confirm" && (
                     <button
                       type="button"
-                      className={`${secondaryButtonClass} text-[#18332e]`}
+                      className={compactSecondaryButtonClass}
                       onClick={() => close(false)}
                     >
                       Hủy
@@ -191,7 +194,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                   <button
                     ref={actionRef}
                     type="button"
-                    className={primaryButtonClass}
+                    className={compactPrimaryButtonClass}
                     onClick={() => close(true)}
                   >
                     {active.kind === "confirm" ? "Xác nhận" : "Đã hiểu"}

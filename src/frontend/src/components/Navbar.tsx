@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import logo from "../assets/images/logo.svg";
 import { primaryButtonClass } from "../lib/ui-classes";
+
+const menuItemClass = ({ isActive }: { isActive: boolean }) =>
+  `inline-flex items-center border-b-2 px-3 py-2 font-semibold no-underline transition-colors ${isActive ? "border-content-secondary text-content-primary" : "border-transparent text-content-secondary hover:text-white"}`;
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -27,21 +30,76 @@ export function Navbar() {
     .map((word) => word[0])
     .join("")
     .toUpperCase();
+  const accountActions =
+    !isInitializing && !user ? (
+      <div className="flex flex-col items-stretch gap-[0.8rem] min-[801px]:flex-row min-[801px]:items-center">
+        <Link
+          className="cursor-pointer border-0 bg-transparent px-3 py-[0.65rem] text-content-secondary no-underline hover:text-white focus-visible:text-white"
+          to="/auth?mode=login"
+          onClick={() => setOpen(false)}
+        >
+          Đăng nhập
+        </Link>
+        <Link
+          className={`${primaryButtonClass} justify-center text-center no-underline`}
+          to="/auth?mode=register"
+          onClick={() => setOpen(false)}
+        >
+          Đăng ký
+        </Link>
+      </div>
+    ) : user ? (
+      <div className="flex flex-wrap items-center gap-[0.8rem] min-[801px]:flex-nowrap">
+        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-[0.78rem] font-bold text-[#18332e] [&_img]:size-full [&_img]:object-cover">
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
+          ) : (
+            initials
+          )}
+        </span>
+        <span className="max-w-40 flex-1 truncate">{user.name}</span>
+        <button
+          className="cursor-pointer border-0 bg-transparent px-3 py-[0.65rem] text-content-secondary hover:text-white focus-visible:text-white"
+          type="button"
+          onClick={onLogout}
+        >
+          Đăng xuất
+        </button>
+      </div>
+    ) : null;
   return (
     <header className="sticky top-0 z-30 border-b border-[rgba(82,121,110,0.55)] bg-[rgba(18,33,31,0.94)] text-content-primary backdrop-blur-[14px]">
       <nav
-        className="mx-auto flex min-h-18 max-w-7xl items-center justify-between px-5"
+        className="relative mx-auto grid min-h-18 max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-5"
         aria-label="Điều hướng chính"
       >
         <Link
           to="/"
-          className="inline-flex items-center gap-[0.7rem] font-display font-bold text-inherit no-underline"
+          className="inline-flex items-center gap-[0.7rem] justify-self-start font-display font-bold text-inherit no-underline"
         >
-          <img className="size-9 rounded-full object-cover" src={logo} alt="" />
+          <img
+            className="size-12 rounded-full object-cover"
+            src={logo}
+            alt=""
+          />
           <span>Gia Phả Số</span>
         </Link>
+        {user && (
+          <div className="hidden min-[801px]:block">
+            <NavLink
+              className={menuItemClass}
+              to="/trees"
+              onClick={() => setOpen(false)}
+            >
+              Gia phả
+            </NavLink>
+          </div>
+        )}
+        <div className="hidden min-w-0 justify-self-end min-[801px]:block">
+          {accountActions}
+        </div>
         <button
-          className="block rounded-lg border border-outline bg-transparent px-[0.65rem] py-[0.45rem] text-white min-[801px]:hidden"
+          className="col-start-3 justify-self-end rounded-lg border border-outline bg-transparent px-[0.65rem] py-[0.45rem] text-white min-[801px]:hidden"
           type="button"
           aria-expanded={open}
           aria-controls="nav-actions"
@@ -53,56 +111,20 @@ export function Navbar() {
           id="nav-actions"
           className={`${
             open ? "flex" : "hidden"
-          } absolute top-16 right-4 left-4 flex-col items-stretch gap-[0.8rem] rounded-[0.7rem] border border-outline bg-[#18332e] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.3)] min-[801px]:static min-[801px]:flex min-[801px]:flex-row min-[801px]:items-center min-[801px]:border-0 min-[801px]:bg-transparent min-[801px]:p-0 min-[801px]:shadow-none`}
+          } absolute top-16 right-4 left-4 flex-col items-stretch gap-[0.8rem] rounded-[0.7rem] border border-outline bg-[#18332e] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.3)] min-[801px]:hidden`}
         >
-          {!isInitializing && !user && (
-            <>
-              <Link
-                className="cursor-pointer border-0 bg-transparent px-3 py-[0.65rem] text-content-secondary no-underline hover:text-white focus-visible:text-white"
-                to="/auth?mode=login"
-                onClick={() => setOpen(false)}
-              >
-                Đăng nhập
-              </Link>
-              <Link
-                className={`${primaryButtonClass} text-center no-underline`}
-                to="/auth?mode=register"
-                onClick={() => setOpen(false)}
-              >
-                Đăng ký
-              </Link>
-            </>
-          )}
           {user && (
-            <div className="flex flex-wrap items-center gap-[0.8rem] min-[801px]:flex-nowrap">
-              <Link
-                className="cursor-pointer border-0 bg-transparent px-3 py-[0.65rem] text-content-secondary no-underline hover:text-white focus-visible:text-white"
+            <div className="flex">
+              <NavLink
+                className={menuItemClass}
                 to="/trees"
                 onClick={() => setOpen(false)}
               >
                 Gia phả
-              </Link>
-              <span className="grid size-9 place-items-center overflow-hidden rounded-full bg-accent text-[0.78rem] font-bold text-[#18332e] [&_img]:size-full [&_img]:object-cover">
-                {user.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  initials
-                )}
-              </span>
-              <span className="max-w-40 flex-1 truncate">{user.name}</span>
-              <button
-                className="cursor-pointer border-0 bg-transparent px-3 py-[0.65rem] text-content-secondary hover:text-white focus-visible:text-white"
-                type="button"
-                onClick={onLogout}
-              >
-                Đăng xuất
-              </button>
+              </NavLink>
             </div>
           )}
+          {accountActions}
         </div>
       </nav>
     </header>
