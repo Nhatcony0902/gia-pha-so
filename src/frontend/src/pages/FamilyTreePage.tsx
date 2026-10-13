@@ -25,8 +25,12 @@ import {
   PersonSidebar,
   RelationshipSidebar,
 } from "../features/family-tree/PersonSidebar";
+import { secondaryButtonClass } from "../lib/ui-classes";
 
 const nodeTypes = { person: FamilyPersonNode, junction: FamilyJunctionNode };
+const routeStateClass =
+  "grid min-h-[calc(100vh-4.5rem)] place-content-center justify-items-center gap-[0.8rem] bg-[#17302b] p-4 text-center text-content-primary [&>h1]:m-0 [&>p]:m-0 [&>a]:text-accent";
+const legendLineClass = "h-0 w-8 border-t-2 border-[#52796e]";
 
 export function FamilyTreePage() {
   const { treeId = "" } = useParams();
@@ -146,17 +150,20 @@ export function FamilyTreePage() {
 
   if (graph.isLoading)
     return (
-      <main className="tree-route-state">
-        <div className="tree-spinner" />
+      <main className={routeStateClass}>
+        <div className="size-10 animate-[spin_0.8s_linear_infinite] rounded-full border-[3px] border-[#52796e] border-t-accent" />
         <p>Đang dựng sơ đồ gia phả…</p>
       </main>
     );
   if (graph.isError || !graph.data)
     return (
-      <main className="tree-route-state">
+      <main className={routeStateClass}>
         <h1>Không thể mở gia phả</h1>
         <p>Gia phả không tồn tại hoặc bạn không có quyền xem.</p>
-        <button className="button-secondary" onClick={() => graph.refetch()}>
+        <button
+          className={secondaryButtonClass}
+          onClick={() => graph.refetch()}
+        >
           Thử lại
         </button>
         <Link to="/trees">Về danh sách</Link>
@@ -164,20 +171,30 @@ export function FamilyTreePage() {
     );
 
   return (
-    <main className={`family-tree-page ${selectedOpen ? "sidebar-open" : ""}`}>
-      <header className="tree-toolbar">
-        <nav aria-label="Breadcrumb">
-          <Link to="/trees">Danh sách gia phả</Link>
+    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_1fr] overflow-hidden bg-[#edf2ee] text-[#18332e]">
+      <header className="z-3 flex flex-col items-start justify-between gap-4 border-b border-[#cad7d0] bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem] min-[801px]:flex-row min-[801px]:items-center">
+        <nav
+          className="flex min-w-0 items-center gap-[0.55rem]"
+          aria-label="Breadcrumb"
+        >
+          <Link className="whitespace-nowrap text-[#8a5c22] no-underline" to="/trees">
+            Danh sách gia phả
+          </Link>
           <span>/</span>
-          <strong>{graph.data.tree.name}</strong>
+          <strong className="truncate">{graph.data.tree.name}</strong>
         </nav>
-        <div>
+        <div className="flex w-full items-center justify-between gap-[1.2rem] text-[0.84rem] text-[#5d7167] min-[801px]:w-auto">
           <span>{graph.data.tree.personCount} thành viên</span>
         </div>
       </header>
-      <section className="tree-canvas" aria-label="Sơ đồ gia phả tương tác">
+      <section
+        className={`relative min-h-0 min-w-0 transition-[margin-right] duration-250 ${selectedOpen ? "min-[801px]:mr-92" : ""}`}
+        aria-label="Sơ đồ gia phả tương tác"
+      >
         {!layoutReady && (
-          <div className="canvas-loading">Đang sắp xếp các thế hệ…</div>
+          <div className="absolute inset-0 z-4 grid place-items-center bg-[#edf2ee] text-outline">
+            Đang sắp xếp các thế hệ…
+          </div>
         )}
         <ReactFlow<FamilyTreeFlowNode, Edge>
           nodes={nodes}
@@ -201,23 +218,25 @@ export function FamilyTreePage() {
           nodesDraggable={false}
           proOptions={{ hideAttribution: true }}
         >
-          <details className="tree-legend-panel">
-            <summary>Chú thích quan hệ</summary>
-            <div>
-              <span>
-                <i className="legend-parent" /> Cha/mẹ – con
+          <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-[#29473f] shadow-[0_8px_24px_rgba(30,58,51,0.14)]">
+            <summary className="cursor-pointer p-[0.65rem_0.8rem] text-[0.78rem] font-bold [list-style-position:inside]">
+              Chú thích quan hệ
+            </summary>
+            <div className="grid gap-[0.55rem] px-[0.8rem] pb-[0.8rem]">
+              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                <i className={legendLineClass} /> Cha/mẹ – con
               </span>
-              <span>
-                <i className="legend-married" /> Kết hôn
+              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                <i className={`${legendLineClass} border-[#a96f25]`} /> Kết hôn
               </span>
-              <span>
-                <i className="legend-divorced" /> Ly hôn
+              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                <i className={`${legendLineClass} border-dashed border-[#b85b4b]`} /> Ly hôn
               </span>
-              <span>
-                <i className="legend-separated" /> Ly thân
+              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                <i className={`${legendLineClass} border-dotted border-[#c1842f]`} /> Ly thân
               </span>
-              <span>
-                <i className="legend-co-parents" /> Có con chung
+              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                <i className={`${legendLineClass} border-dotted border-[#788982]`} /> Có con chung
               </span>
             </div>
           </details>

@@ -6,6 +6,25 @@ import type {
   RelatedPerson,
 } from "@family-tree/shared-types";
 import { Link } from "react-router-dom";
+import { primaryButtonClass } from "../../lib/ui-classes";
+
+const sidebarClass =
+  "absolute right-0 bottom-0 left-0 top-[38%] z-10 overflow-y-auto rounded-t-2xl border-t border-[#c8d5ce] bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
+const closeButtonClass =
+  "absolute top-[0.8rem] right-[0.9rem] size-8 cursor-pointer rounded-full border-0 bg-[#e6ece8] text-xl text-[#314a42]";
+const profileClass =
+  "px-[1.8rem] pt-[0.8rem] pb-[1.25rem] text-center [&>p]:mt-[0.8rem] [&>p]:mb-[0.35rem] [&>p]:text-[0.67rem] [&>p]:font-bold [&>p]:tracking-[0.12em] [&>p]:text-[#a06e2b] [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.55rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-[#65786e]";
+const sectionClass =
+  "mt-[1.3rem] [&>h3]:mt-0 [&>h3]:mb-[0.6rem] [&>h3]:font-display [&>h3]:font-semibold [&>p]:leading-[1.55] [&>p]:text-[#61736a]";
+const treeListClass =
+  "grid gap-[0.45rem] [&>a]:rounded-[0.4rem] [&>a]:bg-[#edf2ef] [&>a]:p-[0.65rem] [&>a]:text-[0.82rem] [&>a]:font-bold [&>a]:text-[#47665c] [&>a]:no-underline";
+const emptyClass = "my-[0.35rem] text-[0.82rem]! text-[#71827a]!";
+const genderBorderClass: Record<RelatedPerson["gender"], string> = {
+  MALE: "border-l-[#4f8aa5]",
+  FEMALE: "border-l-[#b86e8d]",
+  OTHER: "border-l-[#7b8e85]",
+  UNKNOWN: "border-l-[#7b8e85]",
+};
 
 function displayDate(value: string | null, precision: DatePrecision | null) {
   if (!value) return null;
@@ -52,9 +71,6 @@ const genderLabel = (gender: RelatedPerson["gender"]) =>
         ? "Khác"
         : "Chưa rõ";
 
-const partnerRole = (gender: RelatedPerson["gender"]) =>
-  gender === "MALE" ? "Chồng" : gender === "FEMALE" ? "Vợ" : "Thành viên";
-
 function PersonButton({
   person,
   onSelect,
@@ -82,17 +98,31 @@ function PersonButton({
   return (
     <button
       type="button"
-      className={`relative-person relative-person-${person.gender.toLowerCase()} ${person.isDeceased ? "relative-person-deceased" : ""} ${role ? "relative-person-with-role" : ""}`}
+      className={`relative grid w-full min-w-0 cursor-pointer items-center gap-[0.45rem] rounded-none border-0 border-l-[3px] bg-transparent px-[0.7rem] py-[0.48rem] text-left text-[#29473f] hover:bg-[#e5ede9] focus-visible:bg-[#e5ede9] focus-visible:outline-none ${genderBorderClass[person.gender]} ${role ? "grid-cols-[4.7rem_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]"} ${person.isDeceased ? "bg-[repeating-linear-gradient(-45deg,rgba(111,123,117,0.045),rgba(111,123,117,0.045)_5px,transparent_5px,transparent_10px)] text-[#66736d] saturate-[.62]" : ""}`}
       onClick={() => onSelect(person.id)}
       aria-label={accessibleDetails}
     >
-      {role && <span className="relative-role">{role}</span>}
-      <span className="relative-person-copy">
-        <strong>{person.preferredName ?? person.fullName}</strong>
-        {context && <small>{context}</small>}
+      {role && (
+        <span className="text-[0.7rem] font-semibold text-[#71827a]">
+          {role}
+        </span>
+      )}
+      <span className="grid min-w-0 gap-[0.12rem]">
+        <strong className="truncate text-[0.76rem] font-bold text-[#29473f]">
+          {person.preferredName ?? person.fullName}
+        </strong>
+        {context && (
+          <small className="truncate text-[0.63rem] font-medium text-[#788a81]">
+            {context}
+          </small>
+        )}
       </span>
-      <span className="relative-person-meta">
-        {year && <small className="relative-birth-year">{year}</small>}
+      <span className="flex shrink-0 items-center justify-end gap-1">
+        {year && (
+          <small className="text-[0.61rem] font-semibold text-[#60746a] tabular-nums">
+            {year}
+          </small>
+        )}
       </span>
     </button>
   );
@@ -121,10 +151,10 @@ function FamilyConnections({
   );
 
   return (
-    <section className="sidebar-section family-connections">
+    <section className={`${sectionClass} pt-[0.3rem]`}>
       <h3>Người thân</h3>
       {parents.length || partnerFamilies.length || children.length ? (
-        <div className="family-relatives-card">
+        <div className="overflow-hidden rounded-[0.55rem] border border-[#dce5e0] bg-[#f4f7f5]">
           {parents.map(({ person: parent, parentKind }) => {
             const role =
               parent.gender === "MALE"
@@ -143,8 +173,10 @@ function FamilyConnections({
           })}
 
           {partnerFamilies.length > 0 && (
-            <div className="relative-section">
-              <h4>Vợ/chồng</h4>
+            <div className="border-t border-[#d9e3dd] pt-[0.15rem]">
+              <h4 className="m-0 px-3 pt-[0.65rem] pb-1 text-[0.68rem] tracking-[0.07em] text-[#60746a] uppercase">
+                Vợ/chồng
+              </h4>
               {partnerFamilies.map((family) => (
                 <PersonButton
                   key={family.partner!.id}
@@ -157,8 +189,10 @@ function FamilyConnections({
           )}
 
           {children.length > 0 && (
-            <div className="relative-section">
-              <h4>Con cái</h4>
+            <div className="border-t border-[#d9e3dd] pt-[0.15rem]">
+              <h4 className="m-0 px-3 pt-[0.65rem] pb-1 text-[0.68rem] tracking-[0.07em] text-[#60746a] uppercase">
+                Con cái
+              </h4>
               {children.map(({ child, partner, key }) => (
                 <PersonButton
                   key={key}
@@ -176,7 +210,7 @@ function FamilyConnections({
           )}
         </div>
       ) : (
-        <p className="relative-empty">Chưa có thông tin người thân.</p>
+        <p className={emptyClass}>Chưa có thông tin người thân.</p>
       )}
     </section>
   );
@@ -213,20 +247,24 @@ export function PersonSidebar({
     : [];
 
   return (
-    <aside className="person-sidebar" aria-label="Thông tin thành viên">
+    <aside className={sidebarClass} aria-label="Thông tin thành viên">
       <button
-        className="sidebar-close"
+        className={closeButtonClass}
         type="button"
         onClick={onClose}
         aria-label="Đóng"
       >
         ×
       </button>
-      {loading && <div className="sidebar-loading">Đang tải thông tin…</div>}
+      {loading && (
+        <div className="grid min-h-60 place-items-center text-[#61736a]">
+          Đang tải thông tin…
+        </div>
+      )}
       {!loading && person && (
         <>
-          <div className="sidebar-profile">
-            <div className="sidebar-avatar">
+          <div className={profileClass}>
+            <div className="mx-auto grid size-20 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-[2rem] font-semibold text-[#36584e] [&_img]:size-full [&_img]:object-cover">
               {person.avatarUrl ? (
                 <img src={person.avatarUrl} alt="" />
               ) : (
@@ -237,24 +275,27 @@ export function PersonSidebar({
             <h2>{person.fullName}</h2>
             {person.preferredName && <span>{person.preferredName}</span>}
           </div>
-          <dl className="sidebar-details">
+          <dl className="m-0 border-t border-[#dae3de]">
             {rows.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
+              <div
+                className="grid grid-cols-[7rem_1fr] gap-[0.7rem] border-b border-[#e2e8e4] py-[0.65rem]"
+                key={label}
+              >
+                <dt className="text-[0.78rem] text-[#71827a]">{label}</dt>
+                <dd className="m-0 text-[0.84rem] font-semibold">{value}</dd>
               </div>
             ))}
           </dl>
           <FamilyConnections person={person} onSelectPerson={onSelectPerson} />
           {person.biography && (
-            <section className="sidebar-section">
+            <section className={sectionClass}>
               <h3>Tiểu sử</h3>
               <p>{person.biography}</p>
             </section>
           )}
-          <section className="sidebar-section">
+          <section className={sectionClass}>
             <h3>Thuộc các gia phả</h3>
-            <div className="sidebar-tree-list">
+            <div className={treeListClass}>
               {person.visibleTrees.map((tree) => (
                 <Link
                   key={tree.id}
@@ -266,7 +307,7 @@ export function PersonSidebar({
             </div>
           </section>
           <button
-            className="button-primary sidebar-detail-button"
+            className={`${primaryButtonClass} mt-[1.4rem] w-full`}
             type="button"
             disabled
             title="Sắp ra mắt"
@@ -296,38 +337,41 @@ export function RelationshipSidebar({
 }) {
   return (
     <aside
-      className="person-sidebar relationship-sidebar"
+      className={sidebarClass}
       aria-label="Thông tin mối quan hệ"
     >
       <button
-        className="sidebar-close"
+        className={closeButtonClass}
         type="button"
         onClick={onClose}
         aria-label="Đóng"
       >
         ×
       </button>
-      <div className="sidebar-profile relationship-profile">
+      <div className={`${profileClass} pt-[2.4rem]`}>
         <p>MỐI QUAN HỆ</p>
         <h2>{statusLabel(status)}</h2>
       </div>
-      <section className="sidebar-section">
-        <h3>Hai thành viên</h3>
-        <div className="relationship-people">
-          <div className="relationship-member">
-            <span>{partnerRole(first.gender)}</span>
-            <PersonButton person={first} onSelect={onSelectPerson} />
-          </div>
-          <span>—</span>
-          <div className="relationship-member">
-            <span>{partnerRole(second.gender)}</span>
-            <PersonButton person={second} onSelect={onSelectPerson} />
-          </div>
+      <section className={sectionClass}>
+        <h3>Vợ/chồng</h3>
+        <div
+          className={`${treeListClass} overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]`}
+        >
+          <PersonButton
+            person={first}
+            onSelect={onSelectPerson}
+          />
+          <PersonButton
+            person={second}
+            onSelect={onSelectPerson}
+          />
         </div>
       </section>
-      <section className="sidebar-section">
+      <section className={sectionClass}>
         <h3>Con chung</h3>
-        <div className="sidebar-tree-list">
+        <div
+          className={`${treeListClass} overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]`}
+        >
           {children.length ? (
             children.map((child) => (
               <PersonButton
@@ -337,7 +381,7 @@ export function RelationshipSidebar({
               />
             ))
           ) : (
-            <p className="relative-empty">Chưa có thông tin con chung.</p>
+            <p className={emptyClass}>Chưa có thông tin con chung.</p>
           )}
         </div>
       </section>

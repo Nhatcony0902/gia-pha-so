@@ -9,6 +9,20 @@ export type FamilyFlowNode = Node<FamilyPersonNodeData, "person">;
 const year = (date: string | null) =>
   date ? new Date(date).getUTCFullYear() : null;
 
+const genderBorderClass: Record<PersonNode["gender"], string> = {
+  MALE: "border-l-[7px] border-l-[#4f8aa5]",
+  FEMALE: "border-l-[7px] border-l-[#b86e8d]",
+  OTHER: "border-l-[7px] border-l-[#7b8e85]",
+  UNKNOWN: "border-l-[7px] border-l-[#7b8e85]",
+};
+
+function nodeBackgroundClass(isDeceased: boolean, isSelected: boolean) {
+  if (!isDeceased) return isSelected ? "bg-[#e5ede9] outline-none" : "bg-white";
+  return isSelected
+    ? "[background:repeating-linear-gradient(-45deg,rgba(111,123,117,0.055),rgba(111,123,117,0.055)_5px,transparent_5px,transparent_10px),#e5ede9] saturate-62 outline-none"
+    : "[background:repeating-linear-gradient(-45deg,rgba(111,123,117,0.055),rgba(111,123,117,0.055)_5px,transparent_5px,transparent_10px),#f4f7f5] saturate-62";
+}
+
 export function FamilyPersonNode({ data: person }: NodeProps<FamilyFlowNode>) {
   const initials = person.fullName
     .split(/\s+/)
@@ -27,7 +41,7 @@ export function FamilyPersonNode({ data: person }: NodeProps<FamilyFlowNode>) {
     .join(" – ");
   return (
     <article
-      className={`family-node family-node-${person.gender.toLowerCase()} ${person.isDeceased ? "family-node-deceased" : ""} ${person.selectedPerson ? "family-node-selected" : ""}`}
+      className={`family-node flex min-h-22 w-[220px] items-center gap-[0.8rem] rounded-[0.7rem] border-2 border-[#869e93] p-3 text-[#18332e] shadow-[0_8px_20px_rgba(30,58,51,0.14)] transition-[transform,background-color,box-shadow,border-color] duration-180 ${genderBorderClass[person.gender]} ${nodeBackgroundClass(person.isDeceased, person.selectedPerson)}`}
       aria-label={`${person.fullName}, ${genderLabel}${person.isDeceased ? ", đã mất" : ""}`}
     >
       <Handle id="child-target" type="target" position={Position.Top} />
@@ -43,16 +57,22 @@ export function FamilyPersonNode({ data: person }: NodeProps<FamilyFlowNode>) {
         position={Position.Left}
         className="family-horizontal-handle"
       />
-      <div className="family-node-avatar">
+      <div className="grid size-[2.8rem] shrink-0 place-items-center overflow-hidden rounded-full bg-[#dce7e1] font-bold text-[#36584e] [&_img]:size-full [&_img]:object-cover">
         {person.avatarUrl ? <img src={person.avatarUrl} alt="" /> : initials}
       </div>
-      <div className="family-node-copy">
-        <strong>{person.preferredName ?? person.fullName}</strong>
-        <span>
+      <div className="grid min-w-0 gap-[0.18rem]">
+        <strong className="truncate text-[0.88rem]">
+          {person.preferredName ?? person.fullName}
+        </strong>
+        <span className="text-[0.72rem] text-[#61736a]">
           {genderLabel}
           {lifespan ? ` · ${lifespan}` : ""}
         </span>
-        {person.isDeceased && <small>Đã mất</small>}
+        {person.isDeceased && (
+          <small className="w-fit rounded-2xl bg-[#d7ddda] px-[0.36rem] py-[0.12rem] text-[0.63rem] text-[#52635b]">
+            Đã mất
+          </small>
+        )}
       </div>
       <Handle
         id="pair-target-right"

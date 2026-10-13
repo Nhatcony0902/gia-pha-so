@@ -8,6 +8,10 @@ import { z } from "zod";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import { ApiError, publicApi } from "../lib/api/client";
+import {
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "../lib/ui-classes";
 
 type Mode = "login" | "register" | "forgot-password";
 const emailSchema = z.string().email("Email không hợp lệ");
@@ -47,6 +51,12 @@ type EmailInput = z.infer<typeof emailFormSchema>;
 type OtpInput = z.infer<typeof otpSchema>;
 type ResetInput = z.infer<typeof resetSchema>;
 
+const textButtonClass =
+  "cursor-pointer border-0 bg-transparent py-[0.35rem] font-bold text-[#8a5c22]";
+const authSubtitleClass = "mt-0 mb-6 leading-[1.55] text-[#61736a]";
+const tabClass =
+  "cursor-pointer border-0 border-b-2 border-transparent bg-transparent p-[0.85rem] font-bold text-[#6b7d74]";
+
 function Field({
   label,
   error,
@@ -57,10 +67,14 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="form-field">
+    <label className="my-4 grid gap-[0.45rem] text-sm font-semibold [&_input]:min-h-12 [&_input]:w-full [&_input]:rounded-lg [&_input]:border [&_input]:border-[#b9c8c0] [&_input]:bg-white [&_input]:px-[0.85rem] [&_input]:py-[0.7rem] [&_input]:text-[#152824] [&_input]:outline-none [&_input]:focus:border-[#9b6928] [&_input]:focus:shadow-[0_0_0_3px_rgba(178,125,49,0.15)]">
       <span>{label}</span>
       {children}
-      {error && <small role="alert">{error}</small>}
+      {error && (
+        <small className="font-medium text-[#b43b2d]" role="alert">
+          {error}
+        </small>
+      )}
     </label>
   );
 }
@@ -73,7 +87,7 @@ function SubmitButton({
 }) {
   return (
     <button
-      className="button-primary submit-button"
+      className={`${primaryButtonClass} mt-[0.65rem] w-full`}
       disabled={busy}
       type="submit"
     >
@@ -159,26 +173,33 @@ export function AuthPage() {
   if (!isInitializing && isAuthenticated)
     return <Navigate to="/trees" replace />;
   return (
-    <main className="auth-page">
-      <section className="auth-intro">
-        <p className="auth-eyebrow">DIGITAL FAMILY TREE / FOUNDATION</p>
-        <h1>Giữ mạch nguồn, kể tiếp câu chuyện.</h1>
-        <p>
+    <main className="grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
+      <section className="flex flex-col justify-center px-5 pt-10 pb-4 min-[801px]:p-[clamp(3rem,8vw,8rem)]">
+        <p className="text-xs font-bold tracking-[0.14em] text-accent">
+          DIGITAL FAMILY TREE / FOUNDATION
+        </p>
+        <h1 className="my-4 max-w-3xl font-display text-[2.45rem] leading-[1.02] min-[801px]:text-[clamp(2.5rem,5vw,5rem)]">
+          Giữ mạch nguồn, kể tiếp câu chuyện.
+        </h1>
+        <p className="max-w-2xl text-[1.08rem] leading-[1.7] text-content-secondary">
           Không gian số để lưu giữ thành viên, quan hệ và ký ức của dòng họ theo
           cách rõ ràng, có kiểm chứng.
         </p>
       </section>
-      <section className="auth-card" aria-labelledby="auth-title">
+      <section
+        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-[#f9fbfa] p-[clamp(1.5rem,4vw,2.4rem)] text-[#18332e] shadow-[0_24px_70px_rgba(0,0,0,0.28)] [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
+        aria-labelledby="auth-title"
+      >
         {mode !== "forgot-password" && !registerEmail && (
-          <div className="auth-tabs">
+          <div className="grid grid-cols-2 border-b border-[#d8e1dc]">
             <button
-              className={mode === "login" ? "active" : ""}
+              className={`${tabClass} ${mode === "login" ? "border-b-[#b27d31] text-[#18332e]" : ""}`}
               onClick={() => switchMode("login")}
             >
               Đăng nhập
             </button>
             <button
-              className={mode === "register" ? "active" : ""}
+              className={`${tabClass} ${mode === "register" ? "border-b-[#b27d31] text-[#18332e]" : ""}`}
               onClick={() => switchMode("register")}
             >
               Đăng ký
@@ -188,7 +209,7 @@ export function AuthPage() {
         {mode === "login" && (
           <>
             <h2 id="auth-title">Chào mừng trở lại</h2>
-            <p className="auth-subtitle">
+            <p className={authSubtitleClass}>
               Đăng nhập để tiếp tục với gia phả của bạn.
             </p>
             <form
@@ -225,7 +246,7 @@ export function AuthPage() {
                 />
               </Field>
               <button
-                className="text-button forgot-link"
+                className={`${textButtonClass} ml-auto block`}
                 type="button"
                 onClick={() => switchMode("forgot-password")}
               >
@@ -258,7 +279,7 @@ export function AuthPage() {
         {mode === "register" && !registerEmail && (
           <>
             <h2 id="auth-title">Tạo tài khoản</h2>
-            <p className="auth-subtitle">
+            <p className={authSubtitleClass}>
               Bắt đầu lưu giữ câu chuyện của gia đình bạn.
             </p>
             <form
@@ -377,14 +398,14 @@ export function AuthPage() {
         {mode === "forgot-password" && !resetEmail && (
           <>
             <button
-              className="back-link"
+              className={`${textButtonClass} mb-[0.3rem]`}
               type="button"
               onClick={() => switchMode("login")}
             >
               ← Quay lại đăng nhập
             </button>
             <h2 id="auth-title">Quên mật khẩu</h2>
-            <p className="auth-subtitle">
+            <p className={authSubtitleClass}>
               Nhập email của tài khoản đăng nhập bằng mật khẩu để nhận mã xác
               thực.
             </p>
@@ -456,7 +477,7 @@ export function AuthPage() {
         {mode === "forgot-password" && resetToken && (
           <>
             <h2 id="auth-title">Đặt mật khẩu mới</h2>
-            <p className="auth-subtitle">
+            <p className={authSubtitleClass}>
               Mật khẩu mới cần có ít nhất 8 ký tự, gồm chữ và số.
             </p>
             <form
@@ -517,10 +538,12 @@ function GoogleSection({
   const configured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   return (
     <>
-      <div className="auth-divider">
+      <div className="my-5 flex items-center gap-4 text-[0.8rem] text-[#788a81] before:h-px before:flex-1 before:bg-[#d8e1dc] after:h-px after:flex-1 after:bg-[#d8e1dc]">
         <span>hoặc</span>
       </div>
-      <div className={busy ? "google-disabled" : "google-button"}>
+      <div
+        className={`grid min-h-11 place-items-center overflow-hidden ${busy ? "pointer-events-none opacity-55" : ""}`}
+      >
         {configured ? (
           <GoogleLogin
             onSuccess={(response) =>
@@ -534,7 +557,7 @@ function GoogleSection({
         ) : (
           <button
             type="button"
-            className="button-secondary submit-button"
+            className={`${secondaryButtonClass} mt-[0.65rem] w-full`}
             disabled
           >
             Google chưa được cấu hình
@@ -566,24 +589,28 @@ function OtpPanel({
 }) {
   return (
     <>
-      <button className="back-link" type="button" onClick={onBack}>
+      <button
+        className={`${textButtonClass} mb-[0.3rem]`}
+        type="button"
+        onClick={onBack}
+      >
         ← Đổi email
       </button>
       <h2 id="auth-title">{title}</h2>
-      <p className="auth-subtitle">
+      <p className={authSubtitleClass}>
         Mã 6 chữ số đã được gửi tới <strong>{email}</strong>.
       </p>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Field label="Mã xác thực" error={form.formState.errors.code?.message}>
           <input
-            className="otp-input"
+            className="text-center! text-2xl! font-bold tracking-[0.55rem]"
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={6}
             {...form.register("code")}
           />
         </Field>
-        <p className="otp-timer">
+        <p className="text-center text-sm text-[#687a71]">
           {secondsLeft > 0
             ? `Mã hết hạn sau ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`
             : "Mã có thể đã hết hạn"}
@@ -591,7 +618,7 @@ function OtpPanel({
         <SubmitButton busy={busy}>Xác thực</SubmitButton>
         <button
           type="button"
-          className="text-button resend-button"
+          className={`${textButtonClass} mx-auto mt-[0.8rem] block disabled:cursor-not-allowed disabled:text-[#9ba8a2]`}
           disabled={busy || secondsLeft > 540}
           onClick={onResend}
         >
