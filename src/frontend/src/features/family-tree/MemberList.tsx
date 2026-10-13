@@ -5,10 +5,12 @@ import {
   ArrowUpAZ,
   Check,
   Columns3,
+  FilterX,
   ListFilter,
+  Minus,
   RotateCcw,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getTreePersons } from "./api";
 
 type Key = keyof PersonListItem;
@@ -65,6 +67,16 @@ type Filter = {
   values?: string[];
   sort?: "asc" | "desc";
 };
+const isFilterActive = (filter?: Filter) => {
+  if (!filter) return false;
+  return Boolean(
+    filter.sort ||
+      filter.mode === "empty" ||
+      filter.mode === "not-empty" ||
+      filter.values?.length ||
+      ((filter.mode ?? "contains") === "contains" && filter.text?.trim()),
+  );
+};
 const valueOf = (person: PersonListItem, key: Key) => person[key];
 const format = (value: unknown, column: Column) => {
   if (value === null || value === undefined || value === "") return "—";
@@ -89,6 +101,49 @@ const normalizeSearch = (value: unknown) =>
     .toLocaleLowerCase("vi")
     .trim();
 
+  const defaultColumnWidth = (key: Key) => (key === "fullName" ? 320 : 180);
+  const minColumnWidth = (key: Key) => (key === "fullName" ? 200 : 112);
+
+  function StyledCheckbox({
+    checked,
+    indeterminate = false,
+    onChange,
+    label,
+    className,
+  }: {
+    checked: boolean;
+    indeterminate?: boolean;
+    onChange: () => void;
+    label: ReactNode;
+    className: string;
+  }) {
+    return (
+      <label className={`flex cursor-pointer items-center gap-2 ${className}`}>
+        <input
+          type="checkbox"
+          checked={checked}
+          aria-checked={indeterminate ? "mixed" : checked}
+          ref={(input) => {
+            if (input) input.indeterminate = indeterminate;
+          }}
+          onChange={onChange}
+          className="peer sr-only"
+        />
+        <span
+          aria-hidden="true"
+          className={`grid size-4 shrink-0 place-items-center rounded-[4px] border border-[#8fa198] transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#52796e] ${checked || indeterminate ? "border-[#29473f] bg-[#29473f] text-white" : "bg-white text-transparent"}`}
+        >
+          {indeterminate ? (
+            <Minus size={12} strokeWidth={3} />
+          ) : (
+            <Check size={12} strokeWidth={3} />
+          )}
+        </span>
+        <span className="min-w-0">{label}</span>
+      </label>
+    );
+  }
+
 export function MemberList({
   treeId,
   onSelectPerson,
@@ -105,9 +160,20 @@ export function MemberList({
   const [visible, setVisible] = useState<Key[]>(
     columns.filter((column) => column.default).map((column) => column.key),
   );
+  const [draftVisible, setDraftVisible] = useState<Key[]>(visible);
+  const [columnWidths, setColumnWidths] = useState<Record<Key, number>>(() =>
+    Object.fromEntries(
+      columns.map((column) => [column.key, defaultColumnWidth(column.key)]),
+    ) as Record<Key, number>,
+  );
   const [filters, setFilters] = useState<Partial<Record<Key, Filter>>>({});
   const [open, setOpen] = useState<string | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const resizingColumn = useRef<{
+    key: Key;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
   useEffect(() => {
     const close = (event: PointerEvent) => {
       if (!popupRef.current?.contains(event.target as Node)) setOpen(null);
@@ -118,6 +184,11 @@ export function MemberList({
   const activeColumns = columns.filter((column) =>
     visible.includes(column.key),
   );
+  const activeFilterCount = columns.filter((column) =>
+    isFilterActive(filters[column.key]),
+  ).length;
+  const tableWidth =
+    64 + activeColumns.reduce((total, column) => total + columnWidths[column.key], 0);
   const rows = useMemo(() => {
     let result = [...(query.data?.persons ?? [])];
     for (const column of columns) {
@@ -169,11 +240,11 @@ export function MemberList({
     );
   return (
     <section
-      className={`min-h-0 overflow-auto bg-[#edf2ee] p-4 transition-[margin-right] duration-250 md:p-6 ${sidebarOpen ? "min-[801px]:mr-92" : ""}`}
+      className={`min-h-0 overflow-hidden bg-[#edf2ee] p-4 transition-[margin-right] duration-250 md:p-6 ${sidebarOpen ? "min-[801px]:mr-92" : ""}`}
       aria-label="Danh sách thành viên"
     >
-      <div className="mx-auto max-w-[95rem]">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[95rem] flex-col">
+        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="m-0 font-display text-2xl">Danh sách thành viên</h1>
             <p className="mt-1 mb-0 text-sm text-[#61736a]">
@@ -181,44 +252,108 @@ export function MemberList({
               viên
             </p>
           </div>
-          <div
-            className="relative"
-            ref={open === "columns" ? popupRef : undefined}
-          >
-            <button
-              type="button"
-              onClick={() => setOpen(open === "columns" ? null : "columns")}
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#b9cac1] bg-white px-3 py-2 text-sm font-bold text-[#29473f]"
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="relative"
+              ref={open === "columns" ? popupRef : undefined}
             >
-              <Columns3 size={17} /> Chọn cột
-            </button>
-            {open === "columns" && (
-              <div className="absolute top-full right-0 z-20 mt-2 grid max-h-96 w-64 gap-1 overflow-auto rounded-xl border border-[#c8d5ce] bg-white p-2 shadow-xl">
-                {columns.map((column) => (
-                  <label
-                    key={column.key}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-[#edf2ef]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visible.includes(column.key)}
+              <button
+                type="button"
+                onClick={() => {
+                  if (open === "columns") {
+                    setOpen(null);
+                    return;
+                  }
+                  setDraftVisible(visible);
+                  setOpen("columns");
+                }}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#b9cac1] bg-white px-3 py-2 text-sm font-bold text-[#29473f] transition-colors hover:bg-[#edf2ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#52796e]"
+              >
+                <Columns3 size={17} /> Chọn cột
+              </button>
+              {open === "columns" && (
+                <div className="absolute top-full right-0 z-20 mt-2 flex max-h-96 w-72 flex-col rounded-xl border border-[#c8d5ce] bg-white p-2 shadow-xl">
+                <div className="grid min-h-0 gap-1 overflow-auto">
+                  <StyledCheckbox
+                    className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-[#edf2ef]"
+                    checked={draftVisible.length === columns.length}
+                    indeterminate={
+                      draftVisible.length > 0 && draftVisible.length < columns.length
+                    }
+                    onChange={() =>
+                      setDraftVisible(
+                        draftVisible.length === columns.length
+                          ? []
+                          : columns.map((column) => column.key),
+                      )
+                    }
+                    label="Chọn tất cả"
+                  />
+                  {columns.map((column) => (
+                    <StyledCheckbox
+                      key={column.key}
+                      className="rounded-lg px-2 py-2 text-sm hover:bg-[#edf2ef]"
+                      checked={draftVisible.includes(column.key)}
                       onChange={() =>
-                        setVisible((current) =>
+                        setDraftVisible((current) =>
                           current.includes(column.key)
                             ? current.filter((key) => key !== column.key)
                             : [...current, column.key],
                         )
                       }
+                      label={column.label}
                     />
-                    {column.label}
-                  </label>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-end border-t border-[#e4ebe7] pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVisible(draftVisible);
+                      setFilters((current) => {
+                        const next = { ...current };
+                        for (const column of columns) {
+                          if (!draftVisible.includes(column.key)) {
+                            delete next[column.key];
+                          }
+                        }
+                        return next;
+                      });
+                      setOpen(null);
+                    }}
+                    className="rounded-lg bg-[#29473f] px-4 py-2 text-sm font-bold text-white hover:bg-[#203b34]"
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              aria-label={`Xóa tất cả bộ lọc; ${activeFilterCount} bộ lọc đang áp dụng`}
+              onClick={() => {
+                setFilters({});
+                setOpen(null);
+              }}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#b9cac1] bg-white px-3 py-2 text-sm font-bold text-[#29473f] transition-colors hover:bg-[#edf2ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#52796e]"
+            >
+              <FilterX size={16} />
+              <span>Xóa bộ lọc ({activeFilterCount})</span>
+            </button>
           </div>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-[#c8d5ce] bg-white shadow-[0_10px_30px_rgba(27,54,47,0.08)]">
-          <table className="w-full min-w-max border-collapse text-left text-sm">
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[#c8d5ce] bg-white shadow-[0_10px_30px_rgba(27,54,47,0.08)]">
+          <table
+            className="table-fixed border-collapse text-left text-sm"
+            style={{ width: "100%", minWidth: tableWidth }}
+          >
+            <colgroup>
+              <col style={{ width: 64 }} />
+              {activeColumns.map((column) => (
+                <col key={column.key} style={{ width: columnWidths[column.key] }} />
+              ))}
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-[#e3ebe7] text-[#29473f]">
               <tr>
                 <th className="w-16 px-4 py-3 text-center">STT</th>
@@ -227,28 +362,96 @@ export function MemberList({
                     key={column.key}
                     className="relative border-l border-[#cad7d0] px-4 py-3"
                   >
-                    <span className="flex items-center gap-2">
-                      {column.label}
+                    <span className="flex min-w-0 items-center justify-between gap-2 pr-1">
+                      <span className="min-w-0 truncate" title={column.label}>
+                        {column.label}
+                      </span>
                       <button
                         type="button"
                         aria-label={`Lọc cột ${column.label}`}
                         onClick={() =>
                           setOpen(open === column.key ? null : column.key)
                         }
-                        className={`grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent hover:bg-white ${filters[column.key] ? "text-[#a06e2b]" : "text-[#60746a]"}`}
+                        className={`grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent hover:bg-white ${isFilterActive(filters[column.key]) ? "text-[#a06e2b]" : "text-[#60746a]"}`}
                       >
                         <ListFilter size={15} />
                       </button>
                     </span>
+                    <button
+                      type="button"
+                      aria-label={`Thay đổi độ rộng cột ${column.label}`}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        resizingColumn.current = {
+                          key: column.key,
+                          startX: event.clientX,
+                          startWidth: columnWidths[column.key],
+                        };
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                      }}
+                      onPointerMove={(event) => {
+                        const resize = resizingColumn.current;
+                        if (!resize || resize.key !== column.key) return;
+                        const nextWidth = Math.max(
+                          minColumnWidth(column.key),
+                          resize.startWidth + event.clientX - resize.startX,
+                        );
+                        setColumnWidths((current) => ({
+                          ...current,
+                          [column.key]: nextWidth,
+                        }));
+                      }}
+                      onPointerUp={() => {
+                        resizingColumn.current = null;
+                      }}
+                      onLostPointerCapture={() => {
+                        resizingColumn.current = null;
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight")
+                          return;
+                        event.preventDefault();
+                        const delta = event.key === "ArrowRight" ? 16 : -16;
+                        setColumnWidths((current) => ({
+                          ...current,
+                          [column.key]: Math.max(
+                            minColumnWidth(column.key),
+                            current[column.key] + delta,
+                          ),
+                        }));
+                      }}
+                      className="absolute top-0 right-0 z-10 h-full w-2 cursor-col-resize touch-none border-0 bg-transparent p-0 after:absolute after:top-1/4 after:right-0.5 after:h-1/2 after:w-px after:bg-[#aebfb6] hover:after:bg-[#52796e] focus-visible:outline-2 focus-visible:outline-[#52796e]"
+                    />
                     {open === column.key && (
                       <ColumnPopup
                         column={column}
                         value={filters[column.key] ?? {}}
                         onChange={(value) =>
-                          setFilters((current) => ({
-                            ...current,
-                            [column.key]: value,
-                          }))
+                          setFilters((current) => {
+                            const next = { ...current };
+                            if (Object.keys(value).length === 0) {
+                              delete next[column.key];
+                            } else {
+                              next[column.key] = value;
+                            }
+                            if (value.sort) {
+                              for (const otherColumn of columns) {
+                                if (otherColumn.key === column.key) continue;
+                                const otherFilter = next[otherColumn.key];
+                                if (!otherFilter?.sort) continue;
+
+                                const withoutSort = { ...otherFilter };
+                                delete withoutSort.sort;
+                                if (isFilterActive(withoutSort)) {
+                                  next[otherColumn.key] = withoutSort;
+                                } else {
+                                  delete next[otherColumn.key];
+                                }
+                              }
+                            }
+                            return next;
+                          })
                         }
                         onClose={() => setOpen(null)}
                         popupRef={popupRef}
@@ -275,28 +478,33 @@ export function MemberList({
                   {activeColumns.map((column) => (
                     <td
                       key={column.key}
-                      className="max-w-72 border-l border-[#edf1ef] px-4 py-3"
+                      className="min-w-0 overflow-hidden border-l border-[#edf1ef] px-4 py-3"
                     >
-                      <span className="block truncate">
-                        {column.key === "fullName" ? (
-                          <span className="flex items-center gap-2">
-                            {person.avatarUrl ? (
-                              <img
-                                src={person.avatarUrl}
-                                alt=""
-                                className="size-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <span className="grid size-8 place-items-center rounded-full bg-[#dbe6e0] font-bold">
-                                {person.fullName[0]}
-                              </span>
-                            )}
-                            <strong>{person.fullName}</strong>
-                          </span>
-                        ) : (
-                          format(valueOf(person, column.key), column)
-                        )}
-                      </span>
+                      {column.key === "fullName" ? (
+                        <span className="flex min-w-0 items-center gap-2">
+                          {person.avatarUrl ? (
+                            <img
+                              src={person.avatarUrl}
+                              alt=""
+                              className="size-8 shrink-0 rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#dbe6e0] font-bold">
+                              {person.fullName[0]}
+                            </span>
+                          )}
+                          <strong className="min-w-0 truncate" title={person.fullName}>
+                            {person.fullName}
+                          </strong>
+                        </span>
+                      ) : (
+                        <span
+                          className="block truncate"
+                          title={format(valueOf(person, column.key), column)}
+                        >
+                          {format(valueOf(person, column.key), column)}
+                        </span>
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -344,14 +552,14 @@ function ColumnPopup({
         <button
           type="button"
           onClick={() => setDraft({ ...draft, sort: "asc" })}
-          className={`flex items-center justify-center gap-1 rounded-lg border px-2 py-2 ${draft.sort === "asc" ? "border-[#a06e2b] bg-[#fff8ec]" : "border-[#d6e0db] bg-white"}`}
+          className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 py-2 ${draft.sort === "asc" ? "border-[#a06e2b] bg-[#fff8ec]" : "border-[#d6e0db] bg-white"}`}
         >
           <ArrowDownAZ size={15} /> Tăng dần
         </button>
         <button
           type="button"
           onClick={() => setDraft({ ...draft, sort: "desc" })}
-          className={`flex items-center justify-center gap-1 rounded-lg border px-2 py-2 ${draft.sort === "desc" ? "border-[#a06e2b] bg-[#fff8ec]" : "border-[#d6e0db] bg-white"}`}
+          className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 py-2 ${draft.sort === "desc" ? "border-[#a06e2b] bg-[#fff8ec]" : "border-[#d6e0db] bg-white"}`}
         >
           <ArrowUpAZ size={15} /> Giảm dần
         </button>
@@ -362,24 +570,20 @@ function ColumnPopup({
       {column.enumValues ? (
         <div className="grid gap-1">
           {column.enumValues.map(([key, label]) => (
-            <label
+            <StyledCheckbox
               key={key}
-              className="flex items-center gap-2 rounded-md p-1.5 hover:bg-[#edf2ef]"
-            >
-              <input
-                type="checkbox"
-                checked={draft.values?.includes(key) ?? false}
-                onChange={() =>
-                  setDraft({
-                    ...draft,
-                    values: draft.values?.includes(key)
-                      ? draft.values.filter((item) => item !== key)
-                      : [...(draft.values ?? []), key],
-                  })
+              className="rounded-md p-1.5 text-sm hover:bg-[#edf2ef]"
+              checked={draft.values?.includes(key) ?? false}
+              onChange={() =>
+                setDraft({
+                  ...draft,
+                  values: draft.values?.includes(key)
+                    ? draft.values.filter((item) => item !== key)
+                    : [...(draft.values ?? []), key],
+                })
                 }
-              />
-              {label}
-            </label>
+              label={label}
+            />
           ))}
         </div>
       ) : (
@@ -389,7 +593,7 @@ function ColumnPopup({
             onChange={(event) =>
               setDraft({ ...draft, mode: event.target.value as Filter["mode"] })
             }
-            className="w-full rounded-lg border border-[#c8d5ce] bg-white p-2"
+            className="w-full cursor-pointer rounded-lg border border-[#c8d5ce] bg-white p-2"
           >
             <option value="contains">Có chứa</option>
             <option value="empty">Để trống</option>
@@ -403,12 +607,12 @@ function ColumnPopup({
                 setDraft({ ...draft, text: event.target.value })
               }
               placeholder="Nhập nội dung…"
-              className="mt-2 w-full rounded-lg border border-[#c8d5ce] p-2"
+              className="mt-3 w-full rounded-lg border border-[#c8d5ce] p-2 focus:border-[#52796e] focus:outline-none focus:ring-0"
             />
           )}
         </>
       )}
-      <div className="mt-4 flex justify-between gap-2">
+      <div className="mt-4 flex justify-end gap-2">
         <button
           type="button"
           onClick={() => {
@@ -416,7 +620,7 @@ function ColumnPopup({
             onChange({});
             onClose();
           }}
-          className="flex items-center gap-1 rounded-lg border-0 bg-transparent px-2 py-2 text-[#687a71]"
+          className="flex cursor-pointer items-center gap-1 rounded-lg border border-[#c8d5ce] bg-white px-2 py-2 text-[#687a71] transition-colors hover:border-[#aabdb3] hover:bg-[#edf2ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#52796e]"
         >
           <RotateCcw size={14} /> Đặt lại
         </button>
@@ -426,7 +630,7 @@ function ColumnPopup({
             onChange(draft);
             onClose();
           }}
-          className="flex items-center gap-1 rounded-lg border-0 bg-[#29473f] px-3 py-2 font-bold text-white"
+          className="flex cursor-pointer items-center gap-1 rounded-lg border-0 bg-[#29473f] px-3 py-2 font-bold text-white"
         >
           <Check size={14} /> Áp dụng
         </button>
