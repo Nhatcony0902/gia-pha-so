@@ -1,0 +1,1 @@
+ALTER TYPE "MarriageStatus" ADD VALUE 'SEPARATED';

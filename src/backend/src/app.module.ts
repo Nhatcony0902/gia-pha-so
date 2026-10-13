@@ -5,6 +5,7 @@ import { DatabaseModule } from "./modules/database/database.module.js";
 import { HealthModule } from "./modules/health/health.module.js";
 import { AuthModule } from "./modules/auth/auth.module.js";
 import { MailModule } from "./modules/mail/mail.module.js";
+import { TreesModule } from "./modules/trees/trees.module.js";
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { MailModule } from "./modules/mail/mail.module.js";
     DatabaseModule,
     MailModule,
     AuthModule,
+    TreesModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

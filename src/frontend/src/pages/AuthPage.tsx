@@ -133,7 +133,9 @@ export function AuthPage() {
     notifications.toast(message, "success");
     const returnTo = params.get("returnTo");
     navigate(
-      returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/",
+      returnTo?.startsWith("/") && !returnTo.startsWith("//")
+        ? returnTo
+        : "/trees",
       { replace: true },
     );
   };
@@ -154,7 +156,8 @@ export function AuthPage() {
     }
   };
 
-  if (!isInitializing && isAuthenticated) return <Navigate to="/" replace />;
+  if (!isInitializing && isAuthenticated)
+    return <Navigate to="/trees" replace />;
   return (
     <main className="auth-page">
       <section className="auth-intro">

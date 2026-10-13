@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --skip-seed",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@family-tree/shared-types": "*",

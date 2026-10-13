@@ -66,6 +66,13 @@ export function Navbar() {
           )}
           {user && (
             <div className="user-menu">
+              <Link
+                className="nav-link"
+                to="/trees"
+                onClick={() => setOpen(false)}
+              >
+                Gia phả
+              </Link>
               <span className="avatar">
                 {user.avatarUrl ? (
                   <img

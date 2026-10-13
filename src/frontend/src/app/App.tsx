@@ -7,6 +7,9 @@ import { AuthProvider } from "./providers/AuthProvider";
 import { AppLayout } from "./AppLayout";
 import { AuthPage } from "../pages/AuthPage";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { ProtectedRoute } from "./ProtectedRoute";
+import { TreesPage } from "../pages/TreesPage";
+import { FamilyTreePage } from "../pages/FamilyTreePage";
 
 export function App() {
   return (
@@ -21,6 +24,22 @@ export function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/auth" element={<AuthPage />} />
+                  <Route
+                    path="/trees"
+                    element={
+                      <ProtectedRoute>
+                        <TreesPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId"
+                    element={
+                      <ProtectedRoute>
+                        <FamilyTreePage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>
               </Routes>
