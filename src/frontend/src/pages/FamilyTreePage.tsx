@@ -52,7 +52,7 @@ import { compactPrimaryButtonClass } from "../lib/ui-classes";
 const nodeTypes = { person: FamilyPersonNode, junction: FamilyJunctionNode };
 const routeStateClass =
   "grid min-h-[calc(100vh-4.5rem)] place-content-center justify-items-center gap-[0.8rem] bg-[#17302b] p-4 text-center text-content-primary [&>h1]:m-0 [&>p]:m-0 [&>a]:text-accent";
-const legendLineClass = "h-0 w-8 border-t-2 border-[#52796e]";
+const legendLineClass = "h-0 w-8 border-t-2 border-focus";
 
 export function FamilyTreePage({
   view,
@@ -233,7 +233,7 @@ export function FamilyTreePage({
   if (graph.isLoading)
     return (
       <main className={routeStateClass}>
-        <div className="size-10 animate-[spin_0.8s_linear_infinite] rounded-full border-[3px] border-[#52796e] border-t-accent" />
+        <div className="size-10 animate-[spin_0.8s_linear_infinite] rounded-full border-[3px] border-focus border-t-accent" />
         <p>Đang dựng sơ đồ gia phả…</p>
       </main>
     );
@@ -253,8 +253,8 @@ export function FamilyTreePage({
     );
 
   return (
-    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#edf2ee] text-[#18332e]">
-      <header className="z-3 flex flex-col items-start justify-between gap-4 border-b border-[#cad7d0] bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem] min-[801px]:flex-row min-[801px]:items-center">
+    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-surface-page text-ink">
+      <header className="z-3 flex flex-col items-start justify-between gap-4 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem] min-[801px]:flex-row min-[801px]:items-center">
         <Breadcrumbs
           items={[
             { label: "Trang chủ", to: "/" },
@@ -307,7 +307,7 @@ export function FamilyTreePage({
             aria-label="Sơ đồ gia phả tương tác"
           >
             {!layoutReady && (
-              <div className="absolute inset-0 z-4 grid place-items-center bg-[#edf2ee] text-outline">
+              <div className="absolute inset-0 z-4 grid place-items-center bg-surface-page text-outline">
                 Đang sắp xếp các thế hệ…
               </div>
             )}
@@ -333,7 +333,7 @@ export function FamilyTreePage({
               nodesDraggable={false}
               proOptions={{ hideAttribution: true }}
             >
-              <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-[#29473f] shadow-[0_8px_24px_rgba(30,58,51,0.14)]">
+              <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-ink-strong shadow-[0_8px_24px_rgba(30,58,51,0.14)]">
                 <summary className="cursor-pointer p-[0.65rem_0.8rem] text-[0.78rem] font-bold [list-style-position:inside]">
                   Chú thích quan hệ
                 </summary>

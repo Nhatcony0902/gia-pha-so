@@ -27,10 +27,10 @@ export function NotFoundPage() {
             <p className="text-accent tracking-eyebrow font-sans text-xs font-bold">
               LỖI 404
             </p>
-            <h1 className="mt-5 font-display text-5xl leading-tight font-semibold text-balance sm:text-6xl lg:text-7xl">
+            <h1 className="mt-5 font-display text-4xl leading-tight font-semibold text-balance sm:text-5xl lg:text-6xl">
               Không tìm thấy trang
             </h1>
-            <p className="text-content-secondary mt-6 max-w-xl font-sans text-lg leading-relaxed sm:text-xl">
+            <p className="text-content-secondary mt-5 max-w-xl font-sans text-base leading-relaxed sm:text-lg">
               Trang bạn đang tìm không tồn tại hoặc đã được di chuyển.
             </p>
 
@@ -45,10 +45,10 @@ export function NotFoundPage() {
           </div>
 
           <div
-            className="relative mx-auto aspect-square w-full max-w-md"
+            className="relative mx-auto aspect-square w-full max-w-sm"
             aria-hidden="true"
           >
-            <span className="absolute inset-0 grid place-items-center font-display text-[8rem] leading-none font-semibold opacity-10 sm:text-[10rem]">
+            <span className="absolute inset-0 grid place-items-center font-display text-[6rem] leading-none font-semibold opacity-10 sm:text-[8rem]">
               404
             </span>
           </div>

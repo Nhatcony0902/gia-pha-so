@@ -17,8 +17,8 @@ export function Breadcrumbs({
 }) {
   const linkClass = light
     ? "text-content-secondary hover:text-white"
-    : "text-[#63756d] hover:text-[#29473f]";
-  const currentClass = light ? "text-white" : "text-[#18332e]";
+    : "text-[#63756d] hover:text-ink-strong";
+  const currentClass = light ? "text-white" : "text-ink";
 
   return (
     <nav

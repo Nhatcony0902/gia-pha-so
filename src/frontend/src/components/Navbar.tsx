@@ -78,7 +78,7 @@ export function Navbar() {
       </div>
     ) : user ? (
       <div className="flex flex-wrap items-center gap-3 min-[901px]:flex-nowrap">
-        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-xs font-bold text-[#18332e] [&_img]:size-full [&_img]:object-cover">
+        <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-accent text-xs font-bold text-ink [&_img]:size-full [&_img]:object-cover">
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
           ) : (
@@ -184,7 +184,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-30 border-b border-[rgba(82,121,110,0.55)] bg-[rgba(32,58,52,0.96)] text-content-primary backdrop-blur-[14px]">
       <nav
-        className="relative mx-auto flex min-h-16 max-w-[100rem] items-center gap-4 px-5"
+        className="relative mx-auto flex min-h-14 max-w-[100rem] items-center gap-3 px-4"
         aria-label="Điều hướng chính"
       >
         <div className="flex min-w-0 shrink items-center gap-3">
@@ -193,7 +193,7 @@ export function Navbar() {
             className="inline-flex shrink-0 items-center gap-3 font-display font-bold text-inherit no-underline"
           >
             <img
-              className="size-12 rounded-full object-cover"
+              className="size-10 rounded-full object-cover"
               src={logo}
               alt=""
             />

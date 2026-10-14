@@ -13,11 +13,12 @@ import { createPortal } from "react-dom";
 import {
   compactPrimaryButtonClass,
   compactSecondaryButtonClass,
+  formFieldClass,
+  formLabelClass,
 } from "../../lib/ui-classes";
 
-const fieldClass =
-  "w-full rounded-lg border border-[#c8d5ce] bg-white px-3 py-2.5 font-normal text-[#18332e] focus:border-[#52796e] focus:outline-none";
-const labelClass = "grid gap-1.5 text-sm font-bold text-[#526a60]";
+const fieldClass = formFieldClass;
+const labelClass = formLabelClass;
 
 function DialogShell({
   title,
@@ -42,7 +43,7 @@ function DialogShell({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
-        className="my-auto w-[min(42rem,100%)] rounded-2xl bg-[#f9fbfa] p-5 text-[#18332e] shadow-[0_24px_70px_rgba(0,0,0,0.42)] md:p-6"
+        className="my-auto w-[min(42rem,100%)] rounded-2xl bg-surface-soft p-5 text-ink shadow-[0_24px_70px_rgba(0,0,0,0.42)] md:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="management-dialog-title"
@@ -597,16 +598,16 @@ export function RelationshipManagerDialog({
           <Plus size={16} /> Thêm quan hệ
         </button>
       </div>
-      <div className="max-h-[60vh] divide-y divide-[#dce5e0] overflow-y-auto rounded-xl border border-[#c8d5ce] bg-white">
+      <div className="max-h-[60vh] divide-y divide-[#dce5e0] overflow-y-auto rounded-xl border border-border-control bg-white">
         {relationships.map((relationship) => (
           <div key={relationship.id} className="flex items-center gap-3 p-3">
             <div className="min-w-0 flex-1">
-              <strong className="block text-sm text-[#29473f]">
+              <strong className="block text-sm text-ink-strong">
                 {relationship.type === "PARENT_CHILD"
                   ? "Cha/mẹ – con"
                   : "Vợ chồng"}
               </strong>
-              <span className="block truncate text-sm text-[#61736a]">
+              <span className="block truncate text-sm text-ink-muted">
                 {names.get(relationship.fromPersonId)} →{" "}
                 {names.get(relationship.toPersonId)}
               </span>
@@ -630,7 +631,7 @@ export function RelationshipManagerDialog({
           </div>
         ))}
         {!relationships.length && (
-          <p className="m-0 p-8 text-center text-sm text-[#71827a]">
+          <p className="m-0 p-8 text-center text-sm text-ink-subtle">
             Gia phả chưa có quan hệ nào.
           </p>
         )}

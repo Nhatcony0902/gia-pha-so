@@ -10,18 +10,18 @@ import { Link } from "react-router-dom";
 import { primaryButtonClass } from "../../lib/ui-classes";
 
 const sidebarClass =
-  "absolute right-0 bottom-0 left-0 top-[38%] z-10 overflow-y-auto rounded-t-2xl border-t border-[#c8d5ce] bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
+  "absolute right-0 bottom-0 left-0 top-[38%] z-10 overflow-y-auto rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
 const closeButtonClass =
   "absolute top-[0.8rem] right-[0.9rem] grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-[#e6ece8] text-[#314a42]";
 const profileClass =
-  "px-[1.8rem] pt-[0.8rem] pb-[1.25rem] text-center [&>p]:mt-[0.8rem] [&>p]:mb-[0.35rem] [&>p]:text-[0.67rem] [&>p]:font-bold [&>p]:tracking-[0.12em] [&>p]:text-[#a06e2b] [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.55rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-[#65786e]";
+  "px-[1.8rem] pt-[0.8rem] pb-[1.25rem] text-center [&>p]:mt-[0.8rem] [&>p]:mb-[0.35rem] [&>p]:text-[0.67rem] [&>p]:font-bold [&>p]:tracking-[0.12em] [&>p]:text-accent-deep [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.55rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-[#65786e]";
 const sectionClass =
-  "mt-[1.3rem] [&>h3]:mt-0 [&>h3]:mb-[0.6rem] [&>h3]:font-display [&>h3]:font-semibold [&>p]:leading-[1.55] [&>p]:text-[#61736a]";
+  "mt-[1.3rem] [&>h3]:mt-0 [&>h3]:mb-[0.6rem] [&>h3]:font-display [&>h3]:font-semibold [&>p]:leading-[1.55] [&>p]:text-ink-muted";
 const treeListClass =
-  "grid gap-[0.45rem] [&>a]:rounded-[0.4rem] [&>a]:bg-[#edf2ef] [&>a]:p-[0.65rem] [&>a]:text-[0.82rem] [&>a]:font-bold [&>a]:text-[#47665c] [&>a]:no-underline";
+  "grid gap-[0.45rem] [&>a]:rounded-[0.4rem] [&>a]:bg-surface-hover [&>a]:p-[0.65rem] [&>a]:text-[0.82rem] [&>a]:font-bold [&>a]:text-[#47665c] [&>a]:no-underline";
 const relationshipListClass =
   "grid gap-0 overflow-hidden rounded-[0.45rem] border border-[#dce5e0] bg-[#f4f7f5]";
-const emptyClass = "my-[0.35rem] text-[0.82rem]! text-[#71827a]!";
+const emptyClass = "my-[0.35rem] text-[0.82rem]! text-ink-subtle!";
 const genderBorderClass: Record<RelatedPerson["gender"], string> = {
   MALE: "border-l-[#4f8aa5]",
   FEMALE: "border-l-[#b86e8d]",
@@ -101,17 +101,17 @@ function PersonButton({
   return (
     <button
       type="button"
-      className={`relative grid w-full min-w-0 cursor-pointer items-center gap-[0.45rem] rounded-none border-0 border-l-[3px] bg-transparent px-[0.7rem] py-[0.48rem] text-left text-[#29473f] hover:bg-[#e5ede9] focus-visible:bg-[#e5ede9] focus-visible:outline-none ${genderBorderClass[person.gender]} ${role ? "grid-cols-[4.7rem_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]"} ${person.isDeceased ? "bg-[repeating-linear-gradient(-45deg,rgba(111,123,117,0.045),rgba(111,123,117,0.045)_5px,transparent_5px,transparent_10px)] text-[#66736d] saturate-[.62]" : ""}`}
+      className={`relative grid w-full min-w-0 cursor-pointer items-center gap-[0.45rem] rounded-none border-0 border-l-[3px] bg-transparent px-[0.7rem] py-[0.48rem] text-left text-ink-strong hover:bg-[#e5ede9] focus-visible:bg-[#e5ede9] focus-visible:outline-none ${genderBorderClass[person.gender]} ${role ? "grid-cols-[4.7rem_minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_auto]"} ${person.isDeceased ? "bg-[repeating-linear-gradient(-45deg,rgba(111,123,117,0.045),rgba(111,123,117,0.045)_5px,transparent_5px,transparent_10px)] text-[#66736d] saturate-[.62]" : ""}`}
       onClick={() => onSelect(person.id)}
       aria-label={accessibleDetails}
     >
       {role && (
-        <span className="text-[0.7rem] font-semibold text-[#71827a]">
+        <span className="text-[0.7rem] font-semibold text-ink-subtle">
           {role}
         </span>
       )}
       <span className="grid min-w-0 gap-[0.12rem]">
-        <strong className="truncate text-[0.76rem] font-bold text-[#29473f]">
+        <strong className="truncate text-[0.76rem] font-bold text-ink-strong">
           {person.preferredName ?? person.fullName}
         </strong>
         {context && (
@@ -261,14 +261,14 @@ export function PersonSidebar({
         <X size={16} aria-hidden="true" />
       </button>
       {loading && (
-        <div className="grid min-h-60 place-items-center text-[#61736a]">
+        <div className="grid min-h-60 place-items-center text-ink-muted">
           Đang tải thông tin…
         </div>
       )}
       {!loading && person && (
         <>
           <div className={profileClass}>
-            <div className="mx-auto grid size-20 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-[2rem] font-semibold text-[#36584e] [&_img]:size-full [&_img]:object-cover">
+            <div className="mx-auto grid size-20 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-[2rem] font-semibold text-ink-soft [&_img]:size-full [&_img]:object-cover">
               {person.avatarUrl ? (
                 <img src={person.avatarUrl} alt="" />
               ) : (
@@ -285,7 +285,7 @@ export function PersonSidebar({
                 className="grid grid-cols-[7rem_1fr] gap-[0.7rem] border-b border-[#e2e8e4] py-[0.65rem]"
                 key={label}
               >
-                <dt className="text-[0.78rem] text-[#71827a]">{label}</dt>
+                <dt className="text-[0.78rem] text-ink-subtle">{label}</dt>
                 <dd className="m-0 text-[0.84rem] font-semibold">{value}</dd>
               </div>
             ))}

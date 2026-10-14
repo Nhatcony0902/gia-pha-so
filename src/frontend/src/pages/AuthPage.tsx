@@ -51,7 +51,7 @@ type ResetInput = z.infer<typeof resetSchema>;
 
 const textButtonClass =
   "cursor-pointer border-0 bg-transparent py-[0.35rem] font-bold text-[#8a5c22]";
-const authSubtitleClass = "mt-0 mb-6 leading-[1.55] text-[#61736a]";
+const authSubtitleClass = "mt-0 mb-6 leading-[1.55] text-ink-muted";
 const tabClass =
   "cursor-pointer border-0 border-b-2 border-transparent bg-transparent p-[0.85rem] font-bold text-[#6b7d74]";
 
@@ -197,19 +197,19 @@ export function AuthPage() {
         </p>
       </section>
       <section
-        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-[#f9fbfa] p-[clamp(1.5rem,4vw,2.4rem)] text-[#18332e] shadow-[0_24px_70px_rgba(0,0,0,0.28)] [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
+        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-surface-soft p-[clamp(1.5rem,4vw,2.4rem)] text-ink shadow-[0_24px_70px_rgba(0,0,0,0.28)] [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
         aria-labelledby="auth-title"
       >
         {mode !== "forgot-password" && !registerEmail && (
           <div className="grid grid-cols-2 border-b border-[#d8e1dc]">
             <button
-              className={`${tabClass} ${mode === "login" ? "border-b-[#b27d31] text-[#18332e]" : ""}`}
+              className={`${tabClass} ${mode === "login" ? "border-b-[#b27d31] text-ink" : ""}`}
               onClick={() => switchMode("login")}
             >
               Đăng nhập
             </button>
             <button
-              className={`${tabClass} ${mode === "register" ? "border-b-[#b27d31] text-[#18332e]" : ""}`}
+              className={`${tabClass} ${mode === "register" ? "border-b-[#b27d31] text-ink" : ""}`}
               onClick={() => switchMode("register")}
             >
               Đăng ký

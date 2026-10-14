@@ -133,20 +133,20 @@ export function TreesPage() {
     if (accepted) remove.mutate(tree.id);
   };
   return (
-    <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#203a34_0%,#29483e_55%,#355b4a_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(2rem,5vw,4.5rem)] text-content-primary">
+    <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#203a34_0%,#29483e_55%,#355b4a_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(1.5rem,3vw,3rem)] text-content-primary">
       <header>
         <Breadcrumbs items={[{ label: "Trang chủ" }]} light className="mb-7" />
         <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
           KHÔNG GIAN GIA PHẢ
         </p>
-        <h1 className="my-[0.7rem] font-display text-[clamp(2.25rem,4.5vw,3.75rem)] leading-none font-semibold">
+        <h1 className="my-[0.7rem] font-display text-[clamp(1.9rem,3vw,2.8rem)] leading-tight font-semibold">
           Gia phả của bạn
         </h1>
         <span className="text-base text-content-secondary">
           Chọn một gia phả để khám phá các thế hệ và mối quan hệ.
         </span>
       </header>
-      <section className="mt-12" aria-labelledby="owned-trees-title">
+      <section className="mt-9" aria-labelledby="owned-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="owned-trees-title">Gia phả của tôi</h2>
           <div className="flex items-center gap-3">
@@ -195,7 +195,7 @@ export function TreesPage() {
           ))}
         </div>
       </section>
-      <section className="mt-12" aria-labelledby="shared-trees-title">
+      <section className="mt-9" aria-labelledby="shared-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="shared-trees-title">Được chia sẻ với tôi</h2>
           {query.data && <span>{query.data.sharedWithMe.length} gia phả</span>}

@@ -30,6 +30,9 @@ import {
   compactDangerButtonClass,
   compactPrimaryButtonClass,
   compactSecondaryButtonClass,
+  formFieldClass,
+  formLabelClass,
+  surfaceCardClass,
 } from "../lib/ui-classes";
 
 type Field = {
@@ -249,20 +252,20 @@ export function PersonDetailPage() {
   };
   if (query.isLoading)
     return (
-      <main className="grid min-h-[calc(100vh-4.5rem)] place-items-center bg-[#edf2ee] text-[#61736a]">
+      <main className="grid min-h-[calc(100vh-4.5rem)] place-items-center bg-surface-page text-ink-muted">
         Đang tải hồ sơ thành viên…
       </main>
     );
   if (!query.data)
     return (
-      <main className="grid min-h-[calc(100vh-4.5rem)] place-items-center bg-[#edf2ee] text-[#8d3d32]">
+      <main className="grid min-h-[calc(100vh-4.5rem)] place-items-center bg-surface-page text-[#8d3d32]">
         Không tìm thấy thành viên hoặc bạn không có quyền xem.
       </main>
     );
   const person = query.data;
   const currentTree = person.visibleTrees.find((tree) => tree.id === treeId);
   return (
-    <main className="min-h-[calc(100vh-4.5rem)] bg-[#edf2ee] px-4 py-6 text-[#18332e] md:px-8">
+    <main className="min-h-[calc(100vh-4.5rem)] bg-surface-page px-4 py-6 text-ink md:px-8">
       <div className="mx-auto max-w-6xl">
         <Breadcrumbs
           items={[
@@ -336,8 +339,10 @@ export function PersonDetailPage() {
         </div>
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(250px,0.8fr)_minmax(0,1.7fr)]">
           <aside className="grid gap-5">
-            <section className="flex flex-col items-center gap-4 rounded-2xl border border-[#cad7d0] bg-white p-6 text-center shadow-sm">
-              <div className="relative grid size-35 shrink-0 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-4xl font-bold text-[#36584e]">
+            <section
+              className={`${surfaceCardClass} flex flex-col items-center gap-4 p-6 text-center`}
+            >
+              <div className="relative grid size-35 shrink-0 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-4xl font-bold text-ink-soft">
                 {form.avatarUrl ? (
                   <img
                     src={String(form.avatarUrl)}
@@ -362,7 +367,7 @@ export function PersonDetailPage() {
                 </label>
               </div>
               <div>
-                <p className="m-0 text-xs font-bold tracking-widest text-[#a06e2b]">
+                <p className="m-0 text-xs font-bold tracking-widest text-accent-deep">
                   HỒ SƠ THÀNH VIÊN
                 </p>
                 <h1 className="mt-1 mb-1 font-display text-2xl">
@@ -370,7 +375,7 @@ export function PersonDetailPage() {
                 </h1>
               </div>
             </section>
-            <section className="rounded-2xl border border-[#cad7d0] bg-white p-5 shadow-sm">
+            <section className={`${surfaceCardClass} p-5`}>
               <div className="mb-2">
                 <h2 className="m-0 font-display text-xl">Gia phả</h2>
               </div>
@@ -387,13 +392,13 @@ export function PersonDetailPage() {
                       <article key={tree.id} className="py-3">
                         <Link
                           to={`/trees/${tree.id}/tree?person=${person.id}`}
-                          className="flex items-center justify-between gap-3 text-[#36584e] no-underline transition-colors hover:text-[#a06e2b]"
+                          className="flex items-center justify-between gap-3 text-ink-soft no-underline transition-colors hover:text-accent-deep"
                         >
                           <span className="min-w-0">
                             <span className="block truncate text-sm leading-5 font-semibold">
                               {tree.name}
                             </span>
-                            <span className="mt-0.5 block text-xs text-[#71827a]">
+                            <span className="mt-0.5 block text-xs text-ink-subtle">
                               {tree.personCount} thành viên · {relatives.length}{" "}
                               người thân
                             </span>
@@ -409,7 +414,7 @@ export function PersonDetailPage() {
                               <Link
                                 key={`${relative.relationshipId}-${relative.role}`}
                                 to={`/trees/${tree.id}/persons/${relative.person.id}`}
-                                className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f0f5f2] p-2 text-[#29473f] no-underline transition-colors hover:bg-[#e3ece7]"
+                                className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f0f5f2] p-2 text-ink-strong no-underline transition-colors hover:bg-[#e3ece7]"
                               >
                                 {relative.person.avatarUrl ? (
                                   <img
@@ -426,7 +431,7 @@ export function PersonDetailPage() {
                                   <strong className="block truncate text-xs">
                                     {relative.person.fullName}
                                   </strong>
-                                  <small className="block truncate text-[0.68rem] text-[#71827a]">
+                                  <small className="block truncate text-[0.68rem] text-ink-subtle">
                                     {relative.label}
                                   </small>
                                 </span>
@@ -447,12 +452,12 @@ export function PersonDetailPage() {
                   })}
                 </div>
               ) : (
-                <p className="m-0 py-3 text-sm text-[#71827a]">
+                <p className="m-0 py-3 text-sm text-ink-subtle">
                   Chưa có gia phả nào được liên kết.
                 </p>
               )}
             </section>
-            <section className="rounded-2xl border border-[#cad7d0] bg-white p-5 shadow-sm">
+            <section className={`${surfaceCardClass} p-5`}>
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="m-0 font-display text-xl">Thư viện ảnh</h2>
@@ -509,7 +514,7 @@ export function PersonDetailPage() {
                   </figure>
                 ))}
                 {!person.images.length && (
-                  <p className="col-span-full py-8 text-center text-[#71827a]">
+                  <p className="col-span-full py-8 text-center text-ink-subtle">
                     Chưa có ảnh liên quan.
                   </p>
                 )}
@@ -520,7 +525,7 @@ export function PersonDetailPage() {
             {sections.map((section) => (
               <section
                 key={section.title}
-                className="rounded-2xl border border-[#cad7d0] bg-white p-5 shadow-sm"
+                className={`${surfaceCardClass} p-5`}
               >
                 <h2 className="mt-0 mb-4 font-display text-xl">
                   {section.title}
@@ -529,7 +534,7 @@ export function PersonDetailPage() {
                   {section.fields.map((field) => (
                     <label
                       key={field.key}
-                      className={`grid gap-1.5 text-sm font-bold text-[#526a60] ${field.span ? "md:col-span-2" : ""}`}
+                      className={`${formLabelClass} ${field.span ? "md:col-span-2" : ""}`}
                     >
                       {field.label}
                       <FieldInput
@@ -566,8 +571,7 @@ function FieldInput({
   disabled: boolean;
   onChange: (value: unknown) => void;
 }) {
-  const common =
-    "w-full rounded-lg border border-[#c8d5ce] bg-[#fbfcfb] px-3 py-2.5 font-normal text-[#18332e] disabled:border-transparent disabled:bg-[#f1f5f2] disabled:text-[#52645c]";
+  const common = `${formFieldClass} disabled:border-transparent disabled:bg-[#f1f5f2] disabled:text-[#52645c]`;
   const selectClass = `${common} appearance-none pr-10`;
   const selectArrow = (
     <ChevronDown

@@ -2,19 +2,14 @@ import type {
   PersonNode,
   PrimitiveRelationship,
 } from "@family-tree/shared-types";
+import { Columns3, FilterX, ListFilter, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { SurfaceCard } from "../../components/ui/SurfaceCard";
 import {
-  ArrowDownAZ,
-  ArrowUpAZ,
-  Check,
-  Columns3,
-  FilterX,
-  ListFilter,
-  Minus,
-  Pencil,
-  RotateCcw,
-  Trash2,
-} from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+  ColumnFilterPopup,
+  StyledCheckbox,
+  type ColumnFilter,
+} from "./ListFilterControls";
 import {
   compactDangerButtonClass,
   compactPrimaryButtonClass,
@@ -42,12 +37,7 @@ type Column = {
   date?: boolean;
   enumValues?: Array<[string, string]>;
 };
-type Filter = {
-  mode?: "contains" | "empty" | "not-empty";
-  text?: string;
-  values?: string[];
-  sort?: "asc" | "desc";
-};
+type Filter = ColumnFilter;
 
 const columns: Column[] = [
   {
@@ -126,46 +116,6 @@ const defaultColumnWidth = (key: Key) =>
 const minColumnWidth = (key: Key) =>
   key === "firstPerson" || key === "secondPerson" ? 200 : 120;
 
-function StyledCheckbox({
-  checked,
-  indeterminate = false,
-  onChange,
-  label,
-  className,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: () => void;
-  label: ReactNode;
-  className: string;
-}) {
-  return (
-    <label className={`flex cursor-pointer items-center gap-2 ${className}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        aria-checked={indeterminate ? "mixed" : checked}
-        ref={(input) => {
-          if (input) input.indeterminate = indeterminate;
-        }}
-        onChange={onChange}
-        className="peer sr-only"
-      />
-      <span
-        aria-hidden="true"
-        className={`grid size-4 shrink-0 place-items-center rounded-[4px] border border-[#8fa198] transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#52796e] ${checked || indeterminate ? "border-[#29473f] bg-[#29473f] text-white" : "bg-white text-transparent"}`}
-      >
-        {indeterminate ? (
-          <Minus size={12} strokeWidth={3} />
-        ) : (
-          <Check size={12} strokeWidth={3} />
-        )}
-      </span>
-      <span className="min-w-0">{label}</span>
-    </label>
-  );
-}
-
 function PersonCell({
   person,
   role,
@@ -180,7 +130,7 @@ function PersonCell({
     <button
       type="button"
       onClick={() => onSelect(person.id)}
-      className="flex max-w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent p-1 text-left text-[#29473f] hover:bg-[#e6efea] focus-visible:bg-[#e6efea] focus-visible:outline-2 focus-visible:outline-[#52796e]"
+      className="flex max-w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent p-1 text-left text-ink-strong hover:bg-surface-hover focus-visible:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
       {person.avatarUrl ? (
         <img
@@ -195,7 +145,7 @@ function PersonCell({
       )}
       <span className="min-w-0">
         <strong className="block truncate">{person.fullName}</strong>
-        {role && <small className="block text-[#71827a]">{role}</small>}
+        {role && <small className="block text-ink-subtle">{role}</small>}
       </span>
     </button>
   );
@@ -314,14 +264,14 @@ export function RelationshipList({
 
   return (
     <section
-      className={`min-h-0 overflow-hidden bg-[#edf2ee] p-4 transition-[margin-right] duration-250 md:p-6 ${sidebarOpen ? "min-[801px]:mr-92" : ""}`}
+      className={`min-h-0 overflow-hidden bg-surface-page p-4 transition-[margin-right] duration-250 md:p-6 ${sidebarOpen ? "min-[801px]:mr-92" : ""}`}
       aria-label="Danh sách quan hệ"
     >
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[95rem] flex-col">
         <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="m-0 font-display text-2xl">Danh sách quan hệ</h1>
-            <p className="mt-1 mb-0 text-sm text-[#61736a]">
+            <p className="mt-1 mb-0 text-sm text-ink-muted">
               Hiển thị {rows.length}/{relationships.length} quan hệ
             </p>
           </div>
@@ -342,10 +292,10 @@ export function RelationshipList({
                 <Columns3 size={17} /> Chọn cột
               </button>
               {open === "columns" && (
-                <div className="absolute top-full right-0 z-30 mt-2 flex max-h-96 w-72 flex-col rounded-xl border border-[#c8d5ce] bg-white p-2 shadow-xl">
+                <div className="absolute top-full right-0 z-30 mt-2 flex max-h-96 w-72 flex-col rounded-xl border border-border-control bg-white p-2 shadow-xl">
                   <div className="grid min-h-0 gap-1 overflow-auto">
                     <StyledCheckbox
-                      className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-[#edf2ef]"
+                      className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-surface-hover"
                       checked={draftVisible.length === columns.length}
                       indeterminate={
                         draftVisible.length > 0 &&
@@ -363,7 +313,7 @@ export function RelationshipList({
                     {columns.map((column) => (
                       <StyledCheckbox
                         key={column.key}
-                        className="rounded-lg px-2 py-2 text-sm hover:bg-[#edf2ef]"
+                        className="rounded-lg px-2 py-2 text-sm hover:bg-surface-hover"
                         checked={draftVisible.includes(column.key)}
                         onChange={() =>
                           setDraftVisible((current) =>
@@ -411,7 +361,7 @@ export function RelationshipList({
             </button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[#c8d5ce] bg-white shadow-[0_10px_30px_rgba(27,54,47,0.08)]">
+        <SurfaceCard as="div" variant="table">
           <table
             className="table-fixed border-collapse text-left text-sm"
             style={{ width: "100%", minWidth: tableWidth }}
@@ -426,13 +376,13 @@ export function RelationshipList({
               ))}
               <col style={{ width: 190 }} />
             </colgroup>
-            <thead className="sticky top-0 z-10 bg-[#e3ebe7] text-[#29473f]">
+            <thead className="sticky top-0 z-10 bg-surface-raised text-ink-strong">
               <tr>
                 <th className="w-16 px-4 py-3 text-center">STT</th>
                 {activeColumns.map((column) => (
                   <th
                     key={column.key}
-                    className="relative border-l border-[#cad7d0] px-4 py-3"
+                    className="relative border-l border-border-default px-4 py-3"
                   >
                     <span className="flex min-w-0 items-center justify-between gap-2 pr-1">
                       <span className="min-w-0 truncate" title={column.label}>
@@ -444,7 +394,7 @@ export function RelationshipList({
                         onClick={() =>
                           setOpen(open === column.key ? null : column.key)
                         }
-                        className={`grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent hover:bg-white ${isFilterActive(filters[column.key]) ? "text-[#a06e2b]" : "text-[#60746a]"}`}
+                        className={`grid size-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent hover:bg-white ${isFilterActive(filters[column.key]) ? "text-accent-deep" : "text-[#60746a]"}`}
                       >
                         <ListFilter size={15} />
                       </button>
@@ -476,10 +426,10 @@ export function RelationshipList({
                       onLostPointerCapture={() =>
                         (resizingColumn.current = null)
                       }
-                      className="absolute top-0 right-0 z-10 h-full w-2 cursor-col-resize touch-none border-0 bg-transparent p-0 after:absolute after:top-1/4 after:right-0.5 after:h-1/2 after:w-px after:bg-[#aebfb6] hover:after:bg-[#52796e]"
+                      className="absolute top-0 right-0 z-10 h-full w-2 cursor-col-resize touch-none border-0 bg-transparent p-0 after:absolute after:top-1/4 after:right-0.5 after:h-1/2 after:w-px after:bg-[#aebfb6] hover:after:bg-focus"
                     />
                     {open === column.key && (
-                      <ColumnPopup
+                      <ColumnFilterPopup
                         column={column}
                         value={filters[column.key] ?? {}}
                         onChange={(value) =>
@@ -507,7 +457,7 @@ export function RelationshipList({
                     )}
                   </th>
                 ))}
-                <th className="border-l border-[#cad7d0] px-4 py-3 text-right">
+                <th className="border-l border-border-default px-4 py-3 text-right">
                   Thao tác
                 </th>
               </tr>
@@ -518,7 +468,7 @@ export function RelationshipList({
                   key={row.relationship.id}
                   className="border-t border-[#e0e7e3] hover:bg-[#edf4f0]"
                 >
-                  <td className="px-4 py-3 text-center tabular-nums text-[#71827a]">
+                  <td className="px-4 py-3 text-center tabular-nums text-ink-subtle">
                     {index + 1}
                   </td>
                   {activeColumns.map((column) => (
@@ -580,131 +530,14 @@ export function RelationshipList({
             </tbody>
           </table>
           {!rows.length && (
-            <div className="p-12 text-center text-[#71827a]">
+            <div className="p-12 text-center text-ink-subtle">
               {relationships.length
                 ? "Không có quan hệ phù hợp với bộ lọc."
                 : "Gia phả chưa có quan hệ nào."}
             </div>
           )}
-        </div>
+        </SurfaceCard>
       </div>
     </section>
-  );
-}
-
-function ColumnPopup({
-  column,
-  value,
-  onChange,
-  onClose,
-  popupRef,
-}: {
-  column: Column;
-  value: Filter;
-  onChange: (value: Filter) => void;
-  onClose: () => void;
-  popupRef: React.RefObject<HTMLDivElement>;
-}) {
-  const [draft, setDraft] = useState<Filter>(() => ({
-    ...value,
-    ...(!column.enumValues && !value.mode ? { mode: "contains" as const } : {}),
-  }));
-  return (
-    <div
-      ref={popupRef}
-      className="absolute top-[calc(100%-0.25rem)] left-3 z-30 mt-2 w-72 rounded-xl border border-[#c8d5ce] bg-white p-3 font-normal shadow-2xl"
-      onClick={(event) => event.stopPropagation()}
-    >
-      <p className="mt-0 mb-2 text-xs font-bold tracking-wider text-[#71827a] uppercase">
-        Sắp xếp
-      </p>
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => setDraft({ ...draft, sort: "asc" })}
-          className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 py-2 ${draft.sort === "asc" ? "border-[#a06e2b] bg-[#fff8ec]" : "border-[#d6e0db] bg-white"}`}
-        >
-          <ArrowDownAZ size={15} /> Tăng dần
-        </button>
-        <button
-          type="button"
-          onClick={() => setDraft({ ...draft, sort: "desc" })}
-          className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 py-2 ${draft.sort === "desc" ? "border-[#a06e2b] bg-[#fff8ec]" : "border-[#d6e0db] bg-white"}`}
-        >
-          <ArrowUpAZ size={15} /> Giảm dần
-        </button>
-      </div>
-      <p className="mt-4 mb-2 text-xs font-bold tracking-wider text-[#71827a] uppercase">
-        Lọc
-      </p>
-      {column.enumValues ? (
-        <div className="grid gap-1">
-          {column.enumValues.map(([key, label]) => (
-            <StyledCheckbox
-              key={key}
-              className="rounded-md p-1.5 text-sm hover:bg-[#edf2ef]"
-              checked={draft.values?.includes(key) ?? false}
-              onChange={() =>
-                setDraft({
-                  ...draft,
-                  values: draft.values?.includes(key)
-                    ? draft.values.filter((item) => item !== key)
-                    : [...(draft.values ?? []), key],
-                })
-              }
-              label={label}
-            />
-          ))}
-        </div>
-      ) : (
-        <>
-          <select
-            value={draft.mode ?? "contains"}
-            onChange={(event) =>
-              setDraft({ ...draft, mode: event.target.value as Filter["mode"] })
-            }
-            className="w-full cursor-pointer rounded-lg border border-[#c8d5ce] bg-white p-2"
-          >
-            <option value="contains">Có chứa</option>
-            <option value="empty">Để trống</option>
-            <option value="not-empty">Không để trống</option>
-          </select>
-          {(draft.mode ?? "contains") === "contains" && (
-            <input
-              autoFocus
-              value={draft.text ?? ""}
-              onChange={(event) =>
-                setDraft({ ...draft, text: event.target.value })
-              }
-              placeholder="Nhập nội dung…"
-              className="mt-3 w-full rounded-lg border border-[#c8d5ce] p-2 focus:border-[#52796e] focus:outline-none"
-            />
-          )}
-        </>
-      )}
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setDraft({});
-            onChange({});
-            onClose();
-          }}
-          className={compactSecondaryButtonClass}
-        >
-          <RotateCcw size={14} /> Đặt lại
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onChange(draft);
-            onClose();
-          }}
-          className={compactPrimaryButtonClass}
-        >
-          <Check size={14} /> Áp dụng
-        </button>
-      </div>
-    </div>
   );
 }

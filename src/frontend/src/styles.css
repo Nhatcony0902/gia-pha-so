@@ -17,6 +17,22 @@
   --color-content-on-outline: #dbe8dc;
   --color-accent: #d7a95d;
 
+  --color-ink: #18332e;
+  --color-ink-strong: #29473f;
+  --color-ink-soft: #36584e;
+  --color-ink-muted: #61736a;
+  --color-ink-subtle: #71827a;
+  --color-ink-label: #526a60;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f9fbfa;
+  --color-surface-page: #edf2ee;
+  --color-surface-raised: #e3ebe7;
+  --color-surface-hover: #edf2ef;
+  --color-border-default: #cad7d0;
+  --color-border-control: #c8d5ce;
+  --color-focus: #52796e;
+  --color-accent-deep: #a06e2b;
+
   --color-outline: #52796e;
   --color-status-success: #83d3a2;
   --color-status-danger: #ed806d;
@@ -41,6 +57,10 @@
   ::before,
   ::after {
     box-sizing: border-box;
+  }
+
+  html {
+    font-size: 93.75%;
   }
 
   body {
@@ -86,7 +106,7 @@
   width: 7px;
   height: 7px;
   border: 1px solid white;
-  background: #52796e;
+  background: var(--color-focus);
 }
 
 .family-node .family-horizontal-handle {

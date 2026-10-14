@@ -8,17 +8,17 @@ export function HomePage() {
           <p className="text-accent tracking-eyebrow font-sans text-xs font-bold">
             DIGITAL FAMILY TREE / FOUNDATION
           </p>
-          <h1 className="mt-4 max-w-5xl font-display text-5xl leading-[0.98] font-semibold sm:text-6xl lg:text-7xl">
+          <h1 className="mt-4 max-w-5xl font-display text-4xl leading-[1.02] font-semibold sm:text-5xl lg:text-6xl">
             Giữ mạch nguồn, kể tiếp câu chuyện.
           </h1>
-          <p className="text-content-secondary mt-6 max-w-2xl font-sans text-lg leading-relaxed sm:text-xl">
+          <p className="text-content-secondary mt-5 max-w-2xl font-sans text-base leading-relaxed sm:text-lg">
             Không gian số để lưu giữ thành viên, quan hệ và ký ức của dòng họ
             theo cách rõ ràng, có kiểm chứng.
           </p>
           <ApiStatus />
         </section>
         <section
-          className="border-outline mt-20 grid max-w-6xl grid-cols-1 border-t md:grid-cols-3"
+          className="border-outline mt-16 grid max-w-6xl grid-cols-1 border-t md:grid-cols-3"
           aria-label="Nền tảng hệ thống"
         >
           <article className="border-outline border-b py-6 md:border-r md:border-b-0 md:pr-6 lg:py-8">

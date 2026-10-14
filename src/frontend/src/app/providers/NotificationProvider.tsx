@@ -139,7 +139,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             {toasts.map((item) => (
               <div
                 key={item.id}
-                className={`grid animate-[toast-in_0.2s_ease-out] grid-cols-[1fr_auto_auto] items-center gap-[0.7rem] rounded-[0.65rem] border-l-4 bg-white px-4 py-[0.95rem] text-[#18332e] shadow-[0_12px_35px_rgba(0,0,0,0.22)] ${toastToneClass[item.tone]}`}
+                className={`grid animate-[toast-in_0.2s_ease-out] grid-cols-[1fr_auto_auto] items-center gap-[0.7rem] rounded-[0.65rem] border-l-4 bg-surface px-4 py-[0.95rem] text-ink shadow-[0_12px_35px_rgba(0,0,0,0.22)] ${toastToneClass[item.tone]}`}
               >
                 <span>{item.message}</span>
                 <span className="min-w-[1.8rem] text-[0.78rem] text-[#687a71] tabular-nums">
@@ -160,7 +160,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             <div className="fixed inset-0 z-110 grid place-items-center bg-[rgba(4,15,13,0.7)] p-4 backdrop-blur-xs">
               <div
                 ref={panelRef}
-                className="w-[min(28rem,100%)] rounded-[0.85rem] bg-[#f9fbfa] p-[1.6rem] text-[#18332e] shadow-[0_24px_70px_rgba(0,0,0,0.4)]"
+                className="w-[min(28rem,100%)] rounded-[0.85rem] bg-surface-soft p-[1.6rem] text-ink shadow-[0_24px_70px_rgba(0,0,0,0.4)]"
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby="dialog-title"
@@ -177,7 +177,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 </h2>
                 <p
                   id="dialog-description"
-                  className="leading-[1.55] text-[#61736a]"
+                  className="leading-[1.55] text-ink-muted"
                 >
                   {active.message}
                 </p>
