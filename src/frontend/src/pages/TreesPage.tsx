@@ -23,9 +23,9 @@ import {
 } from "../lib/ui-classes";
 
 const sectionHeadingClass =
-  "mb-[1.2rem] flex items-center justify-between gap-4 [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.45rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-content-muted";
+  "mb-[1.2rem] flex items-center justify-between gap-4 [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.3rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-content-muted";
 const treeGridClass =
-  "grid grid-cols-[repeat(auto-fill,minmax(min(100%,21rem),1fr))] gap-[1.2rem]";
+  "grid grid-cols-[repeat(auto-fill,minmax(min(100%,21rem),1fr))] gap-4";
 const emptyStateClass =
   "rounded-card border border-dashed border-[rgba(130,167,151,0.5)] bg-black/8 p-8 text-content-secondary [&>h3]:mt-0 [&>h3]:mb-[0.45rem] [&>h3]:text-content-primary [&>p]:m-0";
 
@@ -41,9 +41,9 @@ function TreeCard({
   deleting: boolean;
 }) {
   return (
-    <article className="grid min-h-80 grid-rows-[1fr_auto] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)] shadow-none transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+    <article className="grid min-h-72 grid-rows-[1fr_auto] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)] shadow-none transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
       <Link
-        className="grid grid-rows-[7.5rem_1fr] text-inherit no-underline"
+        className="grid grid-rows-[7rem_1fr] text-inherit no-underline"
         to={`/trees/${tree.id}/tree`}
       >
         <div className="grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#476f61,#1b352f)] font-display text-[2rem] font-semibold text-accent [&_img]:size-full [&_img]:object-cover">
@@ -53,10 +53,10 @@ function TreeCard({
           <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
             {tree.originPlace ?? "Chưa cập nhật nguồn gốc"}
           </p>
-          <h3 className="mt-[0.45rem] mb-[0.55rem] font-display text-[1.3rem] font-semibold">
+          <h3 className="mt-[0.45rem] mb-[0.55rem] font-display text-[1.15rem] font-semibold">
             {tree.name}
           </h3>
-          <span className="leading-normal text-content-secondary">
+          <span className="text-sm leading-normal text-content-secondary">
             {tree.description ?? "Chưa có mô tả"}
           </span>
           <div className="mt-auto flex items-baseline gap-[0.35rem] pt-4 text-sm text-content-muted">
@@ -133,20 +133,20 @@ export function TreesPage() {
     if (accepted) remove.mutate(tree.id);
   };
   return (
-    <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#12211f_0%,#19342e_55%,#24483d_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(2rem,5vw,4.5rem)] text-content-primary">
+    <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#203a34_0%,#29483e_55%,#355b4a_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(2rem,5vw,4.5rem)] text-content-primary">
       <header>
         <Breadcrumbs items={[{ label: "Trang chủ" }]} light className="mb-7" />
         <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
           KHÔNG GIAN GIA PHẢ
         </p>
-        <h1 className="my-[0.7rem] font-display text-[clamp(2.5rem,5vw,4.5rem)] leading-none font-semibold">
+        <h1 className="my-[0.7rem] font-display text-[clamp(2.25rem,4.5vw,3.75rem)] leading-none font-semibold">
           Gia phả của bạn
         </h1>
-        <span className="text-[1.05rem] text-content-secondary">
+        <span className="text-base text-content-secondary">
           Chọn một gia phả để khám phá các thế hệ và mối quan hệ.
         </span>
       </header>
-      <section className="mt-14" aria-labelledby="owned-trees-title">
+      <section className="mt-12" aria-labelledby="owned-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="owned-trees-title">Gia phả của tôi</h2>
           <div className="flex items-center gap-3">
@@ -162,7 +162,7 @@ export function TreesPage() {
         </div>
         {query.isLoading && (
           <div className={treeGridClass} aria-label="Đang tải">
-            <div className="grid min-h-72 animate-[skeleton-pulse_1.2s_infinite_alternate] grid-rows-[7.5rem_1fr] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)]" />
+            <div className="grid min-h-64 animate-[skeleton-pulse_1.2s_infinite_alternate] grid-rows-[7rem_1fr] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)]" />
           </div>
         )}
         {query.isError && (
@@ -195,7 +195,7 @@ export function TreesPage() {
           ))}
         </div>
       </section>
-      <section className="mt-14" aria-labelledby="shared-trees-title">
+      <section className="mt-12" aria-labelledby="shared-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="shared-trees-title">Được chia sẻ với tôi</h2>
           {query.data && <span>{query.data.sharedWithMe.length} gia phả</span>}
@@ -211,9 +211,9 @@ export function TreesPage() {
             <Link
               key={tree.id}
               to={`/trees/${tree.id}/tree`}
-              className="rounded-card border border-[rgba(130,167,151,0.4)] p-5 text-content-primary no-underline"
+              className="rounded-card border border-[rgba(130,167,151,0.4)] p-4 text-content-primary no-underline"
             >
-              <strong>{tree.name}</strong>
+              <strong className="text-sm">{tree.name}</strong>
               <span className="mt-2 block text-sm text-content-secondary">
                 {tree.personCount} thành viên
               </span>
