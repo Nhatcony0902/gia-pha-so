@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import {
   addPersonImage,
   deletePerson,
@@ -191,6 +192,21 @@ export function PersonDetailPage() {
         error instanceof Error ? error.message : "Dữ liệu chưa hợp lệ",
       ),
   });
+  const remove = useMutation({
+    mutationFn: () => deletePerson(treeId, personId),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["trees"] });
+      client.invalidateQueries({ queryKey: ["tree-persons", treeId] });
+      client.invalidateQueries({ queryKey: ["tree-graph", treeId] });
+      navigate(`/trees/${treeId}/members`);
+      notice.toast("Đã xóa thành viên", "success");
+    },
+    onError: (error) =>
+      notice.alert(
+        "Không thể xóa thành viên",
+        error instanceof Error ? error.message : "Vui lòng thử lại",
+      ),
+  });
   const upload = async (file: File, avatar: boolean) => {
     setUploading(true);
     try {
@@ -244,12 +260,25 @@ export function PersonDetailPage() {
       </main>
     );
   const person = query.data;
+  const currentTree = person.visibleTrees.find((tree) => tree.id === treeId);
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-[#edf2ee] px-4 py-6 text-[#18332e] md:px-8">
       <div className="mx-auto max-w-6xl">
+        <Breadcrumbs
+          items={[
+            { label: "Trang chủ", to: "/" },
+            {
+              label: currentTree?.name ?? "Gia phả",
+              to: `/trees/${treeId}/tree`,
+            },
+            { label: "Danh sách thành viên", to: `/trees/${treeId}/members` },
+            { label: person.fullName },
+          ]}
+          className="mb-5"
+        />
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Link
-            to={`/trees/${treeId}?person=${personId}`}
+            to={`/trees/${treeId}/tree?person=${personId}`}
             className="flex items-center gap-2 text-[#805824] no-underline"
           >
             <ArrowLeft size={18} /> Trở lại gia phả
@@ -289,6 +318,7 @@ export function PersonDetailPage() {
             <button
               type="button"
               className={compactDangerButtonClass}
+              disabled={remove.isPending}
               onClick={async () => {
                 if (
                   await notice.confirm(
@@ -296,13 +326,11 @@ export function PersonDetailPage() {
                     `Xóa ${person.fullName} khỏi gia phả và các quan hệ liên quan?`,
                   )
                 ) {
-                  await deletePerson(treeId, personId);
-                  navigate(`/trees/${treeId}?tab=members`);
-                  notice.toast("Đã xóa thành viên", "success");
+                  remove.mutate();
                 }
               }}
             >
-              <Trash2 size={16} /> Xóa
+              <Trash2 size={16} /> {remove.isPending ? "Đang xóa…" : "Xóa"}
             </button>
           </div>
         </div>
@@ -348,26 +376,75 @@ export function PersonDetailPage() {
               </div>
               {person.visibleTrees.length ? (
                 <div className="divide-y divide-[#e2e8e4]">
-                  {person.visibleTrees.map((tree) => (
-                    <Link
-                      key={tree.id}
-                      to={`/trees/${tree.id}?person=${person.id}`}
-                      className="flex items-center justify-between gap-3 py-2.5 text-[#36584e] no-underline transition-colors hover:text-[#a06e2b]"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm leading-5 font-semibold">
-                          {tree.name}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-[#71827a]">
-                          {tree.personCount} thành viên
-                        </span>
-                      </span>
-                      <ChevronRight
-                        aria-hidden="true"
-                        className="size-4 shrink-0"
-                      />
-                    </Link>
-                  ))}
+                  {person.visibleTrees.map((tree) => {
+                    const relatives = [...tree.relatives].sort(
+                      (left, right) => {
+                        const order = { PARENT: 0, SPOUSE: 1, CHILD: 2 };
+                        return order[left.role] - order[right.role];
+                      },
+                    );
+                    return (
+                      <article key={tree.id} className="py-3">
+                        <Link
+                          to={`/trees/${tree.id}/tree?person=${person.id}`}
+                          className="flex items-center justify-between gap-3 text-[#36584e] no-underline transition-colors hover:text-[#a06e2b]"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm leading-5 font-semibold">
+                              {tree.name}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-[#71827a]">
+                              {tree.personCount} thành viên · {relatives.length}{" "}
+                              người thân
+                            </span>
+                          </span>
+                          <ChevronRight
+                            aria-hidden="true"
+                            className="size-4 shrink-0"
+                          />
+                        </Link>
+                        {relatives.length ? (
+                          <div className="mt-3 grid gap-1.5">
+                            {relatives.map((relative) => (
+                              <Link
+                                key={`${relative.relationshipId}-${relative.role}`}
+                                to={`/trees/${tree.id}/persons/${relative.person.id}`}
+                                className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f0f5f2] p-2 text-[#29473f] no-underline transition-colors hover:bg-[#e3ece7]"
+                              >
+                                {relative.person.avatarUrl ? (
+                                  <img
+                                    src={relative.person.avatarUrl}
+                                    alt=""
+                                    className="size-8 shrink-0 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#d8e5de] text-xs font-bold">
+                                    {relative.person.fullName[0]}
+                                  </span>
+                                )}
+                                <span className="min-w-0 flex-1">
+                                  <strong className="block truncate text-xs">
+                                    {relative.person.fullName}
+                                  </strong>
+                                  <small className="block truncate text-[0.68rem] text-[#71827a]">
+                                    {relative.label}
+                                  </small>
+                                </span>
+                                <ChevronRight
+                                  aria-hidden="true"
+                                  className="size-3.5 shrink-0 text-[#82938b]"
+                                />
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 mb-0 text-xs text-[#82938b]">
+                            Chưa có quan hệ người thân trong gia phả này.
+                          </p>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="m-0 py-3 text-sm text-[#71827a]">

@@ -1,7 +1,26 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  FamilyTreeInput,
+  FamilyTreeSummary,
+} from "@family-tree/shared-types";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { getTrees } from "../features/family-tree/api";
-import { secondaryButtonClass } from "../lib/ui-classes";
+import { useNotifications } from "../app/providers/NotificationProvider";
+import { Breadcrumbs } from "../components/Breadcrumbs";
+import {
+  createTree,
+  deleteTree,
+  getTrees,
+  updateTree,
+} from "../features/family-tree/api";
+import { TreeFormDialog } from "../features/family-tree/ManagementDialogs";
+import {
+  compactDangerButtonClass,
+  compactSecondaryButtonClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "../lib/ui-classes";
 
 const sectionHeadingClass =
   "mb-[1.2rem] flex items-center justify-between gap-4 [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.45rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-content-muted";
@@ -10,11 +29,113 @@ const treeGridClass =
 const emptyStateClass =
   "rounded-card border border-dashed border-[rgba(130,167,151,0.5)] bg-black/8 p-8 text-content-secondary [&>h3]:mt-0 [&>h3]:mb-[0.45rem] [&>h3]:text-content-primary [&>p]:m-0";
 
+function TreeCard({
+  tree,
+  onEdit,
+  onDelete,
+  deleting,
+}: {
+  tree: FamilyTreeSummary;
+  onEdit: () => void;
+  onDelete: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <article className="grid min-h-80 grid-rows-[1fr_auto] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)] shadow-none transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+      <Link
+        className="grid grid-rows-[7.5rem_1fr] text-inherit no-underline"
+        to={`/trees/${tree.id}/tree`}
+      >
+        <div className="grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#476f61,#1b352f)] font-display text-[2rem] font-semibold text-accent [&_img]:size-full [&_img]:object-cover">
+          {tree.coverUrl ? <img src={tree.coverUrl} alt="" /> : <span>⌘</span>}
+        </div>
+        <div className="flex flex-col p-[1.15rem] pb-3">
+          <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
+            {tree.originPlace ?? "Chưa cập nhật nguồn gốc"}
+          </p>
+          <h3 className="mt-[0.45rem] mb-[0.55rem] font-display text-[1.3rem] font-semibold">
+            {tree.name}
+          </h3>
+          <span className="leading-normal text-content-secondary">
+            {tree.description ?? "Chưa có mô tả"}
+          </span>
+          <div className="mt-auto flex items-baseline gap-[0.35rem] pt-4 text-sm text-content-muted">
+            <strong className="text-white">{tree.personCount}</strong> thành
+            viên
+            <b className="ml-auto text-accent">Khám phá →</b>
+          </div>
+        </div>
+      </Link>
+      <footer className="flex justify-end gap-2 border-t border-[rgba(130,167,151,0.28)] px-4 py-3">
+        <button
+          type="button"
+          className={`${compactSecondaryButtonClass} border-[#6f9186] text-content-primary`}
+          onClick={onEdit}
+        >
+          <Pencil size={15} /> Sửa
+        </button>
+        <button
+          type="button"
+          className={compactDangerButtonClass}
+          disabled={deleting}
+          onClick={onDelete}
+        >
+          <Trash2 size={15} /> {deleting ? "Đang xóa…" : "Xóa"}
+        </button>
+      </footer>
+    </article>
+  );
+}
+
 export function TreesPage() {
+  const client = useQueryClient();
+  const notice = useNotifications();
+  const [dialog, setDialog] = useState<
+    { mode: "create" } | { mode: "edit"; tree: FamilyTreeSummary } | null
+  >(null);
   const query = useQuery({ queryKey: ["trees"], queryFn: getTrees });
+  const save = useMutation({
+    mutationFn: (input: FamilyTreeInput) =>
+      dialog?.mode === "edit"
+        ? updateTree(dialog.tree.id, input)
+        : createTree(input),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["trees"] });
+      notice.toast(
+        dialog?.mode === "edit" ? "Đã cập nhật gia phả" : "Đã tạo gia phả",
+        "success",
+      );
+      setDialog(null);
+    },
+    onError: (error) =>
+      notice.alert(
+        "Không thể lưu gia phả",
+        error instanceof Error ? error.message : "Vui lòng thử lại",
+      ),
+  });
+  const remove = useMutation({
+    mutationFn: deleteTree,
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["trees"] });
+      notice.toast("Đã xóa gia phả", "success");
+    },
+    onError: (error) =>
+      notice.alert(
+        "Không thể xóa gia phả",
+        error instanceof Error ? error.message : "Vui lòng thử lại",
+      ),
+  });
+  const requestDelete = async (tree: FamilyTreeSummary) => {
+    const accepted = await notice.confirm(
+      "Xóa gia phả",
+      `Xóa “${tree.name}”, toàn bộ quan hệ và ${tree.personCount} thành viên chỉ thuộc gia phả này? Hành động này không thể hoàn tác.`,
+    );
+    if (accepted) remove.mutate(tree.id);
+  };
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#12211f_0%,#19342e_55%,#24483d_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(2rem,5vw,4.5rem)] text-content-primary">
       <header>
+        <Breadcrumbs items={[{ label: "Trang chủ" }]} light className="mb-7" />
         <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
           KHÔNG GIAN GIA PHẢ
         </p>
@@ -28,7 +149,16 @@ export function TreesPage() {
       <section className="mt-14" aria-labelledby="owned-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="owned-trees-title">Gia phả của tôi</h2>
-          {query.data && <span>{query.data.createdByMe.length} gia phả</span>}
+          <div className="flex items-center gap-3">
+            {query.data && <span>{query.data.createdByMe.length} gia phả</span>}
+            <button
+              type="button"
+              className={primaryButtonClass}
+              onClick={() => setDialog({ mode: "create" })}
+            >
+              <Plus size={18} /> Thêm gia phả
+            </button>
+          </div>
         </div>
         {query.isLoading && (
           <div className={treeGridClass} aria-label="Đang tải">
@@ -50,52 +180,55 @@ export function TreesPage() {
         {query.data?.createdByMe.length === 0 && (
           <div className={emptyStateClass}>
             <h3>Chưa có gia phả</h3>
-            <p>Dữ liệu gia phả mẫu sẽ xuất hiện sau khi chạy seed.</p>
+            <p>Hãy tạo gia phả đầu tiên để bắt đầu thêm các thành viên.</p>
           </div>
         )}
         <div className={treeGridClass}>
           {query.data?.createdByMe.map((tree) => (
-            <Link
-              className="grid min-h-72 grid-rows-[7.5rem_1fr] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)] text-inherit no-underline shadow-none transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_18px_45px_rgba(0,0,0,0.22)] focus-visible:-translate-y-[3px] focus-visible:border-accent focus-visible:shadow-[0_18px_45px_rgba(0,0,0,0.22)]"
-              to={`/trees/${tree.id}`}
+            <TreeCard
+              tree={tree}
               key={tree.id}
-            >
-              <div className="grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#476f61,#1b352f)] font-display text-[2rem] font-semibold text-accent [&_img]:size-full [&_img]:object-cover">
-                {tree.coverUrl ? (
-                  <img src={tree.coverUrl} alt="" />
-                ) : (
-                  <span>⌘</span>
-                )}
-              </div>
-              <div className="flex flex-col p-[1.15rem]">
-                <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
-                  {tree.originPlace ?? "Chưa cập nhật nguồn gốc"}
-                </p>
-                <h3 className="mt-[0.45rem] mb-[0.55rem] font-display text-[1.3rem] font-semibold">
-                  {tree.name}
-                </h3>
-                <span className="leading-normal text-content-secondary">
-                  {tree.description ?? "Chưa có mô tả"}
-                </span>
-                <footer className="mt-auto flex items-baseline gap-[0.35rem] pt-4 text-sm text-content-muted">
-                  <strong className="text-white">{tree.personCount}</strong>{" "}
-                  thành viên <b className="ml-auto text-accent">Khám phá →</b>
-                </footer>
-              </div>
-            </Link>
+              onEdit={() => setDialog({ mode: "edit", tree })}
+              onDelete={() => void requestDelete(tree)}
+              deleting={remove.isPending && remove.variables === tree.id}
+            />
           ))}
         </div>
       </section>
       <section className="mt-14" aria-labelledby="shared-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="shared-trees-title">Được chia sẻ với tôi</h2>
-          <span>Sắp ra mắt</span>
+          {query.data && <span>{query.data.sharedWithMe.length} gia phả</span>}
         </div>
-        <div className={emptyStateClass}>
-          <h3>Chưa có gia phả được chia sẻ</h3>
-          <p>Tính năng chia sẻ sẽ được bổ sung trong phiên bản tiếp theo.</p>
+        {query.data?.sharedWithMe.length === 0 && (
+          <div className={emptyStateClass}>
+            <h3>Chưa có gia phả được chia sẻ</h3>
+            <p>Các gia phả người khác chia sẻ với bạn sẽ xuất hiện tại đây.</p>
+          </div>
+        )}
+        <div className={treeGridClass}>
+          {query.data?.sharedWithMe.map((tree) => (
+            <Link
+              key={tree.id}
+              to={`/trees/${tree.id}/tree`}
+              className="rounded-card border border-[rgba(130,167,151,0.4)] p-5 text-content-primary no-underline"
+            >
+              <strong>{tree.name}</strong>
+              <span className="mt-2 block text-sm text-content-secondary">
+                {tree.personCount} thành viên
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
+      {dialog && (
+        <TreeFormDialog
+          tree={dialog.mode === "edit" ? dialog.tree : undefined}
+          pending={save.isPending}
+          onClose={() => !save.isPending && setDialog(null)}
+          onSubmit={(value) => save.mutate(value)}
+        />
+      )}
     </main>
   );
 }

@@ -7,6 +7,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useNotifications } from "../app/providers/NotificationProvider";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { ApiError, publicApi } from "../lib/api/client";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui-classes";
 
@@ -144,9 +145,7 @@ export function AuthPage() {
     notifications.toast(message, "success");
     const returnTo = params.get("returnTo");
     navigate(
-      returnTo?.startsWith("/") && !returnTo.startsWith("//")
-        ? returnTo
-        : "/trees",
+      returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/",
       { replace: true },
     );
   };
@@ -167,10 +166,24 @@ export function AuthPage() {
     }
   };
 
-  if (!isInitializing && isAuthenticated)
-    return <Navigate to="/trees" replace />;
+  if (!isInitializing && isAuthenticated) return <Navigate to="/" replace />;
   return (
-    <main className="grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
+    <main className="relative grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
+      <Breadcrumbs
+        items={[
+          { label: "Trang chủ", to: "/" },
+          {
+            label:
+              mode === "register"
+                ? "Đăng ký"
+                : mode === "forgot-password"
+                  ? "Quên mật khẩu"
+                  : "Đăng nhập",
+          },
+        ]}
+        light
+        className="absolute top-5 left-5 z-10"
+      />
       <section className="flex flex-col justify-center px-5 pt-10 pb-4 min-[801px]:p-[clamp(3rem,8vw,8rem)]">
         <p className="text-xs font-bold tracking-[0.14em] text-accent">
           DIGITAL FAMILY TREE / FOUNDATION

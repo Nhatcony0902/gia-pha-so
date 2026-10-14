@@ -13,7 +13,15 @@ import {
 import type { Request } from "express";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard.js";
 import { TreesService } from "./trees.service.js";
-import { AddPersonImageDto, UpdatePersonDto } from "./trees.dto.js";
+import {
+  AddPersonImageDto,
+  CreatePersonDto,
+  CreateTreeDto,
+  CreateRelationshipDto,
+  UpdatePersonDto,
+  UpdateTreeDto,
+  UpdateRelationshipDto,
+} from "./trees.dto.js";
 
 type AuthenticatedRequest = Request & { user: { userId: string } };
 
@@ -27,6 +35,31 @@ export class TreesController {
     return this.trees.list(request.user.userId);
   }
 
+  @Post()
+  createTree(
+    @Body() body: CreateTreeDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.createTree(request.user.userId, body);
+  }
+
+  @Patch(":treeId")
+  updateTree(
+    @Param("treeId") treeId: string,
+    @Body() body: UpdateTreeDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.updateTree(treeId, request.user.userId, body);
+  }
+
+  @Delete(":treeId")
+  deleteTree(
+    @Param("treeId") treeId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.deleteTree(treeId, request.user.userId);
+  }
+
   @Get(":treeId/graph")
   graph(@Param("treeId") treeId: string, @Req() request: AuthenticatedRequest) {
     return this.trees.graph(treeId, request.user.userId);
@@ -38,6 +71,52 @@ export class TreesController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.trees.persons(treeId, request.user.userId);
+  }
+
+  @Post(":treeId/persons")
+  createPerson(
+    @Param("treeId") treeId: string,
+    @Body() body: CreatePersonDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.createPerson(treeId, request.user.userId, body);
+  }
+
+  @Post(":treeId/relationships")
+  createRelationship(
+    @Param("treeId") treeId: string,
+    @Body() body: CreateRelationshipDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.createRelationship(treeId, request.user.userId, body);
+  }
+
+  @Patch(":treeId/relationships/:relationshipId")
+  updateRelationship(
+    @Param("treeId") treeId: string,
+    @Param("relationshipId") relationshipId: string,
+    @Body() body: UpdateRelationshipDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.updateRelationship(
+      treeId,
+      relationshipId,
+      request.user.userId,
+      body,
+    );
+  }
+
+  @Delete(":treeId/relationships/:relationshipId")
+  deleteRelationship(
+    @Param("treeId") treeId: string,
+    @Param("relationshipId") relationshipId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.deleteRelationship(
+      treeId,
+      relationshipId,
+      request.user.userId,
+    );
   }
 
   @Get(":treeId/persons/:personId")

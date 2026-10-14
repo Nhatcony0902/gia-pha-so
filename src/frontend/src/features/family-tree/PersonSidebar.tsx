@@ -219,11 +219,13 @@ function FamilyConnections({
 }
 
 export function PersonSidebar({
+  treeId,
   person,
   loading,
   onClose,
   onSelectPerson,
 }: {
+  treeId: string;
   person?: PersonSidebarDetail;
   loading: boolean;
   onClose: () => void;
@@ -301,7 +303,7 @@ export function PersonSidebar({
               {person.visibleTrees.map((tree) => (
                 <Link
                   key={tree.id}
-                  to={`/trees/${tree.id}?person=${person.id}`}
+                  to={`/trees/${tree.id}/tree?person=${person.id}`}
                 >
                   {tree.name}
                 </Link>
@@ -310,7 +312,7 @@ export function PersonSidebar({
           </section>
           <Link
             className={`${primaryButtonClass} mt-[1.4rem] flex w-full justify-center no-underline`}
-            to={`persons/${person.id}`}
+            to={`/trees/${treeId}/persons/${person.id}`}
           >
             Xem chi tiết
           </Link>

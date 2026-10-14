@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 
 export function NotFoundPage() {
   useEffect(() => {
@@ -14,6 +15,13 @@ export function NotFoundPage() {
   return (
     <main className="bg-page-gradient text-content-primary relative isolate min-h-screen overflow-hidden">
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-8 sm:px-8 lg:px-12">
+        <Breadcrumbs
+          items={[
+            { label: "Trang chủ", to: "/" },
+            { label: "Không tìm thấy trang" },
+          ]}
+          light
+        />
         <section className="grid flex-1 items-center gap-12 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)] lg:py-20">
           <div className="max-w-2xl">
             <p className="text-accent tracking-eyebrow font-sans text-xs font-bold">
