@@ -11,6 +11,7 @@ import {
 } from "@xyflow/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ChevronRight, Network, Users } from "lucide-react";
 import { getPersonDetail, getTreeGraph } from "../features/family-tree/api";
 import {
   FamilyPersonNode,
@@ -26,6 +27,7 @@ import {
   RelationshipSidebar,
 } from "../features/family-tree/PersonSidebar";
 import { secondaryButtonClass } from "../lib/ui-classes";
+import { MemberList } from "../features/family-tree/MemberList";
 
 const nodeTypes = { person: FamilyPersonNode, junction: FamilyJunctionNode };
 const routeStateClass =
@@ -37,6 +39,7 @@ export function FamilyTreePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("person");
   const relationshipKey = searchParams.get("relationship");
+  const activeTab = searchParams.get("tab") === "members" ? "members" : "tree";
   const [nodes, setNodes, onNodesChange] = useNodesState<FamilyTreeFlowNode>(
     [],
   );
@@ -95,9 +98,17 @@ export function FamilyTreePage() {
     );
   }, [selectedId, setEdges, setNodes]);
 
-  const closeSidebar = () => setSearchParams({}, { replace: true });
+  const closeSidebar = () =>
+    setSearchParams(activeTab === "members" ? { tab: "members" } : {}, {
+      replace: true,
+    });
   const selectPerson = (personId: string) =>
-    setSearchParams({ person: personId }, { replace: true });
+    setSearchParams(
+      activeTab === "members"
+        ? { tab: "members", person: personId }
+        : { person: personId },
+      { replace: true },
+    );
   const selectedRelationship = useMemo(() => {
     if (!graph.data || !relationshipKey) return null;
     const [firstId, secondId] = relationshipKey.split("::");
@@ -171,107 +182,145 @@ export function FamilyTreePage() {
     );
 
   return (
-    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_1fr] overflow-hidden bg-[#edf2ee] text-[#18332e]">
+    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#edf2ee] text-[#18332e]">
       <header className="z-3 flex flex-col items-start justify-between gap-4 border-b border-[#cad7d0] bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem] min-[801px]:flex-row min-[801px]:items-center">
         <nav
-          className="flex min-w-0 items-center gap-[0.55rem]"
+          className="flex min-w-0 items-center gap-2"
           aria-label="Breadcrumb"
         >
           <Link
-            className="whitespace-nowrap text-[#8a5c22] no-underline"
+            className="shrink-0 whitespace-nowrap text-sm font-medium text-[#63756d] no-underline transition-colors hover:text-[#29473f]"
             to="/trees"
           >
             Danh sách gia phả
           </Link>
-          <span>/</span>
-          <strong className="truncate">{graph.data.tree.name}</strong>
+          <ChevronRight
+            size={15}
+            className="shrink-0 text-[#9aa9a2]"
+            aria-hidden="true"
+          />
+          <strong
+            className="truncate font-display text-base font-semibold text-[#18332e]"
+            aria-current="page"
+          >
+            {graph.data.tree.name}
+          </strong>
         </nav>
-        <div className="flex w-full items-center justify-between gap-[1.2rem] text-[0.84rem] text-[#5d7167] min-[801px]:w-auto">
+        <div className="flex w-full flex-wrap items-center justify-between gap-[1.2rem] text-[0.84rem] text-[#5d7167] min-[801px]:w-auto">
+          <div className="flex rounded-lg bg-[#e6ede9] p-1">
+            <button
+              type="button"
+              onClick={() => setSearchParams({}, { replace: true })}
+              className={`flex cursor-pointer items-center gap-1.5 rounded-md border-0 px-3 py-1.5 font-bold ${activeTab === "tree" ? "bg-white text-[#29473f] shadow-sm" : "bg-transparent text-[#61736a]"}`}
+            >
+              <Network size={16} /> Cây gia phả
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setSearchParams({ tab: "members" }, { replace: true })
+              }
+              className={`flex cursor-pointer items-center gap-1.5 rounded-md border-0 px-3 py-1.5 font-bold ${activeTab === "members" ? "bg-white text-[#29473f] shadow-sm" : "bg-transparent text-[#61736a]"}`}
+            >
+              <Users size={16} /> Danh sách
+            </button>
+          </div>
           <span>{graph.data.tree.personCount} thành viên</span>
         </div>
       </header>
-      <section
-        className={`relative min-h-0 min-w-0 transition-[margin-right] duration-250 ${selectedOpen ? "min-[801px]:mr-92" : ""}`}
-        aria-label="Sơ đồ gia phả tương tác"
-      >
-        {!layoutReady && (
-          <div className="absolute inset-0 z-4 grid place-items-center bg-[#edf2ee] text-outline">
-            Đang sắp xếp các thế hệ…
-          </div>
+      <div className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
+        {activeTab === "tree" ? (
+          <section
+            className={`relative min-h-0 min-w-0 transition-[margin-right] duration-250 ${selectedOpen ? "min-[801px]:mr-92" : ""}`}
+            aria-label="Sơ đồ gia phả tương tác"
+          >
+            {!layoutReady && (
+              <div className="absolute inset-0 z-4 grid place-items-center bg-[#edf2ee] text-outline">
+                Đang sắp xếp các thế hệ…
+              </div>
+            )}
+            <ReactFlow<FamilyTreeFlowNode, Edge>
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={(_, node) => selectPerson(node.id)}
+              onEdgeClick={(_, edge) => {
+                if (!edge.data?.relationshipKey) return;
+                setSearchParams(
+                  { relationship: String(edge.data.relationshipKey) },
+                  { replace: true },
+                );
+              }}
+              fitView
+              fitViewOptions={{ padding: 0.22 }}
+              minZoom={0.15}
+              maxZoom={2}
+              nodesConnectable={false}
+              nodesDraggable={false}
+              proOptions={{ hideAttribution: true }}
+            >
+              <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-[#29473f] shadow-[0_8px_24px_rgba(30,58,51,0.14)]">
+                <summary className="cursor-pointer p-[0.65rem_0.8rem] text-[0.78rem] font-bold [list-style-position:inside]">
+                  Chú thích quan hệ
+                </summary>
+                <div className="grid gap-[0.55rem] px-[0.8rem] pb-[0.8rem]">
+                  <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                    <i className={legendLineClass} /> Cha/mẹ – con
+                  </span>
+                  <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                    <i className={`${legendLineClass} border-[#a96f25]`} /> Kết
+                    hôn
+                  </span>
+                  <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                    <i
+                      className={`${legendLineClass} border-dashed border-[#b85b4b]`}
+                    />{" "}
+                    Ly hôn
+                  </span>
+                  <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                    <i
+                      className={`${legendLineClass} border-dotted border-[#c1842f]`}
+                    />{" "}
+                    Ly thân
+                  </span>
+                  <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
+                    <i
+                      className={`${legendLineClass} border-dotted border-[#788982]`}
+                    />{" "}
+                    Có con chung
+                  </span>
+                </div>
+              </details>
+              <Background color="#365b51" gap={24} size={1} />
+              <Controls showInteractive={false} />
+              <MiniMap nodeColor={minimapColor} pannable zoomable />
+            </ReactFlow>
+          </section>
+        ) : (
+          <MemberList
+            treeId={treeId}
+            onSelectPerson={selectPerson}
+            sidebarOpen={selectedOpen}
+          />
         )}
-        <ReactFlow<FamilyTreeFlowNode, Edge>
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={(_, node) => selectPerson(node.id)}
-          onEdgeClick={(_, edge) => {
-            if (!edge.data?.relationshipKey) return;
-            setSearchParams(
-              { relationship: String(edge.data.relationshipKey) },
-              { replace: true },
-            );
-          }}
-          fitView
-          fitViewOptions={{ padding: 0.22 }}
-          minZoom={0.15}
-          maxZoom={2}
-          nodesConnectable={false}
-          nodesDraggable={false}
-          proOptions={{ hideAttribution: true }}
-        >
-          <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-[#29473f] shadow-[0_8px_24px_rgba(30,58,51,0.14)]">
-            <summary className="cursor-pointer p-[0.65rem_0.8rem] text-[0.78rem] font-bold [list-style-position:inside]">
-              Chú thích quan hệ
-            </summary>
-            <div className="grid gap-[0.55rem] px-[0.8rem] pb-[0.8rem]">
-              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i className={legendLineClass} /> Cha/mẹ – con
-              </span>
-              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i className={`${legendLineClass} border-[#a96f25]`} /> Kết hôn
-              </span>
-              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i
-                  className={`${legendLineClass} border-dashed border-[#b85b4b]`}
-                />{" "}
-                Ly hôn
-              </span>
-              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i
-                  className={`${legendLineClass} border-dotted border-[#c1842f]`}
-                />{" "}
-                Ly thân
-              </span>
-              <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                <i
-                  className={`${legendLineClass} border-dotted border-[#788982]`}
-                />{" "}
-                Có con chung
-              </span>
-            </div>
-          </details>
-          <Background color="#365b51" gap={24} size={1} />
-          <Controls showInteractive={false} />
-          <MiniMap nodeColor={minimapColor} pannable zoomable />
-        </ReactFlow>
-      </section>
-      {selectedOpen && (
-        <PersonSidebar
-          person={detail.data}
-          loading={detail.isLoading}
-          onClose={closeSidebar}
-          onSelectPerson={selectPerson}
-        />
-      )}
-      {selectedRelationship && (
-        <RelationshipSidebar
-          {...selectedRelationship}
-          onClose={closeSidebar}
-          onSelectPerson={selectPerson}
-        />
-      )}
+        {selectedId && (
+          <PersonSidebar
+            person={detail.data}
+            loading={detail.isLoading}
+            onClose={closeSidebar}
+            onSelectPerson={selectPerson}
+          />
+        )}
+        {selectedRelationship && (
+          <RelationshipSidebar
+            {...selectedRelationship}
+            onClose={closeSidebar}
+            onSelectPerson={selectPerson}
+          />
+        )}
+      </div>
     </main>
   );
 }

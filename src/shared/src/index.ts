@@ -117,8 +117,103 @@ export interface PersonSidebarDetail extends PersonNode {
   ethnicity: string | null;
   religion: string | null;
   occupation: string | null;
+  title: string | null;
+  maidenName: string | null;
+  education: string | null;
+  employer: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  bloodType: string | null;
+  identificationCode: string | null;
+  socialLinks: Record<string, string> | null;
   biography: string | null;
+  notes: string | null;
+  burialPlace: string | null;
+  images: PersonImage[];
   visibleTrees: FamilyTreeSummary[];
   parents: PersonParent[];
   partnerFamilies: PartnerFamily[];
+}
+
+export interface PersonImage {
+  id: string;
+  url: string;
+  publicId: string;
+  caption: string | null;
+  takenAt: string | null;
+  width: number | null;
+  height: number | null;
+  format: string | null;
+  bytes: number | null;
+  sortOrder: number;
+}
+
+export interface PersonListItem {
+  id: string;
+  fullName: string;
+  preferredName: string | null;
+  gender: Gender;
+  avatarUrl: string | null;
+  birthDate: string | null;
+  birthPlace: string | null;
+  deathDate: string | null;
+  deathPlace: string | null;
+  isDeceased: boolean;
+  hometown: string | null;
+  currentResidence: string | null;
+  nationality: string | null;
+  ethnicity: string | null;
+  religion: string | null;
+  occupation: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+export interface PersonListResponse {
+  tree: FamilyTreeSummary;
+  persons: PersonListItem[];
+}
+
+export type PersonUpdateInput = Partial<{
+  fullName: string;
+  preferredName: string | null;
+  aliases: string[];
+  gender: Gender;
+  birthDate: string | null;
+  birthDatePrecision: DatePrecision | null;
+  birthPlace: string | null;
+  deathDate: string | null;
+  deathDatePrecision: DatePrecision | null;
+  deathPlace: string | null;
+  isDeceased: boolean;
+  hometown: string | null;
+  currentResidence: string | null;
+  nationality: string | null;
+  ethnicity: string | null;
+  religion: string | null;
+  occupation: string | null;
+  title: string | null;
+  maidenName: string | null;
+  education: string | null;
+  employer: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  bloodType: string | null;
+  identificationCode: string | null;
+  socialLinks: Record<string, string> | null;
+  biography: string | null;
+  notes: string | null;
+  burialPlace: string | null;
+  avatarUrl: string | null;
+  avatarPublicId: string | null;
+}>;
+
+export interface CloudinarySignature {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  signature: string;
+  folder: string;
 }
