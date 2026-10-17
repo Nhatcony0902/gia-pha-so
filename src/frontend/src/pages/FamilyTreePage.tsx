@@ -35,6 +35,7 @@ import {
   type FamilyFlowNode,
 } from "../features/family-tree/FamilyPersonNode";
 import { FamilyJunctionNode } from "../features/family-tree/FamilyJunctionNode";
+import { FamilyRelationshipEdge } from "../features/family-tree/FamilyRelationshipEdge";
 import {
   layoutGraph,
   type FamilyTreeFlowNode,
@@ -53,6 +54,7 @@ import { RelationshipList } from "../features/family-tree/RelationshipList";
 import { compactPrimaryButtonClass } from "../lib/ui-classes";
 
 const nodeTypes = { person: FamilyPersonNode, junction: FamilyJunctionNode };
+const edgeTypes = { "relationship-route": FamilyRelationshipEdge };
 const routeStateClass =
   "grid min-h-[calc(100vh-4.5rem)] place-content-center justify-items-center gap-[0.8rem] bg-[#17302b] p-4 text-center text-content-primary [&>h1]:m-0 [&>p]:m-0 [&>a]:text-accent";
 const legendLineClass = "h-0 w-8 border-t-2 border-focus";
@@ -248,16 +250,13 @@ export function FamilyTreePage({
             { label: "Danh sách gia phả", to: "/trees" },
             {
               label: graph.data.tree.name,
-              ...(activeTab === "tree"
-                ? {}
-                : { to: `/trees/${treeId}/tree` }),
+              ...(activeTab === "tree" ? {} : { to: `/trees/${treeId}/tree` }),
             },
             ...(activeTab === "tree"
               ? []
               : [
                   {
-                    label:
-                      activeTab === "members" ? "Thành viên" : "Quan hệ",
+                    label: activeTab === "members" ? "Thành viên" : "Quan hệ",
                   },
                 ]),
           ]}
@@ -314,6 +313,7 @@ export function FamilyTreePage({
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onNodeClick={(_, node) => selectPerson(node.id)}
