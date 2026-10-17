@@ -220,16 +220,9 @@ export function PersonDetailPage() {
     enabled: Boolean(treeId && isCreating && creationMode === "existing"),
   });
   const candidateDetail = useQuery({
-    queryKey: [
-      "person",
-      candidateSidebar?.treeId,
-      candidateSidebar?.personId,
-    ],
+    queryKey: ["person", candidateSidebar?.treeId, candidateSidebar?.personId],
     queryFn: () =>
-      getPersonDetail(
-        candidateSidebar!.treeId,
-        candidateSidebar!.personId,
-      ),
+      getPersonDetail(candidateSidebar!.treeId, candidateSidebar!.personId),
     enabled: Boolean(candidateSidebar),
   });
   const [editing, setEditing] = useState(isCreating);
@@ -315,9 +308,7 @@ export function PersonDetailPage() {
         await client.invalidateQueries({
           queryKey: ["person", treeId, person.id],
         });
-        pendingImages.forEach((image) =>
-          URL.revokeObjectURL(image.previewUrl),
-        );
+        pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
         const galleryPreviewUrls = new Set(
           pendingImages.map((image) => image.previewUrl),
         );
@@ -563,87 +554,107 @@ export function PersonDetailPage() {
           </div>
           {creationMode === "existing" ? (
             <div className="relative min-h-[34rem]">
-              <section
-                className={`${surfaceCardClass} p-5`}
-              >
-              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h1 className="m-0 font-display text-2xl">
-                    Chọn thành viên từ gia phả khác
-                  </h1>
-                  <p className="mt-1 mb-0 text-sm text-ink-subtle">
-                    Chỉ hiển thị thành viên chưa có trong gia phả đang xử lý.
+              <section className={`${surfaceCardClass} p-5`}>
+                <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h1 className="m-0 font-display text-2xl">
+                      Chọn thành viên từ gia phả khác
+                    </h1>
+                    <p className="mt-1 mb-0 text-sm text-ink-subtle">
+                      Chỉ hiển thị thành viên chưa có trong gia phả đang xử lý.
+                    </p>
+                    {selectedCandidateIds.length > 0 && (
+                      <button
+                        type="button"
+                        className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-accent-deep"
+                        onClick={() => setSelectedCandidateIds([])}
+                      >
+                        Đã chọn {selectedCandidateIds.length} · Bỏ chọn tất cả
+                      </button>
+                    )}
+                  </div>
+                  <label className="relative min-w-64 flex-1 sm:max-w-sm">
+                    <span className="sr-only">Tìm thành viên</span>
+                    <Search
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle"
+                    />
+                    <input
+                      type="search"
+                      className={`${formFieldClass} pl-10`}
+                      placeholder="Tìm theo tên hoặc gia phả…"
+                      value={candidateSearch}
+                      onChange={(event) =>
+                        setCandidateSearch(event.target.value)
+                      }
+                    />
+                  </label>
+                </div>
+                {linkCandidates.isLoading ? (
+                  <p className="py-10 text-center text-ink-subtle">
+                    Đang tải thành viên từ các gia phả khác…
                   </p>
-                  {selectedCandidateIds.length > 0 && (
+                ) : linkCandidates.isError ? (
+                  <div className="py-10 text-center">
+                    <p className="text-[#8d3d32]">
+                      Không thể tải danh sách thành viên.
+                    </p>
                     <button
                       type="button"
-                      className="mt-2 cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-accent-deep"
-                      onClick={() => setSelectedCandidateIds([])}
+                      className={compactSecondaryButtonClass}
+                      onClick={() => linkCandidates.refetch()}
                     >
-                      Đã chọn {selectedCandidateIds.length} · Bỏ chọn tất cả
+                      Thử lại
                     </button>
-                  )}
-                </div>
-                <label className="relative min-w-64 flex-1 sm:max-w-sm">
-                  <span className="sr-only">Tìm thành viên</span>
-                  <Search
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle"
-                  />
-                  <input
-                    type="search"
-                    className={`${formFieldClass} pl-10`}
-                    placeholder="Tìm theo tên hoặc gia phả…"
-                    value={candidateSearch}
-                    onChange={(event) => setCandidateSearch(event.target.value)}
-                  />
-                </label>
-              </div>
-              {linkCandidates.isLoading ? (
-                <p className="py-10 text-center text-ink-subtle">
-                  Đang tải thành viên từ các gia phả khác…
-                </p>
-              ) : linkCandidates.isError ? (
-                <div className="py-10 text-center">
-                  <p className="text-[#8d3d32]">
-                    Không thể tải danh sách thành viên.
-                  </p>
-                  <button
-                    type="button"
-                    className={compactSecondaryButtonClass}
-                    onClick={() => linkCandidates.refetch()}
-                  >
-                    Thử lại
-                  </button>
-                </div>
-              ) : candidateGroups.length ? (
-                <div className="grid gap-7">
-                  {candidateGroups.map((group) => (
-                    <section key={group.tree.id}>
-                      <div className="mb-3 flex items-center justify-between gap-3 border-b border-border-default pb-2">
-                        <h2 className="m-0 font-display text-xl">
-                          {group.tree.name}
-                        </h2>
-                        <span className="text-xs text-ink-subtle">
-                          {group.persons.length} thành viên
-                        </span>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {group.persons.map((candidate) => {
-                          const selected = selectedCandidateIds.includes(
-                            candidate.id,
-                          );
-                          return (
-                            <article
-                              key={`${group.tree.id}-${candidate.id}`}
-                              className={`flex items-stretch overflow-hidden rounded-xl border transition-colors ${selected ? "border-accent bg-[#fff8e9] shadow-sm" : "border-border-default bg-white hover:bg-surface-hover"}`}
-                            >
-                              <label className="flex shrink-0 cursor-pointer items-center px-3 pl-4">
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  disabled={linkExistingPerson.isPending}
-                                  onChange={() => {
+                  </div>
+                ) : candidateGroups.length ? (
+                  <div className="grid gap-7">
+                    {candidateGroups.map((group) => (
+                      <section key={group.tree.id}>
+                        <div className="mb-3 flex items-center justify-between gap-3 border-b border-border-default pb-2">
+                          <h2 className="m-0 font-display text-xl">
+                            {group.tree.name}
+                          </h2>
+                          <span className="text-xs text-ink-subtle">
+                            {group.persons.length} thành viên
+                          </span>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {group.persons.map((candidate) => {
+                            const selected = selectedCandidateIds.includes(
+                              candidate.id,
+                            );
+                            return (
+                              <article
+                                key={`${group.tree.id}-${candidate.id}`}
+                                className={`flex items-stretch overflow-hidden rounded-xl border transition-colors ${selected ? "border-accent bg-[#fff8e9] shadow-sm" : "border-border-default bg-white hover:bg-surface-hover"}`}
+                              >
+                                <label className="flex shrink-0 cursor-pointer items-center px-3 pl-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={linkExistingPerson.isPending}
+                                    onChange={() => {
+                                      setSelectedCandidateIds((current) =>
+                                        current.includes(candidate.id)
+                                          ? current.filter(
+                                              (id) => id !== candidate.id,
+                                            )
+                                          : [...current, candidate.id],
+                                      );
+                                      setCandidateSidebar({
+                                        treeId: group.tree.id,
+                                        personId: candidate.id,
+                                      });
+                                    }}
+                                    className="size-4 accent-[#b87b24]"
+                                    aria-label={`Chọn ${candidate.fullName}`}
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent p-3 text-left"
+                                  onClick={() => {
                                     setSelectedCandidateIds((current) =>
                                       current.includes(candidate.id)
                                         ? current.filter(
@@ -656,64 +667,44 @@ export function PersonDetailPage() {
                                       personId: candidate.id,
                                     });
                                   }}
-                                  className="size-4 accent-[#b87b24]"
-                                  aria-label={`Chọn ${candidate.fullName}`}
-                                />
-                              </label>
-                              <button
-                                type="button"
-                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent p-3 text-left"
-                                onClick={() => {
-                                  setSelectedCandidateIds((current) =>
-                                    current.includes(candidate.id)
-                                      ? current.filter(
-                                          (id) => id !== candidate.id,
-                                        )
-                                      : [...current, candidate.id],
-                                  );
-                                  setCandidateSidebar({
-                                    treeId: group.tree.id,
-                                    personId: candidate.id,
-                                  });
-                                }}
-                                disabled={linkExistingPerson.isPending}
-                              >
-                                {candidate.avatarUrl ? (
-                                  <img
-                                    src={candidate.avatarUrl}
-                                    alt=""
-                                    className="size-12 shrink-0 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="grid size-12 shrink-0 place-items-center rounded-full bg-[#dbe6e0] font-bold text-ink-soft">
-                                    {candidate.fullName[0]}
+                                  disabled={linkExistingPerson.isPending}
+                                >
+                                  {candidate.avatarUrl ? (
+                                    <img
+                                      src={candidate.avatarUrl}
+                                      alt=""
+                                      className="size-12 shrink-0 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="grid size-12 shrink-0 place-items-center rounded-full bg-[#dbe6e0] font-bold text-ink-soft">
+                                      {candidate.fullName[0]}
+                                    </span>
+                                  )}
+                                  <span className="min-w-0 flex-1">
+                                    <strong className="block truncate text-sm text-ink">
+                                      {candidate.fullName}
+                                    </strong>
+                                    <span className="mt-1 block text-xs text-ink-subtle">
+                                      {selected
+                                        ? "Đã chọn · Nhấn để bỏ chọn và xem thông tin"
+                                        : "Nhấn để chọn và xem thông tin"}
+                                    </span>
                                   </span>
-                                )}
-                                <span className="min-w-0 flex-1">
-                                  <strong className="block truncate text-sm text-ink">
-                                    {candidate.fullName}
-                                  </strong>
-                                  <span className="mt-1 block text-xs text-ink-subtle">
-                                    {selected
-                                      ? "Đã chọn · Nhấn để bỏ chọn và xem thông tin"
-                                      : "Nhấn để chọn và xem thông tin"}
-                                  </span>
-                                </span>
-                              </button>
-                            </article>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <p className="py-10 text-center text-ink-subtle">
-                  {candidateSearch.trim()
-                    ? "Không tìm thấy thành viên phù hợp."
-                    : "Không có thành viên nào từ gia phả khác để thêm."}
-                </p>
-              )}
+                                </button>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-10 text-center text-ink-subtle">
+                    {candidateSearch.trim()
+                      ? "Không tìm thấy thành viên phù hợp."
+                      : "Không có thành viên nào từ gia phả khác để thêm."}
+                  </p>
+                )}
               </section>
               {candidateSidebar && (
                 <PersonSidebar
@@ -734,184 +725,186 @@ export function PersonDetailPage() {
             </div>
           ) : (
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.65fr)]">
-            <aside className="grid gap-5">
-              <section
-                className={`${surfaceCardClass} flex flex-col items-center gap-4 p-6 text-center`}
-              >
-                <div className="relative grid size-35 shrink-0 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-4xl font-bold text-ink-soft">
-                  {pendingAvatar ? (
-                    <img
-                      src={pendingAvatar.previewUrl}
-                      alt="Ảnh đại diện xem trước"
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    (String(form.fullName ?? "").trim()[0] ?? "?")
-                  )}
-                  <label className="absolute inset-x-0 bottom-0 flex cursor-pointer justify-center bg-black/55 py-2 text-white">
-                    <Camera size={17} />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (!file) return;
-                        if (pendingAvatar) {
-                          URL.revokeObjectURL(pendingAvatar.previewUrl);
-                          pendingImageUrls.current =
-                            pendingImageUrls.current.filter(
-                              (url) => url !== pendingAvatar.previewUrl,
-                            );
-                        }
-                        const previewUrl = URL.createObjectURL(file);
-                        pendingImageUrls.current.push(previewUrl);
-                        setPendingAvatar({ file, previewUrl });
-                        event.target.value = "";
-                      }}
-                    />
-                  </label>
-                </div>
-                <div>
-                  <p className="m-0 text-xs font-bold tracking-widest text-accent-deep">
-                    HỒ SƠ THÀNH VIÊN MỚI
-                  </p>
-                  <h1 className="mt-1 mb-1 font-display text-2xl">
-                    {String(form.fullName ?? "").trim() || "Chưa nhập họ tên"}
-                  </h1>
-                </div>
-              </section>
-              <section className={`${surfaceCardClass} p-5`}>
-                <div className="mb-2">
-                  <h2 className="m-0 font-display text-xl">Gia phả</h2>
-                </div>
-                <article className="py-3">
-                  <Link
-                    to={`/trees/${treeId}/tree`}
-                    className="flex items-center justify-between gap-3 text-ink-soft no-underline transition-colors hover:text-accent-deep"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm leading-5 font-semibold">
-                        {creationTree.data?.tree.name ??
-                          (creationTree.isLoading
-                            ? "Đang tải gia phả…"
-                            : "Gia phả hiện tại")}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-ink-subtle">
-                        {creationTree.data
-                          ? `${creationTree.data.tree.personCount} thành viên hiện tại`
-                          : "Thành viên sẽ được thêm vào gia phả này"}
-                      </span>
-                    </span>
-                    <ChevronRight
-                      aria-hidden="true"
-                      className="size-4 shrink-0"
-                    />
-                  </Link>
-                </article>
-              </section>
-              <section className={`${surfaceCardClass} p-5`}>
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="m-0 font-display text-xl">Thư viện ảnh</h2>
-                  <label
-                    className={`${compactPrimaryButtonClass} cursor-pointer`}
-                  >
-                    <Upload size={16} /> Thêm ảnh
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => {
-                        const selectedImages = Array.from(
-                          event.target.files ?? [],
-                        ).map((file) => {
-                          const previewUrl = URL.createObjectURL(file);
-                          pendingImageUrls.current.push(previewUrl);
-                          return { file, previewUrl };
-                        });
-                        setPendingImages((current) => [
-                          ...current,
-                          ...selectedImages,
-                        ]);
-                        event.target.value = "";
-                      }}
-                    />
-                  </label>
-                </div>
-                {pendingImages.length ? (
-                  <div className="grid grid-cols-3 gap-3">
-                    {pendingImages.map((image, index) => (
-                      <figure
-                        key={`${image.file.name}-${image.file.lastModified}-${index}`}
-                        className="group relative m-0 aspect-square overflow-hidden rounded-xl bg-[#e7ede9]"
-                      >
-                        <img
-                          src={image.previewUrl}
-                          alt={image.file.name}
-                          className="size-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          aria-label={`Bỏ ảnh ${image.file.name}`}
-                          onClick={() => {
-                            URL.revokeObjectURL(image.previewUrl);
+              <aside className="grid gap-5">
+                <section
+                  className={`${surfaceCardClass} flex flex-col items-center gap-4 p-6 text-center`}
+                >
+                  <div className="relative grid size-35 shrink-0 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-4xl font-bold text-ink-soft">
+                    {pendingAvatar ? (
+                      <img
+                        src={pendingAvatar.previewUrl}
+                        alt="Ảnh đại diện xem trước"
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      (String(form.fullName ?? "").trim()[0] ?? "?")
+                    )}
+                    <label className="absolute inset-x-0 bottom-0 flex cursor-pointer justify-center bg-black/55 py-2 text-white">
+                      <Camera size={17} />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          if (pendingAvatar) {
+                            URL.revokeObjectURL(pendingAvatar.previewUrl);
                             pendingImageUrls.current =
                               pendingImageUrls.current.filter(
-                                (url) => url !== image.previewUrl,
+                                (url) => url !== pendingAvatar.previewUrl,
                               );
-                            setPendingImages((current) =>
-                              current.filter((_, itemIndex) => itemIndex !== index),
-                            );
-                          }}
-                          className="absolute top-2 right-2 grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </figure>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-8 text-center text-sm text-ink-subtle">
-                    Chưa có ảnh được chọn.
-                  </p>
-                )}
-              </section>
-            </aside>
-            <div className="grid gap-5">
-              {sections.map((section) => (
-                <section
-                  key={section.title}
-                  className={`${surfaceCardClass} p-5`}
-                >
-                  <h2 className="mt-0 mb-4 font-display text-xl">
-                    {section.title}
-                  </h2>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {section.fields.map((field) => (
-                      <label
-                        key={field.key}
-                        className={`${formLabelClass} ${field.span ? "md:col-span-2" : ""}`}
-                      >
-                        {field.label}
-                        {field.key === "fullName" && " *"}
-                        <FieldInput
-                          field={field}
-                          value={form[field.key]}
-                          disabled={false}
-                          onChange={(value) =>
-                            setForm((current) => ({
-                              ...current,
-                              [field.key]: value,
-                            }))
                           }
-                        />
-                      </label>
-                    ))}
+                          const previewUrl = URL.createObjectURL(file);
+                          pendingImageUrls.current.push(previewUrl);
+                          setPendingAvatar({ file, previewUrl });
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div>
+                    <p className="m-0 text-xs font-bold tracking-widest text-accent-deep">
+                      HỒ SƠ THÀNH VIÊN MỚI
+                    </p>
+                    <h1 className="mt-1 mb-1 font-display text-2xl">
+                      {String(form.fullName ?? "").trim() || "Chưa nhập họ tên"}
+                    </h1>
                   </div>
                 </section>
-              ))}
-            </div>
+                <section className={`${surfaceCardClass} p-5`}>
+                  <div className="mb-2">
+                    <h2 className="m-0 font-display text-xl">Gia phả</h2>
+                  </div>
+                  <article className="py-3">
+                    <Link
+                      to={`/trees/${treeId}/tree`}
+                      className="flex items-center justify-between gap-3 text-ink-soft no-underline transition-colors hover:text-accent-deep"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm leading-5 font-semibold">
+                          {creationTree.data?.tree.name ??
+                            (creationTree.isLoading
+                              ? "Đang tải gia phả…"
+                              : "Gia phả hiện tại")}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-ink-subtle">
+                          {creationTree.data
+                            ? `${creationTree.data.tree.personCount} thành viên hiện tại`
+                            : "Thành viên sẽ được thêm vào gia phả này"}
+                        </span>
+                      </span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="size-4 shrink-0"
+                      />
+                    </Link>
+                  </article>
+                </section>
+                <section className={`${surfaceCardClass} p-5`}>
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="m-0 font-display text-xl">Thư viện ảnh</h2>
+                    <label
+                      className={`${compactPrimaryButtonClass} cursor-pointer`}
+                    >
+                      <Upload size={16} /> Thêm ảnh
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(event) => {
+                          const selectedImages = Array.from(
+                            event.target.files ?? [],
+                          ).map((file) => {
+                            const previewUrl = URL.createObjectURL(file);
+                            pendingImageUrls.current.push(previewUrl);
+                            return { file, previewUrl };
+                          });
+                          setPendingImages((current) => [
+                            ...current,
+                            ...selectedImages,
+                          ]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {pendingImages.length ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {pendingImages.map((image, index) => (
+                        <figure
+                          key={`${image.file.name}-${image.file.lastModified}-${index}`}
+                          className="group relative m-0 aspect-square overflow-hidden rounded-xl bg-[#e7ede9]"
+                        >
+                          <img
+                            src={image.previewUrl}
+                            alt={image.file.name}
+                            className="size-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Bỏ ảnh ${image.file.name}`}
+                            onClick={() => {
+                              URL.revokeObjectURL(image.previewUrl);
+                              pendingImageUrls.current =
+                                pendingImageUrls.current.filter(
+                                  (url) => url !== image.previewUrl,
+                                );
+                              setPendingImages((current) =>
+                                current.filter(
+                                  (_, itemIndex) => itemIndex !== index,
+                                ),
+                              );
+                            }}
+                            className="absolute top-2 right-2 grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </figure>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="py-8 text-center text-sm text-ink-subtle">
+                      Chưa có ảnh được chọn.
+                    </p>
+                  )}
+                </section>
+              </aside>
+              <div className="grid gap-5">
+                {sections.map((section) => (
+                  <section
+                    key={section.title}
+                    className={`${surfaceCardClass} p-5`}
+                  >
+                    <h2 className="mt-0 mb-4 font-display text-xl">
+                      {section.title}
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {section.fields.map((field) => (
+                        <label
+                          key={field.key}
+                          className={`${formLabelClass} ${field.span ? "md:col-span-2" : ""}`}
+                        >
+                          {field.label}
+                          {field.key === "fullName" && " *"}
+                          <FieldInput
+                            field={field}
+                            value={form[field.key]}
+                            disabled={false}
+                            onChange={(value) =>
+                              setForm((current) => ({
+                                ...current,
+                                [field.key]: value,
+                              }))
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
             </div>
           )}
         </div>

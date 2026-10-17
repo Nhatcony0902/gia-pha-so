@@ -37,9 +37,7 @@ export const getPersonLinkCandidates = (treeId: string) =>
     `/trees/${treeId}/person-link-candidates`,
   );
 export const linkPerson = (treeId: string, personId: string) =>
-  apiPost<PersonSidebarDetail>(
-    `/trees/${treeId}/persons/${personId}/link`,
-  );
+  apiPost<PersonSidebarDetail>(`/trees/${treeId}/persons/${personId}/link`);
 export const createRelationship = (treeId: string, body: RelationshipInput) =>
   apiPost<PrimitiveRelationship>(`/trees/${treeId}/relationships`, body);
 export const updateRelationship = (

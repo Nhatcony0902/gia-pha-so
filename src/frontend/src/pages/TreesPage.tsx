@@ -70,11 +70,7 @@ function TreeCard({
         </div>
       </Link>
       <footer className="flex justify-end gap-2 border-t border-[rgba(130,167,151,0.28)] px-4 py-2.5">
-        <button
-          type="button"
-          className={treeEditButtonClass}
-          onClick={onEdit}
-        >
+        <button type="button" className={treeEditButtonClass} onClick={onEdit}>
           <Pencil size={15} /> Sửa
         </button>
         <button
@@ -240,7 +236,10 @@ export function TreesPage() {
                 {tree.description ?? "Chưa có mô tả"}
               </span>
               <span className="mt-auto pt-4 text-sm text-content-muted">
-                <strong className="text-content-primary">{tree.personCount}</strong> thành viên
+                <strong className="text-content-primary">
+                  {tree.personCount}
+                </strong>{" "}
+                thành viên
               </span>
             </Link>
           ))}

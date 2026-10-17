@@ -10,14 +10,11 @@ import type { FamilyJunctionFlowNode } from "./FamilyJunctionNode";
 import type { FamilyFlowNode } from "./FamilyPersonNode";
 
 const elk = new ELK();
-// Keep these aligned with the rendered card in FamilyPersonNode. Spacing is
-// handled explicitly below so the layout footprint stays as compact as possible.
 const PERSON_NODE_WIDTH = 200;
 const PERSON_NODE_HEIGHT = 80;
 const NODE_WIDTH = PERSON_NODE_WIDTH;
 const NODE_HEIGHT = PERSON_NODE_HEIGHT;
 const JUNCTION_SIZE = 1;
-// Leave enough visible line on both sides of the relationship status tag.
 const PARTNER_GAP = 104;
 const FAMILY_GAP = 32;
 const FAMILY_GROUP_GAP = 80;
@@ -496,9 +493,6 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
         };
       },
     );
-    // Keep siblings with the same parents as one rigid block. Packing people
-    // individually lets a neighbouring branch push only part of a child list,
-    // which makes its visual center drift away from the marriage line.
     const groupedComponents = new Map<string, PositionedComponent[]>();
     components.forEach((component, index) => {
       const key = component.parentGroupKey ?? `unattached:${index}`;
@@ -614,10 +608,6 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
 
   for (const [row] of orderedGenerations) placeGeneration(row, parentPlacement);
 
-  // A top-down pass centers children, then a bottom-up reconciliation gives
-  // parent couples enough room for the real widths of their descendant groups.
-  // Repeating both directions settles dense multi-generation trees while every
-  // row remains collision-free after each pass.
   for (let pass = 0; pass < 16; pass++) {
     for (const [row] of [...orderedGenerations].reverse())
       placeGeneration(row, childPlacement);
