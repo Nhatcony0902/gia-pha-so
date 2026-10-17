@@ -211,6 +211,14 @@ export interface PersonListResponse {
   persons: PersonListItem[];
 }
 
+export interface PersonLinkCandidate extends PersonListItem {
+  sourceTrees: Array<Pick<FamilyTreeSummary, "id" | "name">>;
+}
+
+export interface PersonLinkCandidatesResponse {
+  persons: PersonLinkCandidate[];
+}
+
 export type PersonUpdateInput = Partial<{
   fullName: string;
   preferredName: string | null;

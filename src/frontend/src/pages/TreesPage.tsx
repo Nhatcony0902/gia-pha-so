@@ -5,7 +5,7 @@ import type {
 } from "@family-tree/shared-types";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import {
@@ -17,7 +17,6 @@ import {
 import { TreeFormDialog } from "../features/family-tree/ManagementDialogs";
 import {
   compactDangerButtonClass,
-  compactSecondaryButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from "../lib/ui-classes";
@@ -26,6 +25,10 @@ const sectionHeadingClass =
   "mb-[1.2rem] flex items-center justify-between gap-4 [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-[1.3rem] [&>h2]:font-semibold [&>span]:text-sm [&>span]:text-content-muted";
 const treeGridClass =
   "grid grid-cols-[repeat(auto-fill,minmax(min(100%,21rem),1fr))] gap-4";
+const treeCardClass =
+  "overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)] transition-[border-color,background-color] duration-200 hover:border-accent hover:bg-[rgba(245,249,246,0.1)]";
+const treeEditButtonClass =
+  "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-control border border-accent bg-accent px-3 py-1.5 text-sm font-bold text-[#182b27] hover:not-disabled:bg-[#e6bd77] disabled:cursor-not-allowed disabled:opacity-55";
 const emptyStateClass =
   "rounded-card border border-dashed border-[rgba(130,167,151,0.5)] bg-black/8 p-8 text-content-secondary [&>h3]:mt-0 [&>h3]:mb-[0.45rem] [&>h3]:text-content-primary [&>p]:m-0";
 
@@ -41,22 +44,22 @@ function TreeCard({
   deleting: boolean;
 }) {
   return (
-    <article className="grid min-h-72 grid-rows-[1fr_auto] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)] shadow-none transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+    <article className={`${treeCardClass} grid min-h-64 grid-rows-[1fr_auto]`}>
       <Link
-        className="grid grid-rows-[7rem_1fr] text-inherit no-underline"
+        className="grid grid-rows-[5.5rem_1fr] text-inherit no-underline"
         to={`/trees/${tree.id}/tree`}
       >
-        <div className="grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#476f61,#1b352f)] font-display text-[2rem] font-semibold text-accent [&_img]:size-full [&_img]:object-cover">
+        <div className="grid place-items-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#476f61,#1b352f)] font-display text-[1.75rem] font-semibold text-accent [&_img]:size-full [&_img]:object-cover">
           {tree.coverUrl ? <img src={tree.coverUrl} alt="" /> : <span>⌘</span>}
         </div>
-        <div className="flex flex-col p-[1.15rem] pb-3">
+        <div className="flex flex-col p-4 pb-3">
           <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
             {tree.originPlace ?? "Chưa cập nhật nguồn gốc"}
           </p>
           <h3 className="mt-[0.45rem] mb-[0.55rem] font-display text-[1.15rem] font-semibold">
             {tree.name}
           </h3>
-          <span className="text-sm leading-normal text-content-secondary">
+          <span className="line-clamp-2 text-sm leading-normal text-content-secondary">
             {tree.description ?? "Chưa có mô tả"}
           </span>
           <div className="mt-auto flex items-baseline gap-[0.35rem] pt-4 text-sm text-content-muted">
@@ -66,10 +69,10 @@ function TreeCard({
           </div>
         </div>
       </Link>
-      <footer className="flex justify-end gap-2 border-t border-[rgba(130,167,151,0.28)] px-4 py-3">
+      <footer className="flex justify-end gap-2 border-t border-[rgba(130,167,151,0.28)] px-4 py-2.5">
         <button
           type="button"
-          className={`${compactSecondaryButtonClass} border-[#6f9186] text-content-primary`}
+          className={treeEditButtonClass}
           onClick={onEdit}
         >
           <Pencil size={15} /> Sửa
@@ -90,9 +93,18 @@ function TreeCard({
 export function TreesPage() {
   const client = useQueryClient();
   const notice = useNotifications();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dialog, setDialog] = useState<
     { mode: "create" } | { mode: "edit"; tree: FamilyTreeSummary } | null
-  >(null);
+  >(searchParams.get("create") === "1" ? { mode: "create" } : null);
+  const closeDialog = () => {
+    setDialog(null);
+    if (searchParams.has("create")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("create");
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
   const query = useQuery({ queryKey: ["trees"], queryFn: getTrees });
   const save = useMutation({
     mutationFn: (input: FamilyTreeInput) =>
@@ -105,7 +117,7 @@ export function TreesPage() {
         dialog?.mode === "edit" ? "Đã cập nhật gia phả" : "Đã tạo gia phả",
         "success",
       );
-      setDialog(null);
+      closeDialog();
     },
     onError: (error) =>
       notice.alert(
@@ -135,7 +147,14 @@ export function TreesPage() {
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#203a34_0%,#29483e_55%,#355b4a_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(1.5rem,3vw,3rem)] text-content-primary">
       <header>
-        <Breadcrumbs items={[{ label: "Trang chủ" }]} light className="mb-7" />
+        <Breadcrumbs
+          items={[
+            { label: "Trang chủ", to: "/" },
+            { label: "Danh sách gia phả" },
+          ]}
+          light
+          className="mb-7"
+        />
         <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
           KHÔNG GIAN GIA PHẢ
         </p>
@@ -162,7 +181,7 @@ export function TreesPage() {
         </div>
         {query.isLoading && (
           <div className={treeGridClass} aria-label="Đang tải">
-            <div className="grid min-h-64 animate-[skeleton-pulse_1.2s_infinite_alternate] grid-rows-[7rem_1fr] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)]" />
+            <div className="grid min-h-64 animate-[skeleton-pulse_1.2s_infinite_alternate] grid-rows-[5.5rem_1fr] overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)]" />
           </div>
         )}
         {query.isError && (
@@ -211,11 +230,17 @@ export function TreesPage() {
             <Link
               key={tree.id}
               to={`/trees/${tree.id}/tree`}
-              className="rounded-card border border-[rgba(130,167,151,0.4)] p-4 text-content-primary no-underline"
+              className={`${treeCardClass} grid min-h-48 grid-rows-[1fr] p-4 text-content-primary no-underline`}
             >
-              <strong className="text-sm">{tree.name}</strong>
-              <span className="mt-2 block text-sm text-content-secondary">
-                {tree.personCount} thành viên
+              <span className="text-xs font-bold tracking-[0.13em] text-accent uppercase">
+                {tree.originPlace ?? "Gia phả được chia sẻ"}
+              </span>
+              <strong className="mt-2 text-base">{tree.name}</strong>
+              <span className="mt-2 text-sm text-content-secondary">
+                {tree.description ?? "Chưa có mô tả"}
+              </span>
+              <span className="mt-auto pt-4 text-sm text-content-muted">
+                <strong className="text-content-primary">{tree.personCount}</strong> thành viên
               </span>
             </Link>
           ))}
@@ -225,7 +250,7 @@ export function TreesPage() {
         <TreeFormDialog
           tree={dialog.mode === "edit" ? dialog.tree : undefined}
           pending={save.isPending}
-          onClose={() => !save.isPending && setDialog(null)}
+          onClose={() => !save.isPending && closeDialog()}
           onSubmit={(value) => save.mutate(value)}
         />
       )}

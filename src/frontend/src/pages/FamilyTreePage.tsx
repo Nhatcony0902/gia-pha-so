@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MarriageStatus,
-  PersonCreateInput,
   PrimitiveRelationship,
   RelationshipInput,
 } from "@family-tree/shared-types";
@@ -16,11 +15,15 @@ import {
 } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import {
-  createPerson,
   createRelationship,
   deleteRelationship,
   getPersonDetail,
@@ -43,7 +46,7 @@ import {
 import { secondaryButtonClass } from "../lib/ui-classes";
 import { MemberList } from "../features/family-tree/MemberList";
 import {
-  PersonCreateDialog,
+  PersonAddChoiceDialog,
   RelationshipFormDialog,
 } from "../features/family-tree/ManagementDialogs";
 import { RelationshipList } from "../features/family-tree/RelationshipList";
@@ -60,6 +63,7 @@ export function FamilyTreePage({
   view: "tree" | "members" | "relationships";
 }) {
   const { treeId = "" } = useParams();
+  const navigate = useNavigate();
   const client = useQueryClient();
   const notice = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,7 +75,7 @@ export function FamilyTreePage({
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutReady, setLayoutReady] = useState(false);
-  const [addingPerson, setAddingPerson] = useState(false);
+  const [personChoiceOpen, setPersonChoiceOpen] = useState(false);
   const [relationshipEditor, setRelationshipEditor] = useState<
     PrimitiveRelationship | "new" | null
   >(null);
@@ -84,23 +88,6 @@ export function FamilyTreePage({
     queryKey: ["person", treeId, selectedId],
     queryFn: () => getPersonDetail(treeId, selectedId!),
     enabled: Boolean(treeId && selectedId),
-  });
-  const addPerson = useMutation({
-    mutationFn: (input: PersonCreateInput) => createPerson(treeId, input),
-    onSuccess: (person) => {
-      client.invalidateQueries({ queryKey: ["trees"] });
-      client.invalidateQueries({ queryKey: ["tree-graph", treeId] });
-      client.invalidateQueries({ queryKey: ["tree-persons", treeId] });
-      client.setQueryData(["person", treeId, person.id], person);
-      setAddingPerson(false);
-      selectPerson(person.id);
-      notice.toast("Đã thêm thành viên", "success");
-    },
-    onError: (error) =>
-      notice.alert(
-        "Không thể thêm thành viên",
-        error instanceof Error ? error.message : "Vui lòng thử lại",
-      ),
   });
   const saveRelationship = useMutation({
     mutationFn: (input: RelationshipInput) =>
@@ -248,7 +235,7 @@ export function FamilyTreePage({
         >
           Thử lại
         </button>
-        <Link to="/">Về danh sách</Link>
+        <Link to="/trees">Về danh sách</Link>
       </main>
     );
 
@@ -258,46 +245,58 @@ export function FamilyTreePage({
         <Breadcrumbs
           items={[
             { label: "Trang chủ", to: "/" },
-            { label: graph.data.tree.name, to: `/trees/${treeId}/tree` },
+            { label: "Danh sách gia phả", to: "/trees" },
             {
-              label:
-                activeTab === "tree"
-                  ? "Cây gia phả"
-                  : activeTab === "members"
-                    ? "Danh sách thành viên"
-                    : "Danh sách quan hệ",
+              label: graph.data.tree.name,
+              ...(activeTab === "tree"
+                ? {}
+                : { to: `/trees/${treeId}/tree` }),
             },
+            ...(activeTab === "tree"
+              ? []
+              : [
+                  {
+                    label:
+                      activeTab === "members" ? "Thành viên" : "Quan hệ",
+                  },
+                ]),
           ]}
         />
         <div className="flex w-full flex-wrap items-center justify-between gap-[1.2rem] text-[0.84rem] text-[#5d7167] min-[801px]:w-auto">
-          <span>
-            {activeTab === "relationships"
-              ? `${graph.data.edges.length} quan hệ`
-              : `${graph.data.tree.personCount} thành viên`}
-          </span>
-          {activeTab === "relationships" ? (
-            <button
-              type="button"
-              className={compactPrimaryButtonClass}
-              onClick={() => setRelationshipEditor("new")}
-              disabled={graph.data.nodes.length < 2}
-              title={
-                graph.data.nodes.length < 2
-                  ? "Cần ít nhất hai thành viên để tạo quan hệ"
-                  : undefined
-              }
-            >
-              <Plus size={16} /> Thêm quan hệ
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={compactPrimaryButtonClass}
-              onClick={() => setAddingPerson(true)}
-            >
-              <Plus size={16} /> Thêm thành viên
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {activeTab !== "relationships" && (
+              <span>{graph.data.tree.personCount} thành viên</span>
+            )}
+            {activeTab !== "members" && (
+              <span>{graph.data.edges.length} quan hệ</span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTab !== "relationships" && (
+              <button
+                type="button"
+                className={compactPrimaryButtonClass}
+                onClick={() => setPersonChoiceOpen(true)}
+              >
+                <Plus size={16} /> Thêm thành viên
+              </button>
+            )}
+            {activeTab !== "members" && (
+              <button
+                type="button"
+                className={compactPrimaryButtonClass}
+                onClick={() => setRelationshipEditor("new")}
+                disabled={graph.data.nodes.length < 2}
+                title={
+                  graph.data.nodes.length < 2
+                    ? "Cần ít nhất hai thành viên để tạo quan hệ"
+                    : undefined
+                }
+              >
+                <Plus size={16} /> Thêm quan hệ
+              </button>
+            )}
+          </div>
         </div>
       </header>
       <div className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
@@ -414,11 +413,13 @@ export function FamilyTreePage({
           />
         )}
       </div>
-      {addingPerson && (
-        <PersonCreateDialog
-          pending={addPerson.isPending}
-          onClose={() => !addPerson.isPending && setAddingPerson(false)}
-          onSubmit={(value) => addPerson.mutate(value)}
+      {personChoiceOpen && (
+        <PersonAddChoiceDialog
+          onClose={() => setPersonChoiceOpen(false)}
+          onSelect={(mode) => {
+            setPersonChoiceOpen(false);
+            navigate(`/trees/${treeId}/persons/new?mode=${mode}`);
+          }}
         />
       )}
       {relationshipEditor && (

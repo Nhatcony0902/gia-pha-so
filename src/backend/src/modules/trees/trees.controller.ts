@@ -82,6 +82,23 @@ export class TreesController {
     return this.trees.createPerson(treeId, request.user.userId, body);
   }
 
+  @Get(":treeId/person-link-candidates")
+  personLinkCandidates(
+    @Param("treeId") treeId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.personLinkCandidates(treeId, request.user.userId);
+  }
+
+  @Post(":treeId/persons/:personId/link")
+  linkPerson(
+    @Param("treeId") treeId: string,
+    @Param("personId") personId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.trees.linkPerson(treeId, personId, request.user.userId);
+  }
+
   @Post(":treeId/relationships")
   createRelationship(
     @Param("treeId") treeId: string,

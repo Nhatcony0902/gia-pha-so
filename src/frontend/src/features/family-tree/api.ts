@@ -10,6 +10,7 @@ import type {
   FamilyTreeSummary,
   FamilyTreeUpdateInput,
   PersonCreateInput,
+  PersonLinkCandidatesResponse,
   PrimitiveRelationship,
   RelationshipInput,
   RelationshipUpdateInput,
@@ -31,6 +32,14 @@ export const getTreePersons = (treeId: string) =>
   apiGet<PersonListResponse>(`/trees/${treeId}/persons`);
 export const createPerson = (treeId: string, body: PersonCreateInput) =>
   apiPost<PersonSidebarDetail>(`/trees/${treeId}/persons`, body);
+export const getPersonLinkCandidates = (treeId: string) =>
+  apiGet<PersonLinkCandidatesResponse>(
+    `/trees/${treeId}/person-link-candidates`,
+  );
+export const linkPerson = (treeId: string, personId: string) =>
+  apiPost<PersonSidebarDetail>(
+    `/trees/${treeId}/persons/${personId}/link`,
+  );
 export const createRelationship = (treeId: string, body: RelationshipInput) =>
   apiPost<PrimitiveRelationship>(`/trees/${treeId}/relationships`, body);
 export const updateRelationship = (

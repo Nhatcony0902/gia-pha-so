@@ -12,6 +12,7 @@ import { ApiError, publicApi } from "../lib/api/client";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui-classes";
 
 type Mode = "login" | "register" | "forgot-password";
+const defaultAuthenticatedPath = "/trees";
 const emailSchema = z.string().email("Email không hợp lệ");
 const passwordSchema = z
   .string()
@@ -145,7 +146,9 @@ export function AuthPage() {
     notifications.toast(message, "success");
     const returnTo = params.get("returnTo");
     navigate(
-      returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/",
+      returnTo?.startsWith("/") && !returnTo.startsWith("//")
+        ? returnTo
+        : defaultAuthenticatedPath,
       { replace: true },
     );
   };
@@ -166,7 +169,8 @@ export function AuthPage() {
     }
   };
 
-  if (!isInitializing && isAuthenticated) return <Navigate to="/" replace />;
+  if (!isInitializing && isAuthenticated)
+    return <Navigate to={defaultAuthenticatedPath} replace />;
   return (
     <main className="relative grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
       <Breadcrumbs

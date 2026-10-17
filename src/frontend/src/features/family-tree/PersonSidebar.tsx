@@ -11,6 +11,8 @@ import { primaryButtonClass } from "../../lib/ui-classes";
 
 const sidebarClass =
   "absolute right-0 bottom-0 left-0 top-[38%] z-10 overflow-y-auto rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
+const fixedSidebarClass =
+  "fixed right-0 bottom-0 left-0 top-[38%] z-40 overflow-y-auto rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-16 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
 const closeButtonClass =
   "absolute top-[0.8rem] right-[0.9rem] grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-[#e6ece8] text-[#314a42]";
 const profileClass =
@@ -224,12 +226,14 @@ export function PersonSidebar({
   loading,
   onClose,
   onSelectPerson,
+  placement = "absolute",
 }: {
   treeId: string;
   person?: PersonSidebarDetail;
   loading: boolean;
   onClose: () => void;
   onSelectPerson: (personId: string) => void;
+  placement?: "absolute" | "fixed";
 }) {
   const rows = person
     ? [
@@ -251,7 +255,10 @@ export function PersonSidebar({
     : [];
 
   return (
-    <aside className={sidebarClass} aria-label="Thông tin thành viên">
+    <aside
+      className={placement === "fixed" ? fixedSidebarClass : sidebarClass}
+      aria-label="Thông tin thành viên"
+    >
       <button
         className={closeButtonClass}
         type="button"

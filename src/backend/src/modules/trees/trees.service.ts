@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -13,6 +14,7 @@ import type {
   FamilyTreeListResponse,
   FamilyTreeSummary,
   PersonSidebarDetail,
+  PersonLinkCandidatesResponse,
   PersonListResponse,
   PrimitiveRelationshipType,
   RelatedPerson,
@@ -241,6 +243,96 @@ export class TreesService {
       },
     });
     return this.person(treeId, person.id, userId);
+  }
+
+  async personLinkCandidates(
+    treeId: string,
+    userId: string,
+  ): Promise<PersonLinkCandidatesResponse> {
+    await this.ownedTree(treeId, userId);
+    const memberships = await this.prisma.familyTreePerson.findMany({
+      where: {
+        treeId: { not: treeId },
+        tree: { createdById: userId },
+        person: { familyTrees: { none: { treeId } } },
+      },
+      include: {
+        tree: { select: { id: true, name: true } },
+        person: true,
+      },
+      orderBy: [{ person: { fullName: "asc" } }, { tree: { name: "asc" } }],
+    });
+    const candidates = new Map<
+      string,
+      PersonLinkCandidatesResponse["persons"][number]
+    >();
+    for (const { person, tree } of memberships) {
+      const current = candidates.get(person.id);
+      if (current) {
+        current.sourceTrees.push(tree);
+        continue;
+      }
+      candidates.set(person.id, {
+        id: person.id,
+        fullName: person.fullName,
+        preferredName: person.preferredName,
+        gender: person.gender,
+        avatarUrl: person.avatarUrl,
+        birthDate: iso(person.birthDate),
+        birthPlace: person.birthPlace,
+        deathDate: iso(person.deathDate),
+        deathPlace: person.deathPlace,
+        isDeceased: person.isDeceased,
+        hometown: person.hometown,
+        currentResidence: person.currentResidence,
+        nationality: person.nationality,
+        ethnicity: person.ethnicity,
+        religion: person.religion,
+        occupation: person.occupation,
+        phone: person.phone,
+        email: person.email,
+        sourceTrees: [tree],
+      });
+    }
+    return { persons: [...candidates.values()] };
+  }
+
+  async linkPerson(treeId: string, personId: string, userId: string) {
+    await this.ownedTree(treeId, userId);
+    const existing = await this.prisma.familyTreePerson.findUnique({
+      where: { treeId_personId: { treeId, personId } },
+    });
+    if (existing)
+      throw new ConflictException({
+        code: "PERSON_ALREADY_IN_TREE",
+        message: "Thành viên đã có trong gia phả này",
+      });
+    const sourceMembership = await this.prisma.familyTreePerson.findFirst({
+      where: {
+        personId,
+        treeId: { not: treeId },
+        tree: { createdById: userId },
+      },
+    });
+    if (!sourceMembership)
+      throw new NotFoundException({
+        code: "PERSON_LINK_SOURCE_NOT_FOUND",
+        message: "Không tìm thấy thành viên trong gia phả khác của bạn",
+      });
+    try {
+      await this.prisma.familyTreePerson.create({ data: { treeId, personId } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new ConflictException({
+          code: "PERSON_ALREADY_IN_TREE",
+          message: "Thành viên đã có trong gia phả này",
+        });
+      throw error;
+    }
+    return this.person(treeId, personId, userId);
   }
 
   private async normalizedRelationship(

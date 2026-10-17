@@ -7,7 +7,7 @@ import type {
   PrimitiveRelationship,
   RelationshipInput,
 } from "@family-tree/shared-types";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Link2, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -68,6 +68,54 @@ function DialogShell({
       </section>
     </div>,
     document.body,
+  );
+}
+
+export function PersonAddChoiceDialog({
+  onClose,
+  onSelect,
+}: {
+  onClose: () => void;
+  onSelect: (mode: "new" | "existing") => void;
+}) {
+  return (
+    <DialogShell title="Thêm thành viên" onClose={onClose}>
+      <p className="mt-0 mb-4 text-sm text-ink-subtle">
+        Chọn cách bạn muốn thêm người vào gia phả hiện tại.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          className="flex min-h-36 cursor-pointer flex-col items-start gap-3 rounded-xl border border-border-default bg-white p-5 text-left text-ink transition hover:border-accent hover:bg-[#fff8e9]"
+          onClick={() => onSelect("new")}
+        >
+          <span className="grid size-10 place-items-center rounded-full bg-[#e6efe9] text-accent-deep">
+            <UserPlus size={20} />
+          </span>
+          <span>
+            <strong className="block">Tạo thành viên mới</strong>
+            <small className="mt-1 block leading-5 text-ink-subtle">
+              Nhập thông tin để tạo một hồ sơ hoàn toàn mới.
+            </small>
+          </span>
+        </button>
+        <button
+          type="button"
+          className="flex min-h-36 cursor-pointer flex-col items-start gap-3 rounded-xl border border-border-default bg-white p-5 text-left text-ink transition hover:border-accent hover:bg-[#fff8e9]"
+          onClick={() => onSelect("existing")}
+        >
+          <span className="grid size-10 place-items-center rounded-full bg-[#e6efe9] text-accent-deep">
+            <Link2 size={20} />
+          </span>
+          <span>
+            <strong className="block">Thêm từ gia phả khác</strong>
+            <small className="mt-1 block leading-5 text-ink-subtle">
+              Liên kết một hồ sơ đã có mà không tạo bản sao.
+            </small>
+          </span>
+        </button>
+      </div>
+    </DialogShell>
   );
 }
 

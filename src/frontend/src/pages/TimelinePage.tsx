@@ -57,6 +57,7 @@ export function TimelinePage() {
         <Breadcrumbs
           items={[
             { label: "Trang chủ", to: "/" },
+            { label: "Danh sách gia phả", to: "/trees" },
             {
               label: query.data?.tree.name ?? "Gia phả",
               to: `/trees/${treeId}/tree`,

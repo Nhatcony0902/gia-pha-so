@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { Clock3, GitFork, List, Network } from "lucide-react";
-import { useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  Clock3,
+  GitFork,
+  List,
+  Network,
+  Plus,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   Link,
   NavLink,
@@ -19,6 +27,8 @@ const menuItemClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [treeMenuOpen, setTreeMenuOpen] = useState(false);
+  const treeSelectorRef = useRef<HTMLDivElement>(null);
   const { user, isInitializing, logout } = useAuth();
   const notifications = useNotifications();
   const navigate = useNavigate();
@@ -30,15 +40,38 @@ export function Navbar() {
     queryFn: getTrees,
     enabled: Boolean(user && treeId),
   });
-  const treeView = ["tree", "members", "relationships", "timeline"].includes(
-    location.pathname.split("/")[3] ?? "",
-  )
-    ? location.pathname.split("/")[3]
-    : "tree";
+  const treePathSegment = location.pathname.split("/")[3] ?? "";
+  const treeView =
+    treePathSegment === "persons"
+      ? "members"
+      : ["tree", "members", "relationships", "timeline"].includes(
+            treePathSegment,
+          )
+        ? treePathSegment
+        : "tree";
   const availableTrees = [
     ...(trees.data?.createdByMe ?? []),
     ...(trees.data?.sharedWithMe ?? []),
   ];
+  const selectedTree = availableTrees.find((tree) => tree.id === treeId);
+
+  useEffect(() => {
+    if (!treeMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!treeSelectorRef.current?.contains(event.target as Node)) {
+        setTreeMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTreeMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [treeMenuOpen]);
 
   const onLogout = async () => {
     if (
@@ -97,46 +130,102 @@ export function Navbar() {
     ) : null;
 
   const treeSelector = treeId ? (
-    <label className="relative min-w-0 shrink">
-      <span className="sr-only">Chuyển gia phả</span>
-      <select
+    <div ref={treeSelectorRef} className="relative min-w-0 shrink">
+      <button
+        type="button"
+        className="flex h-10 w-[clamp(10rem,20vw,16rem)] max-w-[calc(100vw-7rem)] cursor-pointer items-center gap-1.5 rounded-lg border border-white/50 bg-[rgba(18,38,33,0.58)] px-2.5 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition hover:border-white hover:bg-[rgba(18,38,33,0.82)] focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
         aria-label="Chuyển gia phả"
-        className="w-[clamp(8rem,22vw,15rem)] cursor-pointer appearance-none truncate rounded-md border border-[rgba(215,169,93,0.55)] bg-[#203a34] py-2 pr-8 pl-3 text-xs font-bold tracking-[0.04em] text-accent outline-none transition-colors hover:border-accent focus:border-accent"
-        value={treeId}
+        aria-haspopup="menu"
+        aria-controls="tree-selector-menu"
+        aria-expanded={treeMenuOpen}
         disabled={trees.isLoading || !availableTrees.length}
-        onChange={(event) => {
-          navigate(`/trees/${event.target.value}/${treeView}`);
-          setOpen(false);
-        }}
+        onClick={() => setTreeMenuOpen((value) => !value)}
       >
-        {!availableTrees.length && (
-          <option value={treeId}>
-            {trees.isLoading ? "Đang tải gia phả…" : "Gia phả đang chọn"}
-          </option>
-        )}
-        {trees.data?.createdByMe.length ? (
-          <optgroup label="Gia phả của tôi">
-            {trees.data.createdByMe.map((tree) => (
-              <option key={tree.id} value={tree.id}>
-                {tree.name}
-              </option>
-            ))}
-          </optgroup>
-        ) : null}
-        {trees.data?.sharedWithMe.length ? (
-          <optgroup label="Được chia sẻ với tôi">
-            {trees.data.sharedWithMe.map((tree) => (
-              <option key={tree.id} value={tree.id}>
-                {tree.name}
-              </option>
-            ))}
-          </optgroup>
-        ) : null}
-      </select>
-      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[0.65rem] text-accent">
-        ▾
-      </span>
-    </label>
+        <Network size={14} className="shrink-0 opacity-80" />
+        <span className="min-w-0 flex-1 truncate text-xs font-bold tracking-[0.015em]">
+          {selectedTree?.name ??
+            (trees.isLoading ? "Đang tải gia phả…" : "Gia phả đang chọn")}
+        </span>
+        <ChevronDown
+          size={14}
+          className={`shrink-0 transition-transform duration-200 ${treeMenuOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+      {treeMenuOpen && (
+        <div
+          id="tree-selector-menu"
+          role="menu"
+          aria-label="Danh sách gia phả"
+          className="absolute top-[calc(100%+0.55rem)] left-0 z-50 w-full overflow-hidden rounded-xl border border-[#cad8d1] bg-[#f7faf8] p-2 text-ink shadow-[0_18px_50px_rgba(6,24,19,0.3)]"
+        >
+          {trees.data?.createdByMe.length ? (
+            <div className="mb-1 last:mb-0">
+              <p className="m-0 px-3 pt-2 pb-1.5 text-[0.68rem] font-bold tracking-[0.13em] text-[#8a672f] uppercase">
+                Gia phả của tôi
+              </p>
+              {trees.data.createdByMe.map((tree) => (
+                <button
+                  key={tree.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={tree.id === treeId}
+                  className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-0 px-2.5 py-2 text-left text-xs transition-colors ${tree.id === treeId ? "bg-[#dfeae4] font-bold text-[#183d32]" : "bg-transparent text-[#415c52] hover:bg-[#eaf1ed] hover:text-[#183d32]"}`}
+                  onClick={() => {
+                    navigate(`/trees/${tree.id}/${treeView}`);
+                    setTreeMenuOpen(false);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate">{tree.name}</span>
+                  {tree.id === treeId && (
+                    <Check size={16} className="shrink-0 text-[#a76f20]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {trees.data?.sharedWithMe.length ? (
+            <div className="mb-1 border-t border-[#dde6e1] pt-1 first:border-0 first:pt-0 last:mb-0">
+              <p className="m-0 px-3 pt-2 pb-1.5 text-[0.68rem] font-bold tracking-[0.13em] text-[#8a672f] uppercase">
+                Được chia sẻ với tôi
+              </p>
+              {trees.data.sharedWithMe.map((tree) => (
+                <button
+                  key={tree.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={tree.id === treeId}
+                  className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-0 px-2.5 py-2 text-left text-xs transition-colors ${tree.id === treeId ? "bg-[#dfeae4] font-bold text-[#183d32]" : "bg-transparent text-[#415c52] hover:bg-[#eaf1ed] hover:text-[#183d32]"}`}
+                  onClick={() => {
+                    navigate(`/trees/${tree.id}/${treeView}`);
+                    setTreeMenuOpen(false);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate">{tree.name}</span>
+                  {tree.id === treeId && (
+                    <Check size={16} className="shrink-0 text-[#a76f20]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            className="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-lg border-0 border-t border-[#dde6e1] bg-transparent px-2.5 py-2.5 text-left text-xs font-bold text-[#9a6720] transition-colors hover:bg-[#fff3d9] hover:text-[#70470d]"
+            onClick={() => {
+              navigate("/trees?create=1");
+              setTreeMenuOpen(false);
+              setOpen(false);
+            }}
+          >
+            <Plus size={16} className="shrink-0" />
+            Tạo gia phả mới
+          </button>
+        </div>
+      )}
+    </div>
   ) : null;
 
   const treeNavigation = treeId ? (
@@ -149,7 +238,9 @@ export function Navbar() {
         <Network size={16} /> Cây gia phả
       </NavLink>
       <NavLink
-        className={menuItemClass}
+        className={({ isActive }) =>
+          menuItemClass({ isActive: isActive || treeView === "members" })
+        }
         to={`/trees/${treeId}/members`}
         onClick={() => setOpen(false)}
       >
@@ -173,7 +264,7 @@ export function Navbar() {
   ) : user ? (
     <NavLink
       className={menuItemClass}
-      to="/"
+      to="/trees"
       end
       onClick={() => setOpen(false)}
     >
@@ -184,7 +275,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-30 border-b border-[rgba(82,121,110,0.55)] bg-[rgba(32,58,52,0.96)] text-content-primary backdrop-blur-[14px]">
       <nav
-        className="relative mx-auto flex min-h-14 max-w-[100rem] items-center gap-3 px-4"
+        className="relative mx-auto flex min-h-16 max-w-[100rem] items-center gap-3 px-4"
         aria-label="Điều hướng chính"
       >
         <div className="flex min-w-0 shrink items-center gap-3">
