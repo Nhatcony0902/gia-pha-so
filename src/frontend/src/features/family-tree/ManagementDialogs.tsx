@@ -7,8 +7,22 @@ import type {
   PrimitiveRelationship,
   RelationshipInput,
 } from "@family-tree/shared-types";
-import { Link2, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  Link2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   compactPrimaryButtonClass,
@@ -24,10 +38,12 @@ function DialogShell({
   title,
   children,
   onClose,
+  wide = false,
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  wide?: boolean;
 }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -43,7 +59,7 @@ function DialogShell({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
-        className="my-auto w-[min(42rem,100%)] rounded-2xl bg-surface-soft p-5 text-ink shadow-[0_24px_70px_rgba(0,0,0,0.42)] md:p-6"
+        className={`my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto ${wide ? "w-[min(68rem,100%)]" : "w-[min(42rem,100%)]"} rounded-2xl bg-surface-soft p-5 text-ink shadow-[0_24px_70px_rgba(0,0,0,0.42)] md:p-6`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="management-dialog-title"
@@ -415,11 +431,21 @@ export function RelationshipFormDialog({
     startedAt: dateInput(relationship?.startedAt ?? null),
     endedAt: dateInput(relationship?.endedAt ?? null),
   });
-  const personOptions = persons.map((person) => (
-    <option key={person.id} value={person.id}>
-      {person.fullName}
-    </option>
-  ));
+  const [activeMemberSlot, setActiveMemberSlot] = useState<
+    "fromPersonId" | "toPersonId"
+  >("fromPersonId");
+  const [memberSearch, setMemberSearch] = useState("");
+  const relationshipFieldsRef = useRef<HTMLDivElement>(null);
+  const [relationshipFieldsHeight, setRelationshipFieldsHeight] = useState(0);
+  const selectedFirst = persons.find(
+    (person) => person.id === form.fromPersonId,
+  );
+  const selectedSecond = persons.find(
+    (person) => person.id === form.toPersonId,
+  );
+  const choosePerson = (personId: string) => {
+    setForm((current) => ({ ...current, [activeMemberSlot]: personId }));
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const number = (value: string) => (value ? Number(value) : null);
@@ -446,147 +472,307 @@ export function RelationshipFormDialog({
           }),
     });
   };
-  const firstLabel = form.type === "PARENT_CHILD" ? "Cha/mẹ" : "Người thứ nhất";
+  const firstLabel = form.type === "PARENT_CHILD" ? "Bố/mẹ" : "Người thứ nhất";
   const secondLabel = form.type === "PARENT_CHILD" ? "Con" : "Người thứ hai";
+  const normalizedSearch = memberSearch
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toLocaleLowerCase("vi")
+    .trim();
+  const visiblePersons = persons.filter((person) =>
+    `${person.fullName} ${person.preferredName ?? ""}`
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .toLocaleLowerCase("vi")
+      .includes(normalizedSearch),
+  );
+  useEffect(() => {
+    const fields = relationshipFieldsRef.current;
+    if (relationship || !fields) return;
+    const measure = () =>
+      setRelationshipFieldsHeight(fields.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(fields);
+    return () => observer.disconnect();
+  }, [relationship]);
   return (
     <DialogShell
       title={relationship ? "Chỉnh sửa quan hệ" : "Thêm quan hệ"}
       onClose={onClose}
+      wide={!relationship}
     >
-      <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-        <label className={`${labelClass} md:col-span-2`}>
-          Loại quan hệ
-          <select
-            className={fieldClass}
-            value={form.type}
-            onChange={(event) =>
-              setForm({
-                ...form,
-                type: event.target.value as typeof form.type,
-              })
+      <form
+        onSubmit={submit}
+        className={`grid gap-4 ${relationship ? "" : "md:grid-cols-[minmax(17rem,0.85fr)_minmax(20rem,1.15fr)]"}`}
+      >
+        {!relationship && (
+          <aside
+            className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-3 rounded-lg border border-border-control bg-white p-3 md:h-[var(--member-panel-height)]"
+            style={
+              relationshipFieldsHeight
+                ? ({
+                    "--member-panel-height": `${relationshipFieldsHeight}px`,
+                  } as CSSProperties)
+                : undefined
             }
           >
-            <option value="PARENT_CHILD">Cha/mẹ – con</option>
-            <option value="SPOUSE">Vợ chồng</option>
-          </select>
-        </label>
-        <label className={labelClass}>
-          {firstLabel}
-          <select
-            required
-            className={fieldClass}
-            value={form.fromPersonId}
-            onChange={(event) =>
-              setForm({ ...form, fromPersonId: event.target.value })
-            }
-          >
-            <option value="">Chọn thành viên</option>
-            {personOptions}
-          </select>
-        </label>
-        <label className={labelClass}>
-          {secondLabel}
-          <select
-            required
-            className={fieldClass}
-            value={form.toPersonId}
-            onChange={(event) =>
-              setForm({ ...form, toPersonId: event.target.value })
-            }
-          >
-            <option value="">Chọn thành viên</option>
-            {personOptions}
-          </select>
-        </label>
-        {form.type === "PARENT_CHILD" ? (
-          <>
-            <label className={labelClass}>
-              Loại cha/mẹ
-              <select
-                className={fieldClass}
-                value={form.parentKind}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    parentKind: event.target.value as typeof form.parentKind,
-                  })
-                }
-              >
-                <option value="BIOLOGICAL">Ruột</option>
-                <option value="ADOPTIVE">Nuôi</option>
-              </select>
-            </label>
-            <label className={labelClass}>
-              Thứ tự sinh của người con
-              <input
-                type="number"
-                min={1}
-                className={fieldClass}
-                value={form.birthOrder}
-                onChange={(event) =>
-                  setForm({ ...form, birthOrder: event.target.value })
-                }
+            <h3 className="m-0 text-sm font-bold">Chọn thành viên</h3>
+            <div className="relative">
+              <Search
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-subtle"
               />
-            </label>
-          </>
-        ) : (
-          <>
-            <label className={labelClass}>
-              Trạng thái
-              <select
-                className={fieldClass}
-                value={form.marriageStatus}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    marriageStatus: event.target
-                      .value as typeof form.marriageStatus,
-                  })
-                }
-              >
-                <option value="MARRIED">Kết hôn</option>
-                <option value="DIVORCED">Ly hôn</option>
-                <option value="SEPARATED">Ly thân</option>
-                <option value="WIDOWED">Góa</option>
-              </select>
-            </label>
-            <label className={labelClass}>
-              Lần kết hôn thứ
               <input
-                type="number"
-                min={1}
-                className={fieldClass}
-                value={form.marriageOrder}
-                onChange={(event) =>
-                  setForm({ ...form, marriageOrder: event.target.value })
-                }
+                type="text"
+                className={`${fieldClass} h-11 pl-9 pr-9`}
+                value={memberSearch}
+                onChange={(event) => setMemberSearch(event.target.value)}
+                placeholder="Tìm tên thành viên"
+                aria-label="Tìm thành viên"
               />
-            </label>
-            <label className={labelClass}>
-              Ngày bắt đầu
-              <input
-                type="date"
-                className={fieldClass}
-                value={form.startedAt}
-                onChange={(event) =>
-                  setForm({ ...form, startedAt: event.target.value })
-                }
-              />
-            </label>
-            <label className={labelClass}>
-              Ngày kết thúc
-              <input
-                type="date"
-                className={fieldClass}
-                value={form.endedAt}
-                onChange={(event) =>
-                  setForm({ ...form, endedAt: event.target.value })
-                }
-              />
-            </label>
-          </>
+              {memberSearch && (
+                <button
+                  type="button"
+                  className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-ink-subtle hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
+                  onClick={() => setMemberSearch("")}
+                  aria-label="Xóa nội dung tìm kiếm"
+                  title="Xóa nội dung tìm kiếm"
+                >
+                  <X size={15} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <div className="grid min-h-0 max-h-[42vh] content-start gap-1 overflow-y-auto md:max-h-none">
+              {visiblePersons.map((person) => {
+                const assignedRole =
+                  person.id === form.fromPersonId
+                    ? firstLabel
+                    : person.id === form.toPersonId
+                      ? secondLabel
+                      : null;
+                const alreadyInOtherSlot =
+                  activeMemberSlot === "fromPersonId"
+                    ? person.id === form.toPersonId
+                    : person.id === form.fromPersonId;
+                return (
+                  <button
+                    key={person.id}
+                    type="button"
+                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-white px-2 py-1.5 text-left text-sm focus:border-focus focus:bg-white focus:outline-none focus-visible:bg-white disabled:cursor-not-allowed disabled:opacity-50 ${assignedRole ? "border-accent" : ""}`}
+                    onClick={() => choosePerson(person.id)}
+                    disabled={alreadyInOtherSlot}
+                  >
+                    {person.avatarUrl ? (
+                      <img
+                        src={person.avatarUrl}
+                        alt=""
+                        className="size-8 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#dbe6e0] font-bold">
+                        {person.fullName.slice(0, 1)}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate font-semibold">
+                      {person.fullName}
+                    </span>
+                    {assignedRole && (
+                      <span className="shrink-0 text-xs text-accent-deep">
+                        {assignedRole}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {!visiblePersons.length && (
+                <p className="m-0 px-2 py-4 text-center text-sm text-ink-subtle">
+                  Không tìm thấy thành viên phù hợp.
+                </p>
+              )}
+            </div>
+          </aside>
         )}
-        <footer className="mt-2 flex justify-end gap-2 md:col-span-2">
+        <div
+          ref={relationshipFieldsRef}
+          className="grid grid-cols-1 content-start gap-4 md:self-start"
+        >
+          <label className={labelClass}>
+            Loại quan hệ
+            {relationship ? (
+              <span className={`${fieldClass} bg-[#edf2ef]`}>
+                {form.type === "PARENT_CHILD" ? "Bố/mẹ – con" : "Vợ chồng"}
+              </span>
+            ) : (
+              <select
+                className={`${fieldClass} cursor-pointer`}
+                value={form.type}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    type: event.target.value as typeof form.type,
+                  })
+                }
+              >
+                <option value="PARENT_CHILD">Bố/mẹ – con</option>
+                <option value="SPOUSE">Vợ chồng</option>
+              </select>
+            )}
+          </label>
+          {relationship ? (
+            <>
+              <div className={labelClass}>
+                {firstLabel}
+                <span className={`${fieldClass} bg-[#edf2ef]`}>
+                  {selectedFirst?.fullName ?? "Thành viên"}
+                </span>
+              </div>
+              <div className={labelClass}>
+                {secondLabel}
+                <span className={`${fieldClass} bg-[#edf2ef]`}>
+                  {selectedSecond?.fullName ?? "Thành viên"}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="grid gap-4">
+              {[
+                {
+                  person: selectedFirst,
+                  label: firstLabel,
+                  slot: "fromPersonId" as const,
+                },
+                {
+                  person: selectedSecond,
+                  label: secondLabel,
+                  slot: "toPersonId" as const,
+                },
+              ].map(({ person, label, slot }) => (
+                <div className={labelClass} key={slot}>
+                  <span>{label}</span>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className={`${fieldClass} h-11 cursor-pointer text-left ${person ? "pr-10" : ""} ${activeMemberSlot === slot ? "border-focus" : ""}`}
+                      onClick={() => setActiveMemberSlot(slot)}
+                      aria-pressed={activeMemberSlot === slot}
+                    >
+                      {person?.fullName ?? (
+                        <span className="text-ink-subtle">Chưa chọn</span>
+                      )}
+                    </button>
+                    {person && (
+                      <button
+                        type="button"
+                        className="absolute top-1/2 right-2 grid size-7 -translate-y-1/2 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-ink-subtle hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-focus"
+                        onClick={() => {
+                          setForm((current) => ({ ...current, [slot]: "" }));
+                          setActiveMemberSlot(slot);
+                        }}
+                        aria-label={`Bỏ ${label.toLocaleLowerCase("vi")}`}
+                        title={`Bỏ ${label.toLocaleLowerCase("vi")}`}
+                      >
+                        <X size={15} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {form.type === "PARENT_CHILD" ? (
+            <>
+              <label className={labelClass}>
+                Loại bố/mẹ
+                <select
+                  className={`${fieldClass} cursor-pointer`}
+                  value={form.parentKind}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      parentKind: event.target.value as typeof form.parentKind,
+                    })
+                  }
+                >
+                  <option value="BIOLOGICAL">Ruột</option>
+                  <option value="ADOPTIVE">Nuôi</option>
+                </select>
+              </label>
+              <label className={labelClass}>
+                Thứ tự sinh của người con
+                <input
+                  type="number"
+                  min={1}
+                  className={fieldClass}
+                  value={form.birthOrder}
+                  onChange={(event) =>
+                    setForm({ ...form, birthOrder: event.target.value })
+                  }
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className={labelClass}>
+                Trạng thái
+                <select
+                  className={`${fieldClass} cursor-pointer`}
+                  value={form.marriageStatus}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      marriageStatus: event.target
+                        .value as typeof form.marriageStatus,
+                    })
+                  }
+                >
+                  <option value="MARRIED">Kết hôn</option>
+                  <option value="DIVORCED">Ly hôn</option>
+                  <option value="SEPARATED">Ly thân</option>
+                  <option value="WIDOWED">Góa</option>
+                </select>
+              </label>
+              <label className={labelClass}>
+                Lần kết hôn thứ
+                <input
+                  type="number"
+                  min={1}
+                  className={fieldClass}
+                  value={form.marriageOrder}
+                  onChange={(event) =>
+                    setForm({ ...form, marriageOrder: event.target.value })
+                  }
+                />
+              </label>
+              <label className={labelClass}>
+                Ngày bắt đầu
+                <input
+                  type="date"
+                  className={fieldClass}
+                  value={form.startedAt}
+                  onChange={(event) =>
+                    setForm({ ...form, startedAt: event.target.value })
+                  }
+                />
+              </label>
+              <label className={labelClass}>
+                Ngày kết thúc
+                <input
+                  type="date"
+                  className={fieldClass}
+                  value={form.endedAt}
+                  onChange={(event) =>
+                    setForm({ ...form, endedAt: event.target.value })
+                  }
+                />
+              </label>
+            </>
+          )}
+        </div>
+        <footer className={`mt-2 flex justify-end gap-2 ${relationship ? "" : "md:col-span-2"}`}>
           <button
             type="button"
             className={compactSecondaryButtonClass}
@@ -601,6 +787,7 @@ export function RelationshipFormDialog({
               pending ||
               !form.fromPersonId ||
               !form.toPersonId ||
+              persons.length < 2 ||
               form.fromPersonId === form.toPersonId
             }
           >
@@ -652,7 +839,7 @@ export function RelationshipManagerDialog({
             <div className="min-w-0 flex-1">
               <strong className="block text-sm text-ink-strong">
                 {relationship.type === "PARENT_CHILD"
-                  ? "Cha/mẹ – con"
+                  ? "Bố/mẹ – con"
                   : "Vợ chồng"}
               </strong>
               <span className="block truncate text-sm text-ink-muted">

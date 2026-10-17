@@ -796,7 +796,11 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
         type: "smoothstep",
         className: "family-edge family-edge-parent",
         zIndex: 1,
-        data: { personIds: [leftId, rightId, childId], kind: "family" },
+        data: {
+          personIds: [leftId, rightId, childId],
+          kind: "family",
+          relationshipKey: `family:${union.key}::${childId}`,
+        },
         style: { stroke: "#52796e", strokeWidth: 2 },
       });
     }
@@ -805,6 +809,13 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
   for (const [childId, parentIds] of parentsByChild) {
     if (pairedChildren.has(childId)) continue;
     for (const parentId of parentIds) {
+      const relationship = graph.edges.find(
+        (edge) =>
+          edge.type === "PARENT_CHILD" &&
+          edge.fromPersonId === parentId &&
+          edge.toPersonId === childId,
+      );
+      if (!relationship) continue;
       edges.push({
         id: `single-parent-${parentId}-${childId}`,
         source: parentId,
@@ -814,7 +825,11 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
         type: "smoothstep",
         className: "family-edge family-edge-parent",
         zIndex: 1,
-        data: { personIds: [parentId, childId], kind: "family" },
+        data: {
+          personIds: [parentId, childId],
+          kind: "family",
+          relationshipKey: `parent:${relationship.id}`,
+        },
         style: { stroke: "#52796e", strokeWidth: 2 },
       });
     }

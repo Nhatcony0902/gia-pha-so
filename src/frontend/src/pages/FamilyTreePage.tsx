@@ -25,6 +25,7 @@ import { useNotifications } from "../app/providers/NotificationProvider";
 import { Breadcrumbs } from "../components/Breadcrumbs";
 import {
   createRelationship,
+  deletePerson,
   deleteRelationship,
   getPersonDetail,
   getTreeGraph,
@@ -123,6 +124,22 @@ export function FamilyTreePage({
         error instanceof Error ? error.message : "Vui lòng thử lại",
       ),
   });
+  const removePerson = useMutation({
+    mutationFn: (personId: string) => deletePerson(treeId, personId),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["tree-graph", treeId] });
+      client.invalidateQueries({ queryKey: ["person", treeId] });
+      client.invalidateQueries({ queryKey: ["tree-persons", treeId] });
+      client.invalidateQueries({ queryKey: ["trees"] });
+      closeSidebar();
+      notice.toast("Đã xóa thành viên", "success");
+    },
+    onError: (error) =>
+      notice.alert(
+        "Không thể xóa thành viên",
+        error instanceof Error ? error.message : "Vui lòng thử lại",
+      ),
+  });
 
   useEffect(() => {
     if (!graph.data) return;
@@ -152,11 +169,14 @@ export function FamilyTreePage({
     setEdges((current) =>
       current.map((edge) => {
         const personIds = (edge.data?.personIds as string[] | undefined) ?? [];
-        const connected = selectedId && personIds.includes(selectedId);
+        const connected = Boolean(
+          (selectedId && personIds.includes(selectedId)) ||
+            (relationshipKey && edge.data?.relationshipKey === relationshipKey),
+        );
         const baseWidth = edge.data?.kind === "pair" ? 2.5 : 2;
         return {
           ...edge,
-          animated: Boolean(connected),
+          animated: connected,
           style: {
             ...edge.style,
             strokeWidth: connected ? baseWidth + 1 : baseWidth,
@@ -164,13 +184,66 @@ export function FamilyTreePage({
         };
       }),
     );
-  }, [selectedId, setEdges, setNodes]);
+  }, [relationshipKey, selectedId, setEdges, setNodes]);
 
   const closeSidebar = () => setSearchParams({}, { replace: true });
   const selectPerson = (personId: string) =>
     setSearchParams({ person: personId }, { replace: true });
   const selectedRelationship = useMemo(() => {
     if (!graph.data || !relationshipKey) return null;
+    if (relationshipKey.startsWith("parent:")) {
+      const relationshipId = relationshipKey.slice("parent:".length);
+      const relationship = graph.data.edges.find(
+        (edge) => edge.id === relationshipId && edge.type === "PARENT_CHILD",
+      );
+      const parent = graph.data.nodes.find(
+        (person) => person.id === relationship?.fromPersonId,
+      );
+      const child = graph.data.nodes.find(
+        (person) => person.id === relationship?.toPersonId,
+      );
+      if (!relationship || !parent || !child) return null;
+      return {
+        type: "PARENT_CHILD" as const,
+        parents: [{ person: parent, relationship }],
+        child,
+        birthOrder: relationship.birthOrder,
+      };
+    }
+    if (relationshipKey.startsWith("family:")) {
+      const [firstId, secondId, childId] = relationshipKey
+        .slice("family:".length)
+        .split("::");
+      if (!firstId || !secondId || !childId) return null;
+      const child = graph.data.nodes.find((person) => person.id === childId);
+      if (!child) return null;
+      const parents = graph.data.edges
+        .filter(
+          (edge) =>
+            edge.type === "PARENT_CHILD" &&
+            edge.toPersonId === childId &&
+            [firstId, secondId].includes(edge.fromPersonId),
+        )
+        .flatMap((relationship) => {
+          const person = graph.data!.nodes.find(
+            (node) => node.id === relationship.fromPersonId,
+          );
+          return person ? [{ person, relationship }] : [];
+        });
+      if (!parents.length) return null;
+      const birthOrder = graph.data.edges.find(
+        (edge) =>
+          edge.type === "PARENT_CHILD" &&
+          edge.toPersonId === childId &&
+          [firstId, secondId].includes(edge.fromPersonId),
+      )?.birthOrder;
+      return {
+        type: "PARENT_CHILD" as const,
+        parents,
+        child,
+        birthOrder: birthOrder ?? null,
+      };
+    }
     const [firstId, secondId] = relationshipKey.split("::");
     const first = graph.data.nodes.find((person) => person.id === firstId);
     const second = graph.data.nodes.find((person) => person.id === secondId);
@@ -199,13 +272,31 @@ export function FamilyTreePage({
       )
       .filter((person) => person !== undefined);
     return {
+      type: "SPOUSE" as const,
       first,
       second,
       children,
+      relationship: spouse,
       status: (spouse?.marriageStatus ?? "CO_PARENT") as
         MarriageStatus | "CO_PARENT",
     };
   }, [graph.data, relationshipKey]);
+  const confirmDeleteRelationship = async (
+    relationship: PrimitiveRelationship,
+  ) => {
+    const accepted = await notice.confirm(
+      "Xóa quan hệ",
+      "Quan hệ sẽ bị xóa khỏi gia phả và sơ đồ sẽ được cập nhật.",
+    );
+    if (accepted) removeRelationship.mutate(relationship.id);
+  };
+  const confirmDeletePerson = async (personId: string) => {
+    const accepted = await notice.confirm(
+      "Xóa thành viên",
+      "Thành viên và các quan hệ liên quan sẽ bị xóa khỏi gia phả này.",
+    );
+    if (accepted) removePerson.mutate(personId);
+  };
   const selectedOpen = Boolean(selectedId || selectedRelationship);
   const minimapColor = useMemo(
     () => (node: FamilyTreeFlowNode) =>
@@ -338,7 +429,7 @@ export function FamilyTreePage({
                 </summary>
                 <div className="grid gap-[0.55rem] px-[0.8rem] pb-[0.8rem]">
                   <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
-                    <i className={legendLineClass} /> Cha/mẹ – con
+                    <i className={legendLineClass} /> Bố/mẹ – con
                   </span>
                   <span className="flex items-center gap-[0.55rem] text-[0.74rem]">
                     <i className={`${legendLineClass} border-[#a96f25]`} /> Kết
@@ -388,11 +479,7 @@ export function FamilyTreePage({
             }
             onEdit={setRelationshipEditor}
             onDelete={async (relationship) => {
-              const accepted = await notice.confirm(
-                "Xóa quan hệ",
-                "Quan hệ sẽ bị xóa khỏi gia phả và sơ đồ sẽ được cập nhật.",
-              );
-              if (accepted) removeRelationship.mutate(relationship.id);
+              await confirmDeleteRelationship(relationship);
             }}
           />
         )}
@@ -403,6 +490,8 @@ export function FamilyTreePage({
             loading={detail.isLoading}
             onClose={closeSidebar}
             onSelectPerson={selectPerson}
+            onDelete={() => void confirmDeletePerson(selectedId)}
+            deleting={removePerson.isPending}
           />
         )}
         {selectedRelationship && (
@@ -410,6 +499,15 @@ export function FamilyTreePage({
             {...selectedRelationship}
             onClose={closeSidebar}
             onSelectPerson={selectPerson}
+            onEdit={setRelationshipEditor}
+            onDelete={(relationship) =>
+              void confirmDeleteRelationship(relationship)
+            }
+            deletingId={
+              removeRelationship.isPending
+                ? removeRelationship.variables
+                : undefined
+            }
           />
         )}
       </div>

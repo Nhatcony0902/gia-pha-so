@@ -4,15 +4,20 @@ import type {
   PersonNode,
   PersonSidebarDetail,
   RelatedPerson,
+  PrimitiveRelationship,
 } from "@family-tree/shared-types";
-import { X } from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { primaryButtonClass } from "../../lib/ui-classes";
+import {
+  compactDangerButtonClass,
+  compactPrimaryButtonClass,
+  compactSecondaryButtonClass,
+} from "../../lib/ui-classes";
 
 const sidebarClass =
-  "absolute right-0 bottom-0 left-0 top-[38%] z-10 overflow-y-auto rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
+  "absolute right-0 bottom-0 left-0 top-[38%] z-10 flex flex-col overflow-hidden rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-0 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
 const fixedSidebarClass =
-  "fixed right-0 bottom-0 left-0 top-[38%] z-40 overflow-y-auto rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-16 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
+  "fixed right-0 bottom-0 left-0 top-[38%] z-40 flex flex-col overflow-hidden rounded-t-2xl border-t border-border-control bg-[#fbfcfb] p-[1.35rem] shadow-[0_-14px_35px_rgba(27,54,47,0.18)] animate-[drawer-in_0.22s_ease-out] min-[801px]:top-16 min-[801px]:left-auto min-[801px]:w-92 min-[801px]:rounded-none min-[801px]:border-t-0 min-[801px]:border-l min-[801px]:shadow-[-14px_0_35px_rgba(27,54,47,0.14)] min-[801px]:animate-[sidebar-in_0.22s_ease-out]";
 const closeButtonClass =
   "absolute top-[0.8rem] right-[0.9rem] grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-[#e6ece8] text-[#314a42]";
 const profileClass =
@@ -166,7 +171,7 @@ function FamilyConnections({
                 ? "Bố"
                 : parent.gender === "FEMALE"
                   ? "Mẹ"
-                  : "Cha/mẹ";
+                  : "Bố/mẹ";
             return (
               <PersonButton
                 key={parent.id}
@@ -226,6 +231,8 @@ export function PersonSidebar({
   loading,
   onClose,
   onSelectPerson,
+  onDelete,
+  deleting,
   placement = "absolute",
 }: {
   treeId: string;
@@ -233,6 +240,8 @@ export function PersonSidebar({
   loading: boolean;
   onClose: () => void;
   onSelectPerson: (personId: string) => void;
+  onDelete: () => void;
+  deleting: boolean;
   placement?: "absolute" | "fixed";
 }) {
   const rows = person
@@ -267,85 +276,143 @@ export function PersonSidebar({
       >
         <X size={16} aria-hidden="true" />
       </button>
-      {loading && (
-        <div className="grid min-h-60 place-items-center text-ink-muted">
-          Đang tải thông tin…
-        </div>
-      )}
-      {!loading && person && (
-        <>
-          <div className={profileClass}>
-            <div className="mx-auto grid size-20 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-[2rem] font-semibold text-ink-soft [&_img]:size-full [&_img]:object-cover">
-              {person.avatarUrl ? (
-                <img src={person.avatarUrl} alt="" />
-              ) : (
-                person.fullName.slice(0, 1)
-              )}
-            </div>
-            <p>THÀNH VIÊN GIA PHẢ</p>
-            <h2>{person.fullName}</h2>
-            {person.preferredName && <span>{person.preferredName}</span>}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+        {loading && (
+          <div className="grid min-h-60 place-items-center text-ink-muted">
+            Đang tải thông tin…
           </div>
-          <dl className="m-0 border-t border-[#dae3de]">
-            {rows.map(([label, value]) => (
-              <div
-                className="grid grid-cols-[7rem_1fr] gap-[0.7rem] border-b border-[#e2e8e4] py-[0.65rem]"
-                key={label}
-              >
-                <dt className="text-[0.78rem] text-ink-subtle">{label}</dt>
-                <dd className="m-0 text-[0.84rem] font-semibold">{value}</dd>
+        )}
+        {!loading && person && (
+          <>
+            <div className={profileClass}>
+              <div className="mx-auto grid size-20 place-items-center overflow-hidden rounded-full bg-[#dbe6e0] font-display text-[2rem] font-semibold text-ink-soft [&_img]:size-full [&_img]:object-cover">
+                {person.avatarUrl ? (
+                  <img src={person.avatarUrl} alt="" />
+                ) : (
+                  person.fullName.slice(0, 1)
+                )}
               </div>
-            ))}
-          </dl>
-          <FamilyConnections person={person} onSelectPerson={onSelectPerson} />
-          {person.biography && (
-            <section className={sectionClass}>
-              <h3>Tiểu sử</h3>
-              <p>{person.biography}</p>
-            </section>
-          )}
-          <section className={sectionClass}>
-            <h3>Thuộc các gia phả</h3>
-            <div className={treeListClass}>
-              {person.visibleTrees.map((tree) => (
-                <Link
-                  key={tree.id}
-                  to={`/trees/${tree.id}/tree?person=${person.id}`}
-                >
-                  {tree.name}
-                </Link>
-              ))}
+              <p>THÀNH VIÊN GIA PHẢ</p>
+              <h2>{person.fullName}</h2>
+              {person.preferredName && <span>{person.preferredName}</span>}
             </div>
-          </section>
+            <dl className="m-0 border-t border-[#dae3de]">
+              {rows.map(([label, value]) => (
+                <div
+                  className="grid grid-cols-[7rem_1fr] gap-[0.7rem] border-b border-[#e2e8e4] py-[0.65rem]"
+                  key={label}
+                >
+                  <dt className="text-[0.78rem] text-ink-subtle">{label}</dt>
+                  <dd className="m-0 text-[0.84rem] font-semibold">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <FamilyConnections
+              person={person}
+              onSelectPerson={onSelectPerson}
+            />
+            {person.biography && (
+              <section className={sectionClass}>
+                <h3>Tiểu sử</h3>
+                <p>{person.biography}</p>
+              </section>
+            )}
+            <section className={sectionClass}>
+              <h3>Thuộc các gia phả</h3>
+              <div className={treeListClass}>
+                {person.visibleTrees.map((tree) => (
+                  <Link
+                    key={tree.id}
+                    to={`/trees/${tree.id}/tree?person=${person.id}`}
+                  >
+                    {tree.name}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+      {!loading && person && (
+        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-[#dae3de] bg-[#fbfcfb] pt-3">
           <Link
-            className={`${primaryButtonClass} mt-[1.4rem] flex w-full justify-center no-underline`}
+            className={`${compactPrimaryButtonClass} px-2 text-center text-sm no-underline`}
             to={`/trees/${treeId}/persons/${person.id}`}
           >
             Xem chi tiết
           </Link>
-        </>
+          <button
+            type="button"
+            className={`${compactDangerButtonClass} px-2 text-sm`}
+            onClick={onDelete}
+            disabled={deleting}
+          >
+            <Trash2 size={16} />
+            {deleting ? "Đang xóa…" : "Xóa"}
+          </button>
+        </footer>
       )}
     </aside>
   );
 }
 
-export function RelationshipSidebar({
-  first,
-  second,
-  status,
-  children,
-  onClose,
-  onSelectPerson,
-}: {
-  first: PersonNode;
-  second: PersonNode;
-  status: MarriageStatus | "CO_PARENT";
-  children: PersonNode[];
+type RelationshipSidebarProps = {
   onClose: () => void;
   onSelectPerson: (personId: string) => void;
-}) {
+  onEdit: (relationship: PrimitiveRelationship) => void;
+  onDelete: (relationship: PrimitiveRelationship) => void;
+  deletingId?: string;
+} & (
+  | {
+      type: "SPOUSE";
+      first: PersonNode;
+      second: PersonNode;
+      status: MarriageStatus | "CO_PARENT";
+      children: PersonNode[];
+      relationship?: PrimitiveRelationship;
+    }
+  | {
+      type: "PARENT_CHILD";
+      parents: Array<{
+        person: PersonNode;
+        relationship: PrimitiveRelationship;
+      }>;
+      child: PersonNode;
+      birthOrder: number | null;
+      relationship?: PrimitiveRelationship;
+    }
+);
+
+export function RelationshipSidebar(props: RelationshipSidebarProps) {
+  const { onClose, onSelectPerson, onEdit, onDelete, deletingId } = props;
+  const relationshipActions = (item: PrimitiveRelationship) => (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        className={`${compactSecondaryButtonClass} min-h-8 flex-1 px-2 py-1 text-xs`}
+        onClick={() => onEdit(item)}
+        aria-label="Sửa quan hệ"
+      >
+        <Pencil size={14} /> Sửa quan hệ
+      </button>
+      <button
+        type="button"
+        className={`${compactDangerButtonClass} min-h-8 flex-1 px-2 py-1 text-xs`}
+        onClick={() => onDelete(item)}
+        disabled={deletingId === item.id}
+        aria-label="Xóa quan hệ"
+      >
+        <Trash2 size={14} />
+        {deletingId === item.id ? "Đang xóa…" : "Xóa"}
+      </button>
+    </div>
+  );
+
   return (
-    <aside className={sidebarClass} aria-label="Thông tin mối quan hệ">
+    <aside
+      className={sidebarClass}
+      aria-label="Thông tin mối quan hệ"
+    >
       <button
         className={closeButtonClass}
         type="button"
@@ -354,31 +421,129 @@ export function RelationshipSidebar({
       >
         <X size={16} aria-hidden="true" />
       </button>
-      <div className={`${profileClass} pt-[2.4rem]`}>
-        <p>MỐI QUAN HỆ</p>
-        <h2>{statusLabel(status)}</h2>
-      </div>
-      <section className={sectionClass}>
-        <h3>Vợ/chồng</h3>
-        <div className={relationshipListClass}>
-          <PersonButton person={first} onSelect={onSelectPerson} />
-          <PersonButton person={second} onSelect={onSelectPerson} />
+      <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+        <div className={`${profileClass} pt-[2.4rem]`}>
+          <p>MỐI QUAN HỆ</p>
+          <h2>
+            {props.type === "PARENT_CHILD"
+              ? "Bố/mẹ – con"
+              : statusLabel(props.status)}
+          </h2>
         </div>
-      </section>
-      {children.length > 0 && (
-        <section className={sectionClass}>
-          <h3>Con cái</h3>
-          <div className={relationshipListClass}>
-            {children.map((child) => (
+        {props.type === "PARENT_CHILD" ? (
+          <>
+            <section className={sectionClass}>
+              <h3>Bố/mẹ</h3>
+              <div className={relationshipListClass}>
+                {props.parents.map(({ person, relationship: parentRelationship }) => {
+                  const role =
+                    person.gender === "MALE"
+                      ? "Bố"
+                      : person.gender === "FEMALE"
+                        ? "Mẹ"
+                        : "Bố/mẹ";
+                  return (
+                    <PersonButton
+                      key={person.id}
+                      person={person}
+                      onSelect={onSelectPerson}
+                      role={`${role}${parentRelationship.parentKind === "ADOPTIVE" ? " nuôi" : ""}`}
+                    />
+                  );
+                })}
+            </div>
+          </section>
+          <section className={sectionClass}>
+            <h3>Con</h3>
+            <div className={relationshipListClass}>
               <PersonButton
-                key={child.id}
-                person={child}
+                person={props.child}
                 onSelect={onSelectPerson}
+                context={props.birthOrder ? `Thứ tự sinh ${props.birthOrder}` : undefined}
               />
-            ))}
-          </div>
-        </section>
-      )}
+            </div>
+          </section>
+          </>
+        ) : (
+          <>
+            <section className={sectionClass}>
+              <h3>Vợ/chồng</h3>
+              <div className={relationshipListClass}>
+                <PersonButton person={props.first} onSelect={onSelectPerson} />
+                <PersonButton person={props.second} onSelect={onSelectPerson} />
+              </div>
+            </section>
+              {props.children.length > 0 && (
+              <section className={sectionClass}>
+                <h3>Con cái</h3>
+                <div className={relationshipListClass}>
+                  {props.children.map((child) => (
+                    <PersonButton
+                      key={child.id}
+                      person={child}
+                      onSelect={onSelectPerson}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+      <footer className="grid shrink-0 gap-2 border-t border-[#dae3de] bg-[#fbfcfb] pt-3">
+        {props.type === "PARENT_CHILD" && props.parents.length > 1 ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              {props.parents.map(({ person, relationship: parentRelationship }) => {
+                const role =
+                  person.gender === "MALE"
+                    ? "cha"
+                    : person.gender === "FEMALE"
+                      ? "mẹ"
+                      : "bố/mẹ";
+                return (
+                  <button
+                    key={parentRelationship.id}
+                    type="button"
+                    className={`${compactSecondaryButtonClass} min-h-9 px-2 py-1 text-xs`}
+                    onClick={() => onEdit(parentRelationship)}
+                  >
+                    <Pencil size={14} /> Sửa {role}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {props.parents.map(({ person, relationship: parentRelationship }) => {
+                const role =
+                  person.gender === "MALE"
+                    ? "cha"
+                    : person.gender === "FEMALE"
+                      ? "mẹ"
+                      : "bố/mẹ";
+                return (
+                  <button
+                    key={parentRelationship.id}
+                    type="button"
+                    className={`${compactDangerButtonClass} min-h-9 px-2 py-1 text-xs`}
+                    onClick={() => onDelete(parentRelationship)}
+                    disabled={deletingId === parentRelationship.id}
+                  >
+                    <Trash2 size={14} />
+                    {deletingId === parentRelationship.id
+                      ? "Đang xóa…"
+                      : `Xóa ${role}`}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : props.type === "PARENT_CHILD" && props.parents[0] ? (
+          relationshipActions(props.parents[0].relationship)
+        ) : props.relationship ? (
+          relationshipActions(props.relationship)
+        ) : null}
+      </footer>
     </aside>
   );
 }

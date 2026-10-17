@@ -45,7 +45,7 @@ const columns: Column[] = [
     label: "Loại quan hệ",
     default: true,
     enumValues: [
-      ["Cha/mẹ – con", "Cha/mẹ – con"],
+      ["Bố/mẹ – con", "Bố/mẹ – con"],
       ["Vợ chồng", "Vợ chồng"],
     ],
   },
@@ -56,8 +56,8 @@ const columns: Column[] = [
     label: "Trạng thái",
     default: true,
     enumValues: [
-      ["Cha/mẹ ruột", "Cha/mẹ ruột"],
-      ["Cha/mẹ nuôi", "Cha/mẹ nuôi"],
+      ["Bố/mẹ ruột", "Bố/mẹ ruột"],
+      ["Bố/mẹ nuôi", "Bố/mẹ nuôi"],
       ["Kết hôn", "Kết hôn"],
       ["Ly hôn", "Ly hôn"],
       ["Ly thân", "Ly thân"],
@@ -73,8 +73,8 @@ const columns: Column[] = [
 const statusLabel = (relationship: PrimitiveRelationship) => {
   if (relationship.type === "PARENT_CHILD")
     return relationship.parentKind === "ADOPTIVE"
-      ? "Cha/mẹ nuôi"
-      : "Cha/mẹ ruột";
+      ? "Bố/mẹ nuôi"
+      : "Bố/mẹ ruột";
   switch (relationship.marriageStatus) {
     case "DIVORCED":
       return "Ly hôn";
@@ -177,7 +177,7 @@ export function RelationshipList({
       relationships.map((relationship) => ({
         relationship,
         type:
-          relationship.type === "PARENT_CHILD" ? "Cha/mẹ – con" : "Vợ chồng",
+          relationship.type === "PARENT_CHILD" ? "Bố/mẹ – con" : "Vợ chồng",
         firstPerson:
           people.get(relationship.fromPersonId)?.fullName ?? "Không tìm thấy",
         secondPerson:
@@ -481,7 +481,7 @@ export function RelationshipList({
                           person={row.first}
                           role={
                             row.relationship.type === "PARENT_CHILD"
-                              ? "Cha/mẹ"
+                              ? "Bố/mẹ"
                               : undefined
                           }
                           onSelect={onSelectPerson}

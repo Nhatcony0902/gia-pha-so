@@ -324,8 +324,8 @@ async function main() {
   });
   await prisma.relationshipType.upsert({
     where: { code: "PARENT_CHILD" },
-    update: { label: "Cha/mẹ - con", isDirected: true },
-    create: { code: "PARENT_CHILD", label: "Cha/mẹ - con", isDirected: true },
+    update: { label: "Bố/mẹ - con", isDirected: true },
+    create: { code: "PARENT_CHILD", label: "Bố/mẹ - con", isDirected: true },
   });
   await prisma.relationshipType.upsert({
     where: { code: "SPOUSE" },

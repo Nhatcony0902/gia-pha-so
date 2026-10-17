@@ -406,8 +406,8 @@ export class TreesService {
           code: "INVALID_PARENT_RELATIONSHIP",
           message:
             error instanceof Error && error.message.includes("two biological")
-              ? "Một thành viên không thể có quá hai cha/mẹ ruột"
-              : "Quan hệ cha/mẹ - con tạo thành vòng lặp hoặc không hợp lệ",
+              ? "Một thành viên không thể có quá hai bố/mẹ ruột"
+              : "Quan hệ bố/mẹ - con tạo thành vòng lặp hoặc không hợp lệ",
         });
       }
       return {
@@ -664,7 +664,7 @@ export class TreesService {
             ? "Bố"
             : relative.gender === "FEMALE"
               ? "Mẹ"
-              : "Cha/mẹ";
+              : "Bố/mẹ";
         label = `${parentLabel}${relation.parentKind === "ADOPTIVE" ? " nuôi" : ""}`;
       }
       relativesByTree.set(relation.treeId, [
