@@ -1,6 +1,6 @@
 # LMS-005: Hồ sơ thành viên đầy đủ + tệp đính kèm
 
-- **Trạng thái:** Todo
+- **Trạng thái:** In Progress
 - **Owner:** Quân + Sơn
 - **Sprint:** Sprint 03
 - **Spec liên quan:** `specs/features.md` (A3)

@@ -1,6 +1,6 @@
 # LMS-003: Quản lý dòng họ, người & quan hệ
 
-- **Trạng thái:** Todo
+- **Trạng thái:** In Progress
 - **Owner:** Sơn + Quân
 - **Sprint:** Sprint 02
 - **Spec liên quan:** `specs/features.md` (A3)
@@ -10,8 +10,8 @@ Là Admin dòng họ, tôi muốn tạo dòng họ, thêm người và khai báo
 
 ## Tiêu chí chấp nhận
 - [ ] Tạo dòng họ → người tạo là Admin
-- [ ] CRUD Person: họ tên, giới tính, ngày sinh/mất (kèm độ chính xác), thứ bậc anh chị em, nghề nghiệp, nơi sinh, tiểu sử
-- [ ] Thêm quan hệ `PARENT_CHILD` (ruột/nuôi) và `SPOUSE` (có thứ tự hôn nhân)
+- [x] CRUD Person: họ tên, giới tính, ngày sinh/mất (kèm độ chính xác), thứ bậc anh chị em, nghề nghiệp, nơi sinh, tiểu sử
+- [x] Thêm quan hệ `PARENT_CHILD` (ruột/nuôi) và `SPOUSE` (có thứ tự hôn nhân)
 - [ ] Từ chối: > 2 cha/mẹ ruột, chu trình tổ tiên, tự quan hệ (409)
 - [ ] Mọi thao tác ghi đi qua `ChangeService` (ADR-0001), có hook để chatbot re-embed
 - [ ] Seed dòng họ mẫu ≥ 50 người, 5 đời, có tái hôn và con nuôi

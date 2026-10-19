@@ -1,6 +1,6 @@
 # LMS-001: Khởi tạo dự án, hạ tầng & CI
 
-- **Trạng thái:** Todo
+- **Trạng thái:** In Progress
 - **Owner:** Sơn + Quân (cả nhóm chốt ADR, ERD)
 - **Sprint:** Sprint 01
 - **Spec liên quan:** `specs/features.md` (ADR-0001/0002/0003)
