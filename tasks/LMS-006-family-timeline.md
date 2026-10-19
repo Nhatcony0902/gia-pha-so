@@ -1,6 +1,6 @@
 # LMS-006: Timeline gia tộc
 
-- **Trạng thái:** Todo
+- **Trạng thái:** In Progress
 - **Owner:** Quân + Sơn
 - **Sprint:** Sprint 03
 - **Spec liên quan:** `specs/features.md` (A4)

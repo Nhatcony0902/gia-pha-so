@@ -1,6 +1,6 @@
 # LMS-002: Đăng ký / đăng nhập
 
-- **Trạng thái:** In Progress
+- **Trạng thái:** Done
 - **Owner:** Sơn + Quân
 - **Sprint:** Sprint 01
 - **Spec liên quan:** `specs/features.md` (D1)
