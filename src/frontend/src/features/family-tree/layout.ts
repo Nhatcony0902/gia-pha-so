@@ -10,18 +10,24 @@ import type { FamilyJunctionFlowNode } from "./FamilyJunctionNode";
 import type { FamilyFlowNode } from "./FamilyPersonNode";
 
 const elk = new ELK();
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 88;
-const PARTNER_GAP = 120;
-const FAMILY_GAP = 145;
-const FAMILY_GROUP_GAP = 425;
-const GENERATION_GAP = 260;
+const PERSON_NODE_WIDTH = 200;
+const PERSON_NODE_HEIGHT = 80;
+const NODE_WIDTH = PERSON_NODE_WIDTH;
+const NODE_HEIGHT = PERSON_NODE_HEIGHT;
+const JUNCTION_SIZE = 1;
+const PARTNER_GAP = 104;
+const FAMILY_GAP = 32;
+const FAMILY_GROUP_GAP = 80;
+const GENERATION_GAP = 190;
+const LOWERED_PAIR_TOP_GAP = 22;
+const LOWERED_PAIR_LANE_GAP = 18;
 
 export type FamilyTreeFlowNode = FamilyFlowNode | FamilyJunctionFlowNode;
 export type FamilyEdgeData = {
   personIds: string[];
   kind?: "pair" | "family";
   relationshipKey?: string;
+  routeY?: number;
 };
 type FamilyEdge = Edge<FamilyEdgeData>;
 type FamilyUnion = {
@@ -34,6 +40,11 @@ type FamilyUnion = {
 
 const pairKey = (first: string, second: string) =>
   [first, second].sort().join("::");
+
+const junctionPosition = (centerX: number, centerY: number) => ({
+  x: centerX - JUNCTION_SIZE / 2,
+  y: centerY - JUNCTION_SIZE / 2,
+});
 
 function relationshipPresentation(status?: MarriageStatus) {
   switch (status) {
@@ -209,8 +220,101 @@ function orderGeneration(
   );
 }
 
+type PositionedComponent = {
+  personIds: string[];
+  width: number;
+  parentGroupKey: string | null;
+  siblingOrder: number;
+  desiredStart: number;
+  sortAnchor: number;
+  elkCenter: number;
+};
+
+const componentWidth = (personIds: string[]) =>
+  personIds.length * NODE_WIDTH + (personIds.length - 1) * PARTNER_GAP;
+
+/**
+ * Finds the closest non-overlapping starts to the requested starts while
+ * preserving component order. This is a one-dimensional isotonic regression:
+ * siblings that request the same center spread equally around that center,
+ * while crowded family groups move only as much as necessary.
+ */
+function packComponents(components: PositionedComponent[], gaps: number[]) {
+  if (!components.length) return [];
+
+  const offsets = [0];
+  for (let index = 1; index < components.length; index++) {
+    offsets[index] =
+      offsets[index - 1]! + components[index - 1]!.width + gaps[index - 1]!;
+  }
+
+  type Block = {
+    first: number;
+    last: number;
+    average: number;
+    weight: number;
+  };
+  const blocks: Block[] = [];
+  components.forEach((component, index) => {
+    blocks.push({
+      first: index,
+      last: index,
+      average: component.desiredStart - offsets[index]!,
+      weight: 1,
+    });
+    while (
+      blocks.length > 1 &&
+      blocks[blocks.length - 2]!.average > blocks[blocks.length - 1]!.average
+    ) {
+      const right = blocks.pop()!;
+      const left = blocks.pop()!;
+      const weight = left.weight + right.weight;
+      blocks.push({
+        first: left.first,
+        last: right.last,
+        average:
+          (left.average * left.weight + right.average * right.weight) / weight,
+        weight,
+      });
+    }
+  });
+
+  const starts = new Array<number>(components.length);
+  for (const block of blocks) {
+    for (let index = block.first; index <= block.last; index++) {
+      starts[index] = block.average + offsets[index]!;
+    }
+  }
+  return starts;
+}
+
 export async function layoutGraph(graph: FamilyTreeGraph) {
   const { unions, parentsByChild } = buildUnions(graph);
+  const singleParentChildren = new Map<string, string[]>();
+  for (const [childId, parentIds] of parentsByChild) {
+    if (parentIds.length !== 1) continue;
+    const parentId = parentIds[0]!;
+    singleParentChildren.set(parentId, [
+      ...(singleParentChildren.get(parentId) ?? []),
+      childId,
+    ]);
+  }
+  const siblingOrderByChild = new Map<string, number>();
+  for (const relationship of graph.edges) {
+    if (
+      relationship.type !== "PARENT_CHILD" ||
+      relationship.birthOrder === null
+    )
+      continue;
+    siblingOrderByChild.set(
+      relationship.toPersonId,
+      Math.min(
+        siblingOrderByChild.get(relationship.toPersonId) ??
+          Number.POSITIVE_INFINITY,
+        relationship.birthOrder,
+      ),
+    );
+  }
   const generation = calculateGenerations(graph, unions);
   const elkResult = await elk.layout({
     id: "root",
@@ -231,6 +335,16 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
   const elkX = new Map(
     (elkResult.children ?? []).map((node) => [node.id, node.x ?? 0]),
   );
+  const elkBounds = (elkResult.children ?? []).reduce(
+    (bounds, node) => ({
+      left: Math.min(bounds.left, node.x ?? 0),
+      right: Math.max(bounds.right, (node.x ?? 0) + NODE_WIDTH),
+    }),
+    { left: Number.POSITIVE_INFINITY, right: Number.NEGATIVE_INFINITY },
+  );
+  const elkGraphCenter = Number.isFinite(elkBounds.left)
+    ? (elkBounds.left + elkBounds.right) / 2
+    : 0;
   const positions = new Map<string, { x: number; y: number }>();
   const generations = new Map<number, string[]>();
   for (const person of graph.nodes) {
@@ -240,67 +354,274 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
   const orderedGenerations = [...generations.entries()].sort(
     ([firstRow], [secondRow]) => firstRow - secondRow,
   );
-  for (const [row, personIds] of orderedGenerations) {
-    const components = orderGeneration(personIds, unions, elkX);
-    const elkAnchor = (component: string[]) =>
-      Math.min(...component.map((id) => elkX.get(id) ?? 0));
-    const parentAnchor = (component: string[]) => {
-      const parentCenters = component.flatMap((personId) =>
-        (parentsByChild.get(personId) ?? []).flatMap((parentId) => {
-          const parentPosition = positions.get(parentId);
-          return parentPosition ? [parentPosition.x + NODE_WIDTH / 2] : [];
+  const componentsByGeneration = new Map(
+    orderedGenerations.map(([row, personIds]) => [
+      row,
+      orderGeneration(personIds, unions, elkX),
+    ]),
+  );
+  type ComponentPlacement = { anchor: number; suggestedStart: number };
+  const averagePlacement = (placements: ComponentPlacement[]) =>
+    placements.length
+      ? {
+          anchor:
+            placements.reduce(
+              (total, placement) => total + placement.anchor,
+              0,
+            ) / placements.length,
+          suggestedStart:
+            placements.reduce(
+              (total, placement) => total + placement.suggestedStart,
+              0,
+            ) / placements.length,
+        }
+      : null;
+  const familyAnchorForChild = (childId: string) => {
+    const parentIds = parentsByChild.get(childId) ?? [];
+    if (parentIds.length >= 2) {
+      const firstPosition = positions.get(parentIds[0]!);
+      const secondPosition = positions.get(parentIds[1]!);
+      if (!firstPosition || !secondPosition) return null;
+      return (
+        (Math.min(firstPosition.x, secondPosition.x) +
+          PERSON_NODE_WIDTH +
+          Math.max(firstPosition.x, secondPosition.x)) /
+        2
+      );
+    }
+    const parentPosition = positions.get(parentIds[0]!);
+    return parentPosition ? parentPosition.x + PERSON_NODE_WIDTH / 2 : null;
+  };
+  const parentPlacement = (component: string[]) =>
+    averagePlacement(
+      component.flatMap((personId, personIndex) => {
+        const anchor = familyAnchorForChild(personId);
+        if (anchor === null) return [];
+        const personCenter =
+          personIndex * (NODE_WIDTH + PARTNER_GAP) + PERSON_NODE_WIDTH / 2;
+        return [{ anchor, suggestedStart: anchor - personCenter }];
+      }),
+    );
+  const childPlacement = (component: string[]) => {
+    const localX = new Map(
+      component.map((personId, index) => [
+        personId,
+        index * (NODE_WIDTH + PARTNER_GAP),
+      ]),
+    );
+    const couplePlacements = [...unions.values()].flatMap((union) => {
+      const firstX = localX.get(union.firstPersonId);
+      const secondX = localX.get(union.secondPersonId);
+      if (firstX === undefined || secondX === undefined || !union.childIds.size)
+        return [];
+      const childCenters = [...union.childIds].flatMap((childId) => {
+        const childPosition = positions.get(childId);
+        return childPosition ? [childPosition.x + PERSON_NODE_WIDTH / 2] : [];
+      });
+      if (!childCenters.length) return [];
+      const anchor =
+        childCenters.reduce((total, center) => total + center, 0) /
+        childCenters.length;
+      const unionCenter =
+        (Math.min(firstX, secondX) +
+          PERSON_NODE_WIDTH +
+          Math.max(firstX, secondX)) /
+        2;
+      return [{ anchor, suggestedStart: anchor - unionCenter }];
+    });
+    const singleParentPlacements = component.flatMap((parentId) => {
+      const parentX = localX.get(parentId);
+      if (parentX === undefined) return [];
+      const childCenters = (singleParentChildren.get(parentId) ?? []).flatMap(
+        (childId) => {
+          const childPosition = positions.get(childId);
+          return childPosition ? [childPosition.x + PERSON_NODE_WIDTH / 2] : [];
+        },
+      );
+      if (!childCenters.length) return [];
+      const anchor =
+        childCenters.reduce((total, center) => total + center, 0) /
+        childCenters.length;
+      const parentCenter = parentX + PERSON_NODE_WIDTH / 2;
+      return [{ anchor, suggestedStart: anchor - parentCenter }];
+    });
+    return averagePlacement([...couplePlacements, ...singleParentPlacements]);
+  };
+  const parentGroupKey = (component: string[]) => {
+    const keys = component.flatMap((personId) => {
+      const parentIds = parentsByChild.get(personId);
+      return parentIds?.length ? [[...parentIds].sort().join("::")] : [];
+    });
+    return [...new Set(keys)].sort().join("|") || null;
+  };
+  const siblingOrder = (component: string[]) =>
+    Math.min(
+      ...component.map(
+        (personId) =>
+          siblingOrderByChild.get(personId) ?? Number.POSITIVE_INFINITY,
+      ),
+    );
+  const placeGeneration = (
+    row: number,
+    getPlacement: (component: string[]) => ComponentPlacement | null,
+  ) => {
+    const generationComponents = componentsByGeneration.get(row) ?? [];
+    const components: PositionedComponent[] = generationComponents.map(
+      (component) => {
+        const left = Math.min(...component.map((id) => elkX.get(id) ?? 0));
+        const right = Math.max(
+          ...component.map((id) => (elkX.get(id) ?? 0) + NODE_WIDTH),
+        );
+        const elkCenter = (left + right) / 2 - elkGraphCenter;
+        const placement = getPlacement(component);
+        const currentStart = positions.get(component[0]!)?.x;
+        return {
+          personIds: component,
+          width: componentWidth(component),
+          parentGroupKey: parentGroupKey(component),
+          siblingOrder: siblingOrder(component),
+          desiredStart:
+            placement?.suggestedStart ??
+            currentStart ??
+            elkCenter - componentWidth(component) / 2,
+          sortAnchor:
+            placement?.anchor ??
+            (currentStart === undefined
+              ? elkCenter
+              : currentStart + componentWidth(component) / 2),
+          elkCenter,
+        };
+      },
+    );
+    const groupedComponents = new Map<string, PositionedComponent[]>();
+    components.forEach((component, index) => {
+      const key = component.parentGroupKey ?? `unattached:${index}`;
+      groupedComponents.set(key, [
+        ...(groupedComponents.get(key) ?? []),
+        component,
+      ]);
+    });
+    const familyGroups = [...groupedComponents.values()].map((group) => {
+      group.sort((first, second) => {
+        const orderDifference = first.siblingOrder - second.siblingOrder;
+        if (Number.isFinite(orderDifference) && orderDifference)
+          return orderDifference;
+        return (
+          first.sortAnchor - second.sortAnchor ||
+          first.elkCenter - second.elkCenter
+        );
+      });
+      const innerStarts = packComponents(
+        group,
+        group.slice(0, -1).map(() => FAMILY_GAP),
+      );
+      const left = Math.min(...innerStarts);
+      const right = Math.max(
+        ...group.map(
+          (component, index) => innerStarts[index]! + component.width,
+        ),
+      );
+      return {
+        components: group,
+        innerStarts,
+        left,
+        width: right - left,
+        parentGroupKey: group[0]!.parentGroupKey,
+        sortAnchor:
+          group.reduce((total, component) => total + component.sortAnchor, 0) /
+          group.length,
+        elkCenter:
+          group.reduce((total, component) => total + component.elkCenter, 0) /
+          group.length,
+      };
+    });
+    familyGroups.sort(
+      (first, second) =>
+        first.sortAnchor - second.sortAnchor ||
+        first.elkCenter - second.elkCenter,
+    );
+    const groupStarts = packComponents(
+      familyGroups.map((group) => ({
+        personIds: [],
+        width: group.width,
+        parentGroupKey: group.parentGroupKey,
+        siblingOrder: Number.POSITIVE_INFINITY,
+        desiredStart: group.left,
+        sortAnchor: group.sortAnchor,
+        elkCenter: group.elkCenter,
+      })),
+      familyGroups
+        .slice(0, -1)
+        .map((group, index) =>
+          group.parentGroupKey &&
+          familyGroups[index + 1]!.parentGroupKey &&
+          group.parentGroupKey !== familyGroups[index + 1]!.parentGroupKey
+            ? FAMILY_GROUP_GAP
+            : FAMILY_GAP,
+        ),
+    );
+
+    familyGroups.forEach((group, groupIndex) => {
+      const shift = groupStarts[groupIndex]! - group.left;
+      group.components.forEach((component, componentIndex) => {
+        let x = group.innerStarts[componentIndex]! + shift;
+        component.personIds.forEach((personId, personIndex) => {
+          positions.set(personId, { x, y: row * GENERATION_GAP });
+          x += NODE_WIDTH;
+          if (personIndex < component.personIds.length - 1) x += PARTNER_GAP;
+        });
+      });
+    });
+  };
+  const reconciledParentPlacements = (row: number) => {
+    const rowComponents = componentsByGeneration.get(row) ?? [];
+    const familyGroups = new Map<string, string[][]>();
+    for (const component of rowComponents) {
+      const key = parentGroupKey(component) ?? `unattached:${component[0]}`;
+      familyGroups.set(key, [...(familyGroups.get(key) ?? []), component]);
+    }
+    const placements = new Map<string, ComponentPlacement>();
+    for (const components of familyGroups.values()) {
+      const deltas = components.flatMap((component) =>
+        component.flatMap((personId) => {
+          const personPosition = positions.get(personId);
+          if (!personPosition) return [];
+          const parentCenter = familyAnchorForChild(personId);
+          if (parentCenter === null) return [];
+          return [parentCenter - (personPosition.x + PERSON_NODE_WIDTH / 2)];
         }),
       );
-      if (!parentCenters.length) return null;
-      return (
-        parentCenters.reduce((total, center) => total + center, 0) /
-        parentCenters.length
-      );
-    };
-    components.sort((first, second) => {
-      const firstParentAnchor = parentAnchor(first);
-      const secondParentAnchor = parentAnchor(second);
-      if (firstParentAnchor !== null && secondParentAnchor !== null) {
-        const difference = firstParentAnchor - secondParentAnchor;
-        if (difference) return difference;
-      } else if (firstParentAnchor !== null) {
-        return -1;
-      } else if (secondParentAnchor !== null) {
-        return 1;
+      if (!deltas.length) continue;
+      const delta =
+        deltas.reduce((total, value) => total + value, 0) / deltas.length;
+      for (const component of components) {
+        const currentStart = positions.get(component[0]!)!.x;
+        const suggestedStart = currentStart + delta;
+        placements.set(component[0]!, {
+          anchor: suggestedStart + componentWidth(component) / 2,
+          suggestedStart,
+        });
       }
-      return elkAnchor(first) - elkAnchor(second);
-    });
-    const parentGroupKey = (component: string[]) => {
-      const keys = component.flatMap((personId) => {
-        const parentIds = parentsByChild.get(personId);
-        return parentIds?.length ? [[...parentIds].sort().join("::")] : [];
-      });
-      return [...new Set(keys)].sort().join("|") || null;
-    };
-    const parentGroupKeys = components.map(parentGroupKey);
-    const gapAfter = (index: number) => {
-      const currentKey = parentGroupKeys[index];
-      const nextKey = parentGroupKeys[index + 1];
-      return currentKey && nextKey && currentKey !== nextKey
-        ? FAMILY_GROUP_GAP
-        : FAMILY_GAP;
-    };
-    const rowWidth = components.reduce((total, component, index) => {
-      const componentWidth =
-        component.length * NODE_WIDTH + (component.length - 1) * PARTNER_GAP;
-      const followingGap = index < components.length - 1 ? gapAfter(index) : 0;
-      return total + componentWidth + followingGap;
-    }, 0);
-    let x = -rowWidth / 2;
-    components.forEach((component, componentIndex) => {
-      component.forEach((personId, personIndex) => {
-        positions.set(personId, { x, y: row * GENERATION_GAP });
-        x += NODE_WIDTH;
-        if (personIndex < component.length - 1) x += PARTNER_GAP;
-      });
-      if (componentIndex < components.length - 1) x += gapAfter(componentIndex);
-    });
+    }
+    return placements;
+  };
+
+  for (const [row] of orderedGenerations) placeGeneration(row, parentPlacement);
+
+  for (let pass = 0; pass < 16; pass++) {
+    for (const [row] of [...orderedGenerations].reverse())
+      placeGeneration(row, childPlacement);
+    for (const [row] of orderedGenerations.slice(1)) {
+      const placements = reconciledParentPlacements(row);
+      placeGeneration(
+        row,
+        (component) =>
+          placements.get(component[0]!) ?? parentPlacement(component),
+      );
+    }
   }
+  for (const [row] of [...orderedGenerations].reverse())
+    placeGeneration(row, childPlacement);
 
   const people = new Map<string, PersonNode>(
     graph.nodes.map((person) => [person.id, person]),
@@ -313,6 +634,64 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
   }));
   const edges: FamilyEdge[] = [];
   const pairedChildren = new Set<string>();
+  const loweredPairRoutes = new Map<string, number>();
+  const loweredPairsByRow = new Map<
+    number,
+    Array<{ key: string; left: number; right: number }>
+  >();
+  for (const union of unions.values()) {
+    const firstPosition = positions.get(union.firstPersonId)!;
+    const secondPosition = positions.get(union.secondPersonId)!;
+    const left = Math.min(firstPosition.x, secondPosition.x);
+    const right = Math.max(firstPosition.x, secondPosition.x);
+    const hasPersonBetween = graph.nodes.some((person) => {
+      if (
+        person.id === union.firstPersonId ||
+        person.id === union.secondPersonId
+      )
+        return false;
+      const position = positions.get(person.id)!;
+      return (
+        position.y === firstPosition.y &&
+        position.x > left &&
+        position.x < right
+      );
+    });
+    if (!hasPersonBetween) continue;
+    loweredPairsByRow.set(firstPosition.y, [
+      ...(loweredPairsByRow.get(firstPosition.y) ?? []),
+      { key: union.key, left, right },
+    ]);
+  }
+  for (const [rowY, rowPairs] of loweredPairsByRow) {
+    const lanes: Array<Array<{ left: number; right: number }>> = [];
+    rowPairs
+      .sort(
+        (first, second) =>
+          first.right - first.left - (second.right - second.left) ||
+          first.left - second.left,
+      )
+      .forEach((pair) => {
+        let lane = lanes.findIndex((intervals) =>
+          intervals.every(
+            (interval) =>
+              pair.right <= interval.left || pair.left >= interval.right,
+          ),
+        );
+        if (lane < 0) {
+          lane = lanes.length;
+          lanes.push([]);
+        }
+        lanes[lane]!.push(pair);
+        loweredPairRoutes.set(
+          pair.key,
+          rowY +
+            PERSON_NODE_HEIGHT +
+            LOWERED_PAIR_TOP_GAP +
+            lane * LOWERED_PAIR_LANE_GAP,
+        );
+      });
+  }
 
   for (const union of unions.values()) {
     const firstPosition = positions.get(union.firstPersonId)!;
@@ -328,15 +707,16 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
     const leftPosition = positions.get(leftId)!;
     const rightPosition = positions.get(rightId)!;
     const unionId = `union-${union.key}`;
-    const unionX = (leftPosition.x + NODE_WIDTH + rightPosition.x) / 2;
-    const unionY = leftPosition.y + NODE_HEIGHT / 2;
+    const unionX = (leftPosition.x + PERSON_NODE_WIDTH + rightPosition.x) / 2;
+    const loweredRouteY = loweredPairRoutes.get(union.key);
+    const unionY = loweredRouteY ?? leftPosition.y + PERSON_NODE_HEIGHT / 2;
     const presentation = relationshipPresentation(
       union.relationship?.marriageStatus ?? undefined,
     );
     nodes.push({
       id: unionId,
       type: "junction",
-      position: { x: unionX, y: unionY },
+      position: junctionPosition(unionX, unionY),
       data: {
         personIds: [leftId, rightId],
         kind: "pair",
@@ -352,7 +732,7 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
       target: rightId,
       sourceHandle: "pair-source-right",
       targetHandle: "pair-target-left",
-      type: "straight",
+      type: loweredRouteY === undefined ? "straight" : "relationship-route",
       label: presentation.label,
       labelStyle: { fill: presentation.color, fontWeight: 700 },
       labelBgStyle: { fill: "#f8faf9", fillOpacity: 1 },
@@ -364,6 +744,7 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
         personIds: [leftId, rightId],
         kind: "pair",
         relationshipKey: union.key,
+        routeY: loweredRouteY,
       },
       style: {
         stroke: presentation.color,
@@ -381,7 +762,10 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
     nodes.push({
       id: branchId,
       type: "junction",
-      position: { x: unionX, y: unionY + (closestChildY - unionY) * 0.48 },
+      position: junctionPosition(
+        unionX,
+        unionY + (closestChildY - unionY) * 0.48,
+      ),
       data: { personIds: [leftId, rightId, ...childIds], kind: "family" },
       selectable: false,
       draggable: false,
@@ -412,7 +796,11 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
         type: "smoothstep",
         className: "family-edge family-edge-parent",
         zIndex: 1,
-        data: { personIds: [leftId, rightId, childId], kind: "family" },
+        data: {
+          personIds: [leftId, rightId, childId],
+          kind: "family",
+          relationshipKey: `family:${union.key}::${childId}`,
+        },
         style: { stroke: "#52796e", strokeWidth: 2 },
       });
     }
@@ -421,6 +809,13 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
   for (const [childId, parentIds] of parentsByChild) {
     if (pairedChildren.has(childId)) continue;
     for (const parentId of parentIds) {
+      const relationship = graph.edges.find(
+        (edge) =>
+          edge.type === "PARENT_CHILD" &&
+          edge.fromPersonId === parentId &&
+          edge.toPersonId === childId,
+      );
+      if (!relationship) continue;
       edges.push({
         id: `single-parent-${parentId}-${childId}`,
         source: parentId,
@@ -430,7 +825,11 @@ export async function layoutGraph(graph: FamilyTreeGraph) {
         type: "smoothstep",
         className: "family-edge family-edge-parent",
         zIndex: 1,
-        data: { personIds: [parentId, childId], kind: "family" },
+        data: {
+          personIds: [parentId, childId],
+          kind: "family",
+          relationshipKey: `parent:${relationship.id}`,
+        },
         style: { stroke: "#52796e", strokeWidth: 2 },
       });
     }

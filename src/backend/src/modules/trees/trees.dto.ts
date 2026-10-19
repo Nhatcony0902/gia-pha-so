@@ -1,10 +1,17 @@
-import { Gender, DatePrecision } from "@prisma/client";
+import {
+  Gender,
+  DatePrecision,
+  MarriageStatus,
+  ParentKind,
+} from "@prisma/client";
 import {
   IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
+  IsIn,
   IsISO8601,
+  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
@@ -12,6 +19,24 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+
+export class CreateTreeDto {
+  @IsString() @IsNotEmpty() @MaxLength(200) name!: string;
+  @IsOptional() @IsString() @MaxLength(2000) description?: string | null;
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  coverUrl?: string | null;
+  @IsOptional() @IsString() @MaxLength(500) originPlace?: string | null;
+}
+
+export class UpdateTreeDto {
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200) name?: string;
+  @IsOptional() @IsString() @MaxLength(2000) description?: string | null;
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  coverUrl?: string | null;
+  @IsOptional() @IsString() @MaxLength(500) originPlace?: string | null;
+}
 
 export class UpdatePersonDto {
   @IsOptional() @IsString() @MaxLength(200) fullName?: string;
@@ -50,6 +75,53 @@ export class UpdatePersonDto {
   @IsOptional() @IsString() burialPlace?: string | null;
   @IsOptional() @IsUrl({ require_protocol: true }) avatarUrl?: string | null;
   @IsOptional() @IsString() avatarPublicId?: string | null;
+}
+
+export class CreatePersonDto extends UpdatePersonDto {
+  @IsString() @IsNotEmpty() @MaxLength(200) declare fullName: string;
+}
+
+export class CreateRelationshipDto {
+  @IsIn(["PARENT_CHILD", "SPOUSE"])
+  type!: "PARENT_CHILD" | "SPOUSE";
+  @IsString() @IsNotEmpty() fromPersonId!: string;
+  @IsString() @IsNotEmpty() toPersonId!: string;
+  @IsOptional() @IsEnum(ParentKind) parentKind?: ParentKind | null;
+  @IsOptional() @IsInt() @Min(1) birthOrder?: number | null;
+  @IsOptional()
+  @IsEnum(MarriageStatus)
+  marriageStatus?: MarriageStatus | null;
+  @IsOptional() @IsInt() @Min(1) marriageOrder?: number | null;
+  @IsOptional() @IsISO8601() startedAt?: string | null;
+  @IsOptional()
+  @IsEnum(DatePrecision)
+  startedAtPrecision?: DatePrecision | null;
+  @IsOptional() @IsISO8601() endedAt?: string | null;
+  @IsOptional()
+  @IsEnum(DatePrecision)
+  endedAtPrecision?: DatePrecision | null;
+}
+
+export class UpdateRelationshipDto {
+  @IsOptional()
+  @IsIn(["PARENT_CHILD", "SPOUSE"])
+  type?: "PARENT_CHILD" | "SPOUSE";
+  @IsOptional() @IsString() @IsNotEmpty() fromPersonId?: string;
+  @IsOptional() @IsString() @IsNotEmpty() toPersonId?: string;
+  @IsOptional() @IsEnum(ParentKind) parentKind?: ParentKind | null;
+  @IsOptional() @IsInt() @Min(1) birthOrder?: number | null;
+  @IsOptional()
+  @IsEnum(MarriageStatus)
+  marriageStatus?: MarriageStatus | null;
+  @IsOptional() @IsInt() @Min(1) marriageOrder?: number | null;
+  @IsOptional() @IsISO8601() startedAt?: string | null;
+  @IsOptional()
+  @IsEnum(DatePrecision)
+  startedAtPrecision?: DatePrecision | null;
+  @IsOptional() @IsISO8601() endedAt?: string | null;
+  @IsOptional()
+  @IsEnum(DatePrecision)
+  endedAtPrecision?: DatePrecision | null;
 }
 
 export class AddPersonImageDto {

@@ -51,6 +51,15 @@ export interface FamilyTreeListResponse {
   sharedWithMe: FamilyTreeSummary[];
 }
 
+export interface FamilyTreeInput {
+  name: string;
+  description?: string | null;
+  coverUrl?: string | null;
+  originPlace?: string | null;
+}
+
+export type FamilyTreeUpdateInput = Partial<FamilyTreeInput>;
+
 export interface PersonNode {
   id: string;
   fullName: string;
@@ -78,6 +87,22 @@ export interface PrimitiveRelationship {
   endedAt: string | null;
   endedAtPrecision: DatePrecision | null;
 }
+
+export interface RelationshipInput {
+  type: PrimitiveRelationshipType;
+  fromPersonId: string;
+  toPersonId: string;
+  parentKind?: ParentKind | null;
+  birthOrder?: number | null;
+  marriageStatus?: MarriageStatus | null;
+  marriageOrder?: number | null;
+  startedAt?: string | null;
+  startedAtPrecision?: DatePrecision | null;
+  endedAt?: string | null;
+  endedAtPrecision?: DatePrecision | null;
+}
+
+export type RelationshipUpdateInput = Partial<RelationshipInput>;
 
 export interface FamilyTreeGraph {
   tree: FamilyTreeSummary;
@@ -107,6 +132,17 @@ export interface PartnerFamily {
   children: RelatedPerson[];
 }
 
+export interface PersonTreeRelative {
+  relationshipId: string;
+  role: "PARENT" | "CHILD" | "SPOUSE";
+  label: string;
+  person: RelatedPerson;
+}
+
+export interface PersonVisibleTree extends FamilyTreeSummary {
+  relatives: PersonTreeRelative[];
+}
+
 export interface PersonSidebarDetail extends PersonNode {
   aliases: string[];
   birthPlace: string | null;
@@ -131,7 +167,7 @@ export interface PersonSidebarDetail extends PersonNode {
   notes: string | null;
   burialPlace: string | null;
   images: PersonImage[];
-  visibleTrees: FamilyTreeSummary[];
+  visibleTrees: PersonVisibleTree[];
   parents: PersonParent[];
   partnerFamilies: PartnerFamily[];
 }
@@ -175,6 +211,14 @@ export interface PersonListResponse {
   persons: PersonListItem[];
 }
 
+export interface PersonLinkCandidate extends PersonListItem {
+  sourceTrees: Array<Pick<FamilyTreeSummary, "id" | "name">>;
+}
+
+export interface PersonLinkCandidatesResponse {
+  persons: PersonLinkCandidate[];
+}
+
 export type PersonUpdateInput = Partial<{
   fullName: string;
   preferredName: string | null;
@@ -209,6 +253,8 @@ export type PersonUpdateInput = Partial<{
   avatarUrl: string | null;
   avatarPublicId: string | null;
 }>;
+
+export type PersonCreateInput = PersonUpdateInput & { fullName: string };
 
 export interface CloudinarySignature {
   cloudName: string;

@@ -6,16 +6,53 @@ import type {
   PersonUpdateInput,
   PersonImage,
   CloudinarySignature,
+  FamilyTreeInput,
+  FamilyTreeSummary,
+  FamilyTreeUpdateInput,
+  PersonCreateInput,
+  PersonLinkCandidatesResponse,
+  PrimitiveRelationship,
+  RelationshipInput,
+  RelationshipUpdateInput,
 } from "@family-tree/shared-types";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../lib/api/client";
 
 export const getTrees = () => apiGet<FamilyTreeListResponse>("/trees");
+export const createTree = (body: FamilyTreeInput) =>
+  apiPost<FamilyTreeSummary>("/trees", body);
+export const updateTree = (treeId: string, body: FamilyTreeUpdateInput) =>
+  apiPatch<FamilyTreeSummary>(`/trees/${treeId}`, body);
+export const deleteTree = (treeId: string) =>
+  apiDelete<{ success: true }>(`/trees/${treeId}`);
 export const getTreeGraph = (treeId: string) =>
   apiGet<FamilyTreeGraph>(`/trees/${treeId}/graph`);
 export const getPersonDetail = (treeId: string, personId: string) =>
   apiGet<PersonSidebarDetail>(`/trees/${treeId}/persons/${personId}`);
 export const getTreePersons = (treeId: string) =>
   apiGet<PersonListResponse>(`/trees/${treeId}/persons`);
+export const createPerson = (treeId: string, body: PersonCreateInput) =>
+  apiPost<PersonSidebarDetail>(`/trees/${treeId}/persons`, body);
+export const getPersonLinkCandidates = (treeId: string) =>
+  apiGet<PersonLinkCandidatesResponse>(
+    `/trees/${treeId}/person-link-candidates`,
+  );
+export const linkPerson = (treeId: string, personId: string) =>
+  apiPost<PersonSidebarDetail>(`/trees/${treeId}/persons/${personId}/link`);
+export const createRelationship = (treeId: string, body: RelationshipInput) =>
+  apiPost<PrimitiveRelationship>(`/trees/${treeId}/relationships`, body);
+export const updateRelationship = (
+  treeId: string,
+  relationshipId: string,
+  body: RelationshipUpdateInput,
+) =>
+  apiPatch<PrimitiveRelationship>(
+    `/trees/${treeId}/relationships/${relationshipId}`,
+    body,
+  );
+export const deleteRelationship = (treeId: string, relationshipId: string) =>
+  apiDelete<{ success: true }>(
+    `/trees/${treeId}/relationships/${relationshipId}`,
+  );
 export const updatePerson = (
   treeId: string,
   personId: string,

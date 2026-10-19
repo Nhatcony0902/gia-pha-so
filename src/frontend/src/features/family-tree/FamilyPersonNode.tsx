@@ -41,7 +41,7 @@ export function FamilyPersonNode({ data: person }: NodeProps<FamilyFlowNode>) {
     .join(" – ");
   return (
     <article
-      className={`family-node flex min-h-22 w-[220px] items-center gap-[0.8rem] rounded-[0.7rem] border-2 border-[#869e93] p-3 text-[#18332e] shadow-[0_8px_20px_rgba(30,58,51,0.14)] transition-[transform,background-color,box-shadow,border-color] duration-180 ${genderBorderClass[person.gender]} ${nodeBackgroundClass(person.isDeceased, person.selectedPerson)}`}
+      className={`family-node flex min-h-20 w-[200px] items-center gap-[0.6rem] rounded-[0.7rem] border-2 border-[#869e93] p-2.5 text-ink shadow-[0_8px_20px_rgba(30,58,51,0.14)] transition-[transform,background-color,box-shadow,border-color] duration-180 ${genderBorderClass[person.gender]} ${nodeBackgroundClass(person.isDeceased, person.selectedPerson)}`}
       aria-label={`${person.fullName}, ${genderLabel}${person.isDeceased ? ", đã mất" : ""}`}
     >
       <Handle id="child-target" type="target" position={Position.Top} />
@@ -57,14 +57,14 @@ export function FamilyPersonNode({ data: person }: NodeProps<FamilyFlowNode>) {
         position={Position.Left}
         className="family-horizontal-handle"
       />
-      <div className="grid size-[2.8rem] shrink-0 place-items-center overflow-hidden rounded-full bg-[#dce7e1] font-bold text-[#36584e] [&_img]:size-full [&_img]:object-cover">
+      <div className="grid size-[2.4rem] shrink-0 place-items-center overflow-hidden rounded-full bg-[#dce7e1] font-bold text-ink-soft [&_img]:size-full [&_img]:object-cover">
         {person.avatarUrl ? <img src={person.avatarUrl} alt="" /> : initials}
       </div>
       <div className="grid min-w-0 gap-[0.18rem]">
         <strong className="truncate text-[0.88rem]">
           {person.preferredName ?? person.fullName}
         </strong>
-        <span className="text-[0.72rem] text-[#61736a]">
+        <span className="text-[0.72rem] text-ink-muted">
           {genderLabel}
           {lifespan ? ` · ${lifespan}` : ""}
         </span>

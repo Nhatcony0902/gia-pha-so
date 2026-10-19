@@ -1,23 +1,38 @@
 import { createHash } from "node:crypto";
 import {
+  BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Relationship } from "@prisma/client";
 import type {
   CloudinarySignature,
   FamilyTreeGraph,
   FamilyTreeListResponse,
   FamilyTreeSummary,
   PersonSidebarDetail,
+  PersonLinkCandidatesResponse,
   PersonListResponse,
   PrimitiveRelationshipType,
   RelatedPerson,
 } from "@family-tree/shared-types";
 import { PrismaService } from "../database/prisma.service.js";
-import type { AddPersonImageDto, UpdatePersonDto } from "./trees.dto.js";
+import type {
+  AddPersonImageDto,
+  CreatePersonDto,
+  CreateRelationshipDto,
+  CreateTreeDto,
+  UpdatePersonDto,
+  UpdateRelationshipDto,
+  UpdateTreeDto,
+} from "./trees.dto.js";
+import {
+  canonicalSpousePair,
+  validateParentRelationships,
+} from "./relationship-validation.js";
 
 const iso = (value: Date | null) => value?.toISOString() ?? null;
 
@@ -45,6 +60,23 @@ export class TreesService {
     };
   }
 
+  private relationshipSummary(relationship: Relationship) {
+    return {
+      id: relationship.id,
+      type: relationship.typeCode as PrimitiveRelationshipType,
+      fromPersonId: relationship.fromPersonId,
+      toPersonId: relationship.toPersonId,
+      parentKind: relationship.parentKind,
+      birthOrder: relationship.birthOrder,
+      marriageStatus: relationship.marriageStatus,
+      marriageOrder: relationship.marriageOrder,
+      startedAt: iso(relationship.startedAt),
+      startedAtPrecision: relationship.startedAtPrecision,
+      endedAt: iso(relationship.endedAt),
+      endedAtPrecision: relationship.endedAtPrecision,
+    };
+  }
+
   private async ownedTree(treeId: string, userId: string) {
     const tree = await this.prisma.familyTree.findFirst({
       where: { id: treeId, createdById: userId },
@@ -68,6 +100,58 @@ export class TreesService {
       createdByMe: trees.map((tree) => this.summary(tree)),
       sharedWithMe: [],
     };
+  }
+
+  async createTree(userId: string, body: CreateTreeDto) {
+    const name = body.name?.trim();
+    if (!name)
+      throw new BadRequestException({
+        code: "TREE_NAME_REQUIRED",
+        message: "Tên gia phả không được để trống",
+      });
+    const tree = await this.prisma.familyTree.create({
+      data: {
+        ...body,
+        name,
+        createdById: userId,
+      },
+      include: { _count: { select: { persons: true } } },
+    });
+    return this.summary(tree);
+  }
+
+  async updateTree(treeId: string, userId: string, body: UpdateTreeDto) {
+    await this.ownedTree(treeId, userId);
+    const name = body.name?.trim();
+    if (body.name !== undefined && !name)
+      throw new BadRequestException({
+        code: "TREE_NAME_REQUIRED",
+        message: "Tên gia phả không được để trống",
+      });
+    const tree = await this.prisma.familyTree.update({
+      where: { id: treeId },
+      data: { ...body, ...(name ? { name } : {}) },
+      include: { _count: { select: { persons: true } } },
+    });
+    return this.summary(tree);
+  }
+
+  async deleteTree(treeId: string, userId: string) {
+    await this.ownedTree(treeId, userId);
+    const memberships = await this.prisma.familyTreePerson.findMany({
+      where: { treeId },
+      select: { personId: true },
+    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.relationship.deleteMany({ where: { treeId } });
+      await tx.familyTreePerson.deleteMany({ where: { treeId } });
+      await tx.familyTree.delete({ where: { id: treeId } });
+      for (const { personId } of memberships) {
+        if ((await tx.familyTreePerson.count({ where: { personId } })) === 0)
+          await tx.person.delete({ where: { id: personId } });
+      }
+    });
+    return { success: true };
   }
 
   async graph(treeId: string, userId: string): Promise<FamilyTreeGraph> {
@@ -97,20 +181,9 @@ export class TreesService {
         deathDatePrecision: person.deathDatePrecision,
         isDeceased: person.isDeceased,
       })),
-      edges: relationships.map((relationship) => ({
-        id: relationship.id,
-        type: relationship.typeCode as PrimitiveRelationshipType,
-        fromPersonId: relationship.fromPersonId,
-        toPersonId: relationship.toPersonId,
-        parentKind: relationship.parentKind,
-        birthOrder: relationship.birthOrder,
-        marriageStatus: relationship.marriageStatus,
-        marriageOrder: relationship.marriageOrder,
-        startedAt: iso(relationship.startedAt),
-        startedAtPrecision: relationship.startedAtPrecision,
-        endedAt: iso(relationship.endedAt),
-        endedAtPrecision: relationship.endedAtPrecision,
-      })),
+      edges: relationships.map((relationship) =>
+        this.relationshipSummary(relationship),
+      ),
     };
   }
 
@@ -144,6 +217,309 @@ export class TreesService {
         email: person.email,
       })),
     };
+  }
+
+  async createPerson(treeId: string, userId: string, body: CreatePersonDto) {
+    await this.ownedTree(treeId, userId);
+    const fullName = body.fullName?.trim();
+    if (!fullName)
+      throw new BadRequestException({
+        code: "PERSON_NAME_REQUIRED",
+        message: "Họ và tên thành viên không được để trống",
+      });
+    const { birthDate, deathDate, socialLinks, ...fields } = body;
+    const person = await this.prisma.person.create({
+      data: {
+        ...fields,
+        fullName,
+        birthDate: birthDate ? new Date(birthDate) : null,
+        deathDate: deathDate ? new Date(deathDate) : null,
+        ...(socialLinks !== undefined
+          ? {
+              socialLinks: socialLinks === null ? Prisma.JsonNull : socialLinks,
+            }
+          : {}),
+        familyTrees: { create: { treeId } },
+      },
+    });
+    return this.person(treeId, person.id, userId);
+  }
+
+  async personLinkCandidates(
+    treeId: string,
+    userId: string,
+  ): Promise<PersonLinkCandidatesResponse> {
+    await this.ownedTree(treeId, userId);
+    const memberships = await this.prisma.familyTreePerson.findMany({
+      where: {
+        treeId: { not: treeId },
+        tree: { createdById: userId },
+        person: { familyTrees: { none: { treeId } } },
+      },
+      include: {
+        tree: { select: { id: true, name: true } },
+        person: true,
+      },
+      orderBy: [{ person: { fullName: "asc" } }, { tree: { name: "asc" } }],
+    });
+    const candidates = new Map<
+      string,
+      PersonLinkCandidatesResponse["persons"][number]
+    >();
+    for (const { person, tree } of memberships) {
+      const current = candidates.get(person.id);
+      if (current) {
+        current.sourceTrees.push(tree);
+        continue;
+      }
+      candidates.set(person.id, {
+        id: person.id,
+        fullName: person.fullName,
+        preferredName: person.preferredName,
+        gender: person.gender,
+        avatarUrl: person.avatarUrl,
+        birthDate: iso(person.birthDate),
+        birthPlace: person.birthPlace,
+        deathDate: iso(person.deathDate),
+        deathPlace: person.deathPlace,
+        isDeceased: person.isDeceased,
+        hometown: person.hometown,
+        currentResidence: person.currentResidence,
+        nationality: person.nationality,
+        ethnicity: person.ethnicity,
+        religion: person.religion,
+        occupation: person.occupation,
+        phone: person.phone,
+        email: person.email,
+        sourceTrees: [tree],
+      });
+    }
+    return { persons: [...candidates.values()] };
+  }
+
+  async linkPerson(treeId: string, personId: string, userId: string) {
+    await this.ownedTree(treeId, userId);
+    const existing = await this.prisma.familyTreePerson.findUnique({
+      where: { treeId_personId: { treeId, personId } },
+    });
+    if (existing)
+      throw new ConflictException({
+        code: "PERSON_ALREADY_IN_TREE",
+        message: "Thành viên đã có trong gia phả này",
+      });
+    const sourceMembership = await this.prisma.familyTreePerson.findFirst({
+      where: {
+        personId,
+        treeId: { not: treeId },
+        tree: { createdById: userId },
+      },
+    });
+    if (!sourceMembership)
+      throw new NotFoundException({
+        code: "PERSON_LINK_SOURCE_NOT_FOUND",
+        message: "Không tìm thấy thành viên trong gia phả khác của bạn",
+      });
+    try {
+      await this.prisma.familyTreePerson.create({ data: { treeId, personId } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new ConflictException({
+          code: "PERSON_ALREADY_IN_TREE",
+          message: "Thành viên đã có trong gia phả này",
+        });
+      throw error;
+    }
+    return this.person(treeId, personId, userId);
+  }
+
+  private async normalizedRelationship(
+    treeId: string,
+    body: CreateRelationshipDto,
+    excludeId?: string,
+  ) {
+    if (body.fromPersonId === body.toPersonId)
+      throw new BadRequestException({
+        code: "RELATIONSHIP_SELF_REFERENCE",
+        message: "Không thể tạo quan hệ của một thành viên với chính họ",
+      });
+    const membershipCount = await this.prisma.familyTreePerson.count({
+      where: {
+        treeId,
+        personId: { in: [body.fromPersonId, body.toPersonId] },
+      },
+    });
+    if (membershipCount !== 2)
+      throw new BadRequestException({
+        code: "RELATIONSHIP_PERSON_NOT_IN_TREE",
+        message: "Hai thành viên phải cùng thuộc gia phả này",
+      });
+
+    let fromPersonId = body.fromPersonId;
+    let toPersonId = body.toPersonId;
+    if (body.type === "SPOUSE")
+      [fromPersonId, toPersonId] = canonicalSpousePair(
+        fromPersonId,
+        toPersonId,
+      );
+
+    const duplicate = await this.prisma.relationship.findFirst({
+      where: {
+        treeId,
+        typeCode: body.type,
+        fromPersonId,
+        toPersonId,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    });
+    if (duplicate)
+      throw new BadRequestException({
+        code: "RELATIONSHIP_DUPLICATE",
+        message: "Quan hệ này đã tồn tại trong gia phả",
+      });
+
+    if (body.type === "PARENT_CHILD") {
+      const existing = await this.prisma.relationship.findMany({
+        where: {
+          treeId,
+          typeCode: "PARENT_CHILD",
+          ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+      });
+      try {
+        validateParentRelationships([
+          ...existing.map((relationship) => ({
+            fromPersonId: relationship.fromPersonId,
+            toPersonId: relationship.toPersonId,
+            parentKind: relationship.parentKind!,
+          })),
+          {
+            fromPersonId,
+            toPersonId,
+            parentKind: body.parentKind ?? "BIOLOGICAL",
+          },
+        ]);
+      } catch (error) {
+        throw new BadRequestException({
+          code: "INVALID_PARENT_RELATIONSHIP",
+          message:
+            error instanceof Error && error.message.includes("two biological")
+              ? "Một thành viên không thể có quá hai bố/mẹ ruột"
+              : "Quan hệ bố/mẹ - con tạo thành vòng lặp hoặc không hợp lệ",
+        });
+      }
+      return {
+        typeCode: body.type,
+        fromPersonId,
+        toPersonId,
+        parentKind: body.parentKind ?? "BIOLOGICAL",
+        birthOrder: body.birthOrder ?? null,
+        marriageStatus: null,
+        marriageOrder: null,
+        startedAt: null,
+        startedAtPrecision: null,
+        endedAt: null,
+        endedAtPrecision: null,
+      };
+    }
+
+    const startedAt = body.startedAt ? new Date(body.startedAt) : null;
+    const endedAt = body.endedAt ? new Date(body.endedAt) : null;
+    if (startedAt && endedAt && endedAt < startedAt)
+      throw new BadRequestException({
+        code: "RELATIONSHIP_DATE_ORDER",
+        message: "Ngày kết thúc không được trước ngày bắt đầu",
+      });
+    return {
+      typeCode: body.type,
+      fromPersonId,
+      toPersonId,
+      parentKind: null,
+      birthOrder: null,
+      marriageStatus: body.marriageStatus ?? "MARRIED",
+      marriageOrder: body.marriageOrder ?? null,
+      startedAt,
+      startedAtPrecision: startedAt ? (body.startedAtPrecision ?? "DAY") : null,
+      endedAt,
+      endedAtPrecision: endedAt ? (body.endedAtPrecision ?? "DAY") : null,
+    };
+  }
+
+  async createRelationship(
+    treeId: string,
+    userId: string,
+    body: CreateRelationshipDto,
+  ) {
+    await this.ownedTree(treeId, userId);
+    const data = await this.normalizedRelationship(treeId, body);
+    const relationship = await this.prisma.relationship.create({
+      data: { treeId, ...data },
+    });
+    return this.relationshipSummary(relationship);
+  }
+
+  async updateRelationship(
+    treeId: string,
+    relationshipId: string,
+    userId: string,
+    body: UpdateRelationshipDto,
+  ) {
+    await this.ownedTree(treeId, userId);
+    const current = await this.prisma.relationship.findFirst({
+      where: { id: relationshipId, treeId },
+    });
+    if (!current)
+      throw new NotFoundException({
+        code: "RELATIONSHIP_NOT_FOUND",
+        message: "Không tìm thấy quan hệ trong gia phả",
+      });
+    const value = <T>(next: T | undefined, fallback: T) =>
+      next === undefined ? fallback : next;
+    const merged: CreateRelationshipDto = {
+      type: value(body.type, current.typeCode as CreateRelationshipDto["type"]),
+      fromPersonId: value(body.fromPersonId, current.fromPersonId),
+      toPersonId: value(body.toPersonId, current.toPersonId),
+      parentKind: value(body.parentKind, current.parentKind),
+      birthOrder: value(body.birthOrder, current.birthOrder),
+      marriageStatus: value(body.marriageStatus, current.marriageStatus),
+      marriageOrder: value(body.marriageOrder, current.marriageOrder),
+      startedAt: value(body.startedAt, iso(current.startedAt)),
+      startedAtPrecision: value(
+        body.startedAtPrecision,
+        current.startedAtPrecision,
+      ),
+      endedAt: value(body.endedAt, iso(current.endedAt)),
+      endedAtPrecision: value(body.endedAtPrecision, current.endedAtPrecision),
+    };
+    const data = await this.normalizedRelationship(
+      treeId,
+      merged,
+      relationshipId,
+    );
+    const relationship = await this.prisma.relationship.update({
+      where: { id: relationshipId },
+      data,
+    });
+    return this.relationshipSummary(relationship);
+  }
+
+  async deleteRelationship(
+    treeId: string,
+    relationshipId: string,
+    userId: string,
+  ) {
+    await this.ownedTree(treeId, userId);
+    const deleted = await this.prisma.relationship.deleteMany({
+      where: { id: relationshipId, treeId },
+    });
+    if (!deleted.count)
+      throw new NotFoundException({
+        code: "RELATIONSHIP_NOT_FOUND",
+        message: "Không tìm thấy quan hệ trong gia phả",
+      });
+    return { success: true };
   }
 
   async person(
@@ -231,6 +607,76 @@ export class TreesService {
       birthDate: iso(value.birthDate),
       birthDatePrecision: value.birthDatePrecision,
     });
+    const visibleTreeIds = visibleMemberships.map(({ treeId: id }) => id);
+    const visibleRelations = visibleTreeIds.length
+      ? await this.prisma.relationship.findMany({
+          where: {
+            treeId: { in: visibleTreeIds },
+            OR: [{ fromPersonId: personId }, { toPersonId: personId }],
+          },
+          include: { fromPerson: true, toPerson: true },
+          orderBy: [{ treeId: "asc" }, { typeCode: "asc" }, { id: "asc" }],
+        })
+      : [];
+    const relativesByTree = new Map<
+      string,
+      Array<{
+        relationshipId: string;
+        role: "PARENT" | "CHILD" | "SPOUSE";
+        label: string;
+        person: RelatedPerson;
+      }>
+    >();
+    for (const relation of visibleRelations) {
+      const personIsFrom = relation.fromPersonId === personId;
+      const relative = personIsFrom ? relation.toPerson : relation.fromPerson;
+      let role: "PARENT" | "CHILD" | "SPOUSE";
+      let label: string;
+      if (relation.typeCode === "SPOUSE") {
+        role = "SPOUSE";
+        const relationshipLabel =
+          relation.marriageStatus === "DIVORCED"
+            ? "đã ly hôn"
+            : relation.marriageStatus === "SEPARATED"
+              ? "ly thân"
+              : relation.marriageStatus === "WIDOWED"
+                ? "góa"
+                : "kết hôn";
+        const partnerLabel =
+          relative.gender === "MALE"
+            ? "Chồng"
+            : relative.gender === "FEMALE"
+              ? "Vợ"
+              : "Vợ/chồng";
+        label = `${partnerLabel} · ${relationshipLabel}`;
+      } else if (personIsFrom) {
+        role = "CHILD";
+        label =
+          relative.gender === "MALE"
+            ? "Con trai"
+            : relative.gender === "FEMALE"
+              ? "Con gái"
+              : "Con";
+      } else {
+        role = "PARENT";
+        const parentLabel =
+          relative.gender === "MALE"
+            ? "Bố"
+            : relative.gender === "FEMALE"
+              ? "Mẹ"
+              : "Bố/mẹ";
+        label = `${parentLabel}${relation.parentKind === "ADOPTIVE" ? " nuôi" : ""}`;
+      }
+      relativesByTree.set(relation.treeId, [
+        ...(relativesByTree.get(relation.treeId) ?? []),
+        {
+          relationshipId: relation.id,
+          role,
+          label,
+          person: relatedPerson(relative),
+        },
+      ]);
+    }
     const spouseById = new Map(
       spouseRelations.map((relation) => {
         const partner =
@@ -338,9 +784,10 @@ export class TreesService {
         bytes: image.bytes,
         sortOrder: image.sortOrder,
       })),
-      visibleTrees: visibleMemberships.map(({ tree: visibleTree }) =>
-        this.summary(visibleTree),
-      ),
+      visibleTrees: visibleMemberships.map(({ tree: visibleTree }) => ({
+        ...this.summary(visibleTree),
+        relatives: relativesByTree.get(visibleTree.id) ?? [],
+      })),
       parents: parentRelations.map((relation) => ({
         person: relatedPerson(relation.fromPerson),
         parentKind: relation.parentKind!,
@@ -370,11 +817,19 @@ export class TreesService {
     body: UpdatePersonDto,
   ) {
     await this.ownedPerson(treeId, personId, userId);
+    if (body.fullName !== undefined && !body.fullName.trim())
+      throw new BadRequestException({
+        code: "PERSON_NAME_REQUIRED",
+        message: "Họ và tên thành viên không được để trống",
+      });
     const { birthDate, deathDate, socialLinks, ...fields } = body;
     await this.prisma.person.update({
       where: { id: personId },
       data: {
         ...fields,
+        ...(body.fullName !== undefined
+          ? { fullName: body.fullName.trim() }
+          : {}),
         ...(birthDate !== undefined
           ? { birthDate: birthDate ? new Date(birthDate) : null }
           : {}),

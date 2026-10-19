@@ -7,10 +7,12 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useNotifications } from "../app/providers/NotificationProvider";
+import { Breadcrumbs } from "../components/Breadcrumbs";
 import { ApiError, publicApi } from "../lib/api/client";
 import { primaryButtonClass, secondaryButtonClass } from "../lib/ui-classes";
 
 type Mode = "login" | "register" | "forgot-password";
+const defaultAuthenticatedPath = "/trees";
 const emailSchema = z.string().email("Email không hợp lệ");
 const passwordSchema = z
   .string()
@@ -50,7 +52,7 @@ type ResetInput = z.infer<typeof resetSchema>;
 
 const textButtonClass =
   "cursor-pointer border-0 bg-transparent py-[0.35rem] font-bold text-[#8a5c22]";
-const authSubtitleClass = "mt-0 mb-6 leading-[1.55] text-[#61736a]";
+const authSubtitleClass = "mt-0 mb-6 leading-[1.55] text-ink-muted";
 const tabClass =
   "cursor-pointer border-0 border-b-2 border-transparent bg-transparent p-[0.85rem] font-bold text-[#6b7d74]";
 
@@ -146,7 +148,7 @@ export function AuthPage() {
     navigate(
       returnTo?.startsWith("/") && !returnTo.startsWith("//")
         ? returnTo
-        : "/trees",
+        : defaultAuthenticatedPath,
       { replace: true },
     );
   };
@@ -168,9 +170,24 @@ export function AuthPage() {
   };
 
   if (!isInitializing && isAuthenticated)
-    return <Navigate to="/trees" replace />;
+    return <Navigate to={defaultAuthenticatedPath} replace />;
   return (
-    <main className="grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
+    <main className="relative grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
+      <Breadcrumbs
+        items={[
+          { label: "Trang chủ", to: "/" },
+          {
+            label:
+              mode === "register"
+                ? "Đăng ký"
+                : mode === "forgot-password"
+                  ? "Quên mật khẩu"
+                  : "Đăng nhập",
+          },
+        ]}
+        light
+        className="absolute top-5 left-5 z-10"
+      />
       <section className="flex flex-col justify-center px-5 pt-10 pb-4 min-[801px]:p-[clamp(3rem,8vw,8rem)]">
         <p className="text-xs font-bold tracking-[0.14em] text-accent">
           DIGITAL FAMILY TREE / FOUNDATION
@@ -184,19 +201,19 @@ export function AuthPage() {
         </p>
       </section>
       <section
-        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-[#f9fbfa] p-[clamp(1.5rem,4vw,2.4rem)] text-[#18332e] shadow-[0_24px_70px_rgba(0,0,0,0.28)] [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
+        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-surface-soft p-[clamp(1.5rem,4vw,2.4rem)] text-ink shadow-[0_24px_70px_rgba(0,0,0,0.28)] [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
         aria-labelledby="auth-title"
       >
         {mode !== "forgot-password" && !registerEmail && (
           <div className="grid grid-cols-2 border-b border-[#d8e1dc]">
             <button
-              className={`${tabClass} ${mode === "login" ? "border-b-[#b27d31] text-[#18332e]" : ""}`}
+              className={`${tabClass} ${mode === "login" ? "border-b-[#b27d31] text-ink" : ""}`}
               onClick={() => switchMode("login")}
             >
               Đăng nhập
             </button>
             <button
-              className={`${tabClass} ${mode === "register" ? "border-b-[#b27d31] text-[#18332e]" : ""}`}
+              className={`${tabClass} ${mode === "register" ? "border-b-[#b27d31] text-ink" : ""}`}
               onClick={() => switchMode("register")}
             >
               Đăng ký

@@ -1,5 +1,11 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { HomePage } from "../pages/HomePage";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { QueryProvider } from "./providers/QueryProvider";
 import { NotificationProvider } from "./providers/NotificationProvider";
@@ -11,6 +17,29 @@ import { ProtectedRoute } from "./ProtectedRoute";
 import { TreesPage } from "../pages/TreesPage";
 import { FamilyTreePage } from "../pages/FamilyTreePage";
 import { PersonDetailPage } from "../pages/PersonDetailPage";
+import { TimelinePage } from "../pages/TimelinePage";
+import { HomePage } from "../pages/HomePage";
+
+function LegacyTreeRedirect() {
+  const { treeId } = useParams();
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const legacyTab = params.get("tab");
+  const view =
+    legacyTab === "members"
+      ? "members"
+      : legacyTab === "relationships"
+        ? "relationships"
+        : "tree";
+  params.delete("tab");
+  const remainingSearch = params.toString();
+  return (
+    <Navigate
+      to={`/trees/${treeId}/${view}${remainingSearch ? `?${remainingSearch}` : ""}`}
+      replace
+    />
+  );
+}
 
 export function App() {
   return (
@@ -37,7 +66,39 @@ export function App() {
                     path="/trees/:treeId"
                     element={
                       <ProtectedRoute>
-                        <FamilyTreePage />
+                        <LegacyTreeRedirect />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/tree"
+                    element={
+                      <ProtectedRoute>
+                        <FamilyTreePage view="tree" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/members"
+                    element={
+                      <ProtectedRoute>
+                        <FamilyTreePage view="members" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/relationships"
+                    element={
+                      <ProtectedRoute>
+                        <FamilyTreePage view="relationships" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/timeline"
+                    element={
+                      <ProtectedRoute>
+                        <TimelinePage />
                       </ProtectedRoute>
                     }
                   />
