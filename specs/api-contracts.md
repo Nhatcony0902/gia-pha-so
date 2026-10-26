@@ -67,11 +67,14 @@ Base URL: `/api`
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/trees/{treeId}/members` | Danh sách cộng tác viên |
+| GET | `/trees/{treeId}/members` | Danh sách cộng tác viên (chỉ Admin) |
 | PATCH | `/trees/{treeId}/members/{userId}` | Cập nhật quyền cộng tác viên |
-| DELETE | `/trees/{treeId}/members/{userId}` | Xóa cộng tác viên |
-| POST | `/trees/{treeId}/invitations` | Tạo lời mời |
-| POST | `/invitations/{token}/accept` | Chấp nhận lời mời |
+| DELETE | `/trees/{treeId}/members/{userId}` | Xóa cộng tác viên. Admin xóa người khác, hoặc tự rời gia phả. Không xóa được Admin |
+| GET | `/trees/{treeId}/invitations` | Danh sách link mời kèm trạng thái (chỉ Admin) |
+| POST | `/trees/{treeId}/invitations` | Tạo link mời `{ expiresInDays?: 1–30 (mặc định 7), maxUses?: số \| null }`. Trả `token` **một lần duy nhất** |
+| DELETE | `/trees/{treeId}/invitations/{id}` | Thu hồi link mời. Người đã vào vẫn giữ quyền |
+| GET | `/invitations/{token}` | Xem trước lời mời, **không cần đăng nhập**. Chỉ trả tên gia phả, vai trò, người mời, trạng thái |
+| POST | `/invitations/{token}/accept` | Chấp nhận lời mời. Đã là thành viên thì trả `alreadyMember: true` và giữ nguyên vai trò |
 | GET | `/trees/{treeId}/change-requests?status=PENDING` | Danh sách yêu cầu thay đổi |
 | GET | `/trees/{treeId}/change-requests/{id}` | Chi tiết yêu cầu thay đổi |
 | POST | `/trees/{treeId}/change-requests/{id}/approve` | Duyệt yêu cầu thay đổi |

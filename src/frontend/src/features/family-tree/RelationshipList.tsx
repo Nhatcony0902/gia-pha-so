@@ -159,6 +159,7 @@ export function RelationshipList({
   onSelectPerson,
   onEdit,
   onDelete,
+  readOnly = false,
 }: {
   persons: PersonNode[];
   relationships: PrimitiveRelationship[];
@@ -167,6 +168,7 @@ export function RelationshipList({
   onSelectPerson: (id: string) => void;
   onEdit: (relationship: PrimitiveRelationship) => void;
   onDelete: (relationship: PrimitiveRelationship) => void;
+  readOnly?: boolean;
 }) {
   const people = useMemo(
     () => new Map(persons.map((person) => [person.id, person])),
@@ -457,9 +459,11 @@ export function RelationshipList({
                     )}
                   </th>
                 ))}
-                <th className="border-l border-border-default px-4 py-3 text-right">
-                  Thao tác
-                </th>
+                {!readOnly && (
+                  <th className="border-l border-border-default px-4 py-3 text-right">
+                    Thao tác
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -503,28 +507,30 @@ export function RelationshipList({
                       )}
                     </td>
                   ))}
-                  <td className="border-l border-[#edf1ef] px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        className={compactSecondaryButtonClass}
-                        onClick={() => onEdit(row.relationship)}
-                      >
-                        <Pencil size={15} /> Sửa
-                      </button>
-                      <button
-                        type="button"
-                        className={compactDangerButtonClass}
-                        disabled={deletingId === row.relationship.id}
-                        onClick={() => onDelete(row.relationship)}
-                      >
-                        <Trash2 size={15} />
-                        {deletingId === row.relationship.id
-                          ? "Đang xóa…"
-                          : "Xóa"}
-                      </button>
-                    </div>
-                  </td>
+                  {!readOnly && (
+                    <td className="border-l border-[#edf1ef] px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className={compactSecondaryButtonClass}
+                          onClick={() => onEdit(row.relationship)}
+                        >
+                          <Pencil size={15} /> Sửa
+                        </button>
+                        <button
+                          type="button"
+                          className={compactDangerButtonClass}
+                          disabled={deletingId === row.relationship.id}
+                          onClick={() => onDelete(row.relationship)}
+                        >
+                          <Trash2 size={15} />
+                          {deletingId === row.relationship.id
+                            ? "Đang xóa…"
+                            : "Xóa"}
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

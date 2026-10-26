@@ -34,7 +34,7 @@ import {
 const fieldClass = formFieldClass;
 const labelClass = formLabelClass;
 
-function DialogShell({
+export function DialogShell({
   title,
   children,
   onClose,

@@ -20,6 +20,8 @@ model User {
   refreshSessions RefreshSession[]
   resetTokens     PasswordResetToken[]
   familyTrees     FamilyTree[]
+  memberships     Membership[]
+  invitations     Invitation[]
 }
 
 enum Gender {
@@ -59,8 +61,45 @@ model FamilyTree {
   createdBy     User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
   persons       FamilyTreePerson[]
   relationships Relationship[]
+  memberships   Membership[]
+  invitations   Invitation[]
 
   @@index([createdById, updatedAt])
+}
+
+enum TreeRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Membership {
+  treeId   String
+  userId   String
+  role     TreeRole
+  joinedAt DateTime   @default(now())
+  tree     FamilyTree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([treeId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String     @id @default(cuid())
+  treeId      String
+  tokenHash   String     @unique
+  role        TreeRole   @default(VIEWER)
+  maxUses     Int?
+  useCount    Int        @default(0)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdById String
+  createdAt   DateTime   @default(now())
+  tree        FamilyTree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([treeId, createdAt])
 }
 
 model Person {

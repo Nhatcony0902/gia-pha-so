@@ -19,6 +19,7 @@ import { FamilyTreePage } from "../pages/FamilyTreePage";
 import { PersonDetailPage } from "../pages/PersonDetailPage";
 import { TimelinePage } from "../pages/TimelinePage";
 import { HomePage } from "../pages/HomePage";
+import { InvitePage } from "../pages/InvitePage";
 
 function LegacyTreeRedirect() {
   const { treeId } = useParams();
@@ -54,6 +55,7 @@ export function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/auth" element={<AuthPage />} />
+                  <Route path="/invite/:token" element={<InvitePage />} />
                   <Route
                     path="/trees"
                     element={
