@@ -13,7 +13,8 @@ Quyền chia làm 2 cấp: **tài khoản hệ thống** và **vai trò trong t�
 - **Link mời** (đã có): Admin tạo link, gửi vào nhóm Zalo. Ai có link và đăng nhập thì vào gia phả với quyền **Viewer**. Link chung không bao giờ cấp quyền Editor/Admin, để lộ link cũng không ai sửa được dữ liệu.
 - Link có hạn dùng (1–30 ngày, mặc định 7), có thể giới hạn số lượt, Admin thu hồi được bất cứ lúc nào. DB chỉ lưu hash của token.
 - Người đã ở trong gia phả bấm lại link thì giữ nguyên vai trò cũ (không bị hạ quyền).
-- **Mời qua email** (chưa làm): mời đích danh, dùng một lần, mới được cấp quyền Editor và gắn với Person.
+- **Mời qua email** (đã có): mời đích danh, dùng một lần, chỉ tài khoản đúng email (đã xác minh) mới chấp nhận được. Có thể gắn với một Person: khi chấp nhận, tài khoản được liên kết với đúng người đó trong cây (mỗi Person chỉ gắn một tài khoản trong một gia phả). Mời lại cùng email thì link cũ bị thu hồi.
+  - Hiện mới cấp quyền **Viewer**. Mời Editor qua email sẽ mở khi có luồng duyệt (LMS-011).
 - Người ngoài gia phả gọi API của gia phả nhận `404` (không lộ gia phả tồn tại). Thành viên không đủ quyền ghi nhận `403`.
 
 ## Câu hỏi mở (chốt ở Sprint 05)

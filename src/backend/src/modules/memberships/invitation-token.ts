@@ -9,6 +9,12 @@ export const generateInvitationToken = () =>
 export const hashInvitationToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 
+/** Che email cho trang xem trước công khai: "nguyenvana@gmail.com" → "ng***@gmail.com". */
+export function maskEmail(email: string) {
+  const [local = "", domain = ""] = email.split("@");
+  return `${local.slice(0, Math.min(2, local.length - 1))}***@${domain}`;
+}
+
 export function invitationStatus(
   invitation: {
     revokedAt: Date | null;

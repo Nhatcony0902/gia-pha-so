@@ -883,6 +883,15 @@ export class TreesService {
       await tx.familyTreePerson.delete({
         where: { treeId_personId: { treeId, personId } },
       });
+      // Person vẫn có thể còn ở gia phả khác, nên phải tự gỡ liên kết trong gia phả này.
+      await tx.membership.updateMany({
+        where: { treeId, personId },
+        data: { personId: null },
+      });
+      await tx.invitation.updateMany({
+        where: { treeId, personId },
+        data: { personId: null },
+      });
       if ((await tx.familyTreePerson.count({ where: { personId } })) === 0)
         await tx.person.delete({ where: { id: personId } });
     });

@@ -1,12 +1,14 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   GoneException,
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
-import type { Invitation, User } from "@prisma/client";
+import type { Invitation, Person, Prisma, User } from "@prisma/client";
 import type {
   AcceptInvitationResponse,
   CreatedTreeInvitation,
@@ -16,15 +18,24 @@ import type {
   TreeMemberListResponse,
 } from "@family-tree/shared-types";
 import { PrismaService } from "../database/prisma.service.js";
+import { MailService } from "../mail/mail.service.js";
 import type { CreateInvitationDto } from "./memberships.dto.js";
 import {
   generateInvitationToken,
   hashInvitationToken,
   invitationStatus,
+  maskEmail,
 } from "./invitation-token.js";
 
 const DEFAULT_EXPIRES_IN_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const invitationInclude = {
+  createdBy: { select: { id: true, name: true } },
+  person: { select: { id: true, fullName: true } },
+} as const;
+
+const webOrigin = () => process.env.WEB_ORIGIN ?? "http://localhost:5173";
 
 const unusableInvitation = {
   EXPIRED: "Lời mời đã hết hạn. Hãy nhờ trưởng họ gửi link mới",
@@ -34,7 +45,10 @@ const unusableInvitation = {
 
 @Injectable()
 export class MembershipsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(MailService) private readonly mail: MailService,
+  ) {}
 
   private async assertAdmin(treeId: string, userId: string) {
     const membership = await this.prisma.membership.findUnique({
@@ -53,7 +67,10 @@ export class MembershipsService {
   }
 
   private invitationView(
-    invitation: Invitation & { createdBy: Pick<User, "id" | "name"> },
+    invitation: Invitation & {
+      createdBy: Pick<User, "id" | "name">;
+      person: Pick<Person, "id" | "fullName"> | null;
+    },
   ): TreeInvitation {
     return {
       id: invitation.id,
@@ -64,7 +81,26 @@ export class MembershipsService {
       expiresAt: invitation.expiresAt.toISOString(),
       createdAt: invitation.createdAt.toISOString(),
       createdBy: invitation.createdBy,
+      email: invitation.email,
+      person: invitation.person,
     };
+  }
+
+  /** Person phải thuộc gia phả và chưa gắn với tài khoản nào khác trong gia phả. */
+  private async linkablePerson(
+    db: Prisma.TransactionClient,
+    treeId: string,
+    personId: string,
+  ) {
+    const [inTree, linked] = await Promise.all([
+      db.familyTreePerson.findUnique({
+        where: { treeId_personId: { treeId, personId } },
+      }),
+      db.membership.findUnique({
+        where: { treeId_personId: { treeId, personId } },
+      }),
+    ]);
+    return { inTree: Boolean(inTree), linked: Boolean(linked) };
   }
 
   async members(
@@ -74,17 +110,21 @@ export class MembershipsService {
     await this.assertAdmin(treeId, userId);
     const memberships = await this.prisma.membership.findMany({
       where: { treeId },
-      include: { user: true },
+      include: {
+        user: true,
+        person: { select: { id: true, fullName: true } },
+      },
       orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
     });
     return {
-      members: memberships.map(({ user, role, joinedAt }) => ({
+      members: memberships.map(({ user, role, joinedAt, person }) => ({
         userId: user.id,
         name: user.name,
         email: user.email,
         avatarUrl: user.avatarUrl,
         role,
         joinedAt: joinedAt.toISOString(),
+        person,
       })),
     };
   }
@@ -111,28 +151,89 @@ export class MembershipsService {
     return { success: true };
   }
 
+  /**
+   * Không có email: link chung, trả token để trưởng họ tự gửi.
+   * Có email: lời mời đích danh, dùng một lần, gửi link qua email và không trả token.
+   */
   async createInvitation(
     treeId: string,
     userId: string,
     body: CreateInvitationDto,
   ): Promise<CreatedTreeInvitation> {
     await this.assertAdmin(treeId, userId);
+    const email = body.email?.trim().toLowerCase() || null;
+    const personId = body.personId || null;
+    if (personId && !email)
+      throw new BadRequestException({
+        code: "PERSON_REQUIRES_EMAIL",
+        message: "Muốn gắn với hồ sơ thì phải mời qua email",
+      });
+    if (personId) {
+      const person = await this.linkablePerson(this.prisma, treeId, personId);
+      if (!person.inTree)
+        throw new NotFoundException({
+          code: "PERSON_NOT_FOUND",
+          message: "Không tìm thấy thành viên trong gia phả",
+        });
+      if (person.linked)
+        throw new ConflictException({
+          code: "PERSON_ALREADY_LINKED",
+          message: "Hồ sơ này đã gắn với một tài khoản khác",
+        });
+    }
+    if (
+      email &&
+      (await this.prisma.membership.findFirst({
+        where: { treeId, user: { email } },
+      }))
+    )
+      throw new ConflictException({
+        code: "ALREADY_MEMBER",
+        message: "Người này đã có quyền truy cập gia phả",
+      });
+
     const token = generateInvitationToken();
     const invitation = await this.prisma.invitation.create({
       data: {
         treeId,
         tokenHash: hashInvitationToken(token),
-        // Link chung chỉ cấp quyền xem: lộ link cũng không ai sửa được gia phả.
+        // Chưa có luồng duyệt (LMS-011) nên mọi lời mời đều chỉ cấp quyền xem.
+        // Riêng link chung thì luôn chỉ xem: lộ link cũng không ai sửa được gia phả.
         role: "VIEWER",
-        maxUses: body.maxUses ?? null,
+        maxUses: email ? 1 : (body.maxUses ?? null),
+        email,
+        personId,
         expiresAt: new Date(
           Date.now() + (body.expiresInDays ?? DEFAULT_EXPIRES_IN_DAYS) * DAY_MS,
         ),
         createdById: userId,
       },
-      include: { createdBy: { select: { id: true, name: true } } },
+      include: { ...invitationInclude, tree: { select: { name: true } } },
     });
-    return { ...this.invitationView(invitation), token };
+    if (!email) return { ...this.invitationView(invitation), token };
+
+    try {
+      await this.mail.sendTreeInvitation({
+        email,
+        inviterName: invitation.createdBy.name,
+        treeName: invitation.tree.name,
+        personName: invitation.person?.fullName ?? null,
+        url: `${webOrigin()}/invite/${token}`,
+        expiresAt: invitation.expiresAt,
+      });
+    } catch {
+      await this.prisma.invitation.delete({ where: { id: invitation.id } });
+      throw new ServiceUnavailableException({
+        code: "INVITATION_EMAIL_FAILED",
+        message: "Không gửi được email mời. Vui lòng thử lại sau",
+      });
+    }
+    // Mời lại cùng một email thì chỉ link mới nhất còn dùng được.
+    await this.prisma.invitation.updateMany({
+      where: { treeId, email, id: { not: invitation.id }, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return { ...this.invitationView(invitation), token: null };
   }
 
   async invitations(
@@ -142,7 +243,7 @@ export class MembershipsService {
     await this.assertAdmin(treeId, userId);
     const invitations = await this.prisma.invitation.findMany({
       where: { treeId },
-      include: { createdBy: { select: { id: true, name: true } } },
+      include: invitationInclude,
       orderBy: { createdAt: "desc" },
     });
     return {
@@ -176,6 +277,7 @@ export class MembershipsService {
       include: {
         tree: { include: { _count: { select: { persons: true } } } },
         createdBy: { select: { name: true } },
+        person: { select: { fullName: true } },
       },
     });
     if (!invitation)
@@ -200,6 +302,8 @@ export class MembershipsService {
       invitedBy: invitation.createdBy,
       status: invitationStatus(invitation),
       expiresAt: invitation.expiresAt.toISOString(),
+      emailHint: invitation.email ? maskEmail(invitation.email) : null,
+      person: invitation.person,
     };
   }
 
@@ -208,14 +312,40 @@ export class MembershipsService {
     userId: string,
   ): Promise<AcceptInvitationResponse> {
     const invitation = await this.invitationByToken(token);
-    const { treeId } = invitation;
-    const existing = await this.prisma.membership.findUnique({
-      where: { treeId_userId: { treeId, userId } },
-    });
-    // Đã ở trong gia phả thì giữ nguyên vai trò cũ, không để link Viewer hạ quyền Editor.
-    if (existing) return { treeId, role: existing.role, alreadyMember: true };
-
+    const { treeId, personId } = invitation;
+    const [existing, user] = await Promise.all([
+      this.prisma.membership.findUnique({
+        where: { treeId_userId: { treeId, userId } },
+      }),
+      this.prisma.user.findUnique({ where: { id: userId } }),
+    ]);
+    const emailMatches =
+      !invitation.email ||
+      (user?.email === invitation.email && Boolean(user.emailVerifiedAt));
     const status = invitationStatus(invitation);
+
+    if (existing) {
+      // Đã ở trong gia phả thì giữ nguyên vai trò cũ, không để link Viewer hạ quyền Editor.
+      // Lời mời đích danh còn hạn thì vẫn gắn Person nếu tài khoản chưa gắn.
+      if (
+        invitation.email &&
+        emailMatches &&
+        status === "ACTIVE" &&
+        personId &&
+        !existing.personId
+      )
+        await this.prisma.$transaction(async (tx) => {
+          await this.claim(tx, invitation.id);
+          await this.linkPersonIfFree(tx, treeId, userId, personId);
+        });
+      return { treeId, role: existing.role, alreadyMember: true };
+    }
+
+    if (!emailMatches)
+      throw new ForbiddenException({
+        code: "INVITATION_EMAIL_MISMATCH",
+        message: `Lời mời này dành cho ${maskEmail(invitation.email!)}. Hãy đăng nhập bằng đúng email đó`,
+      });
     if (status !== "ACTIVE")
       throw new GoneException({
         code: `INVITATION_${status}`,
@@ -223,30 +353,50 @@ export class MembershipsService {
       });
 
     return this.prisma.$transaction(async (tx) => {
-      // Điều kiện nằm trong câu UPDATE để hai người bấm cùng lúc không vượt maxUses.
-      const claimed = await tx.invitation.updateMany({
-        where: {
-          id: invitation.id,
-          revokedAt: null,
-          expiresAt: { gt: new Date() },
-          OR: [
-            { maxUses: null },
-            { useCount: { lt: tx.invitation.fields.maxUses } },
-          ],
-        },
-        data: { useCount: { increment: 1 } },
-      });
-      if (!claimed.count)
-        throw new GoneException({
-          code: "INVITATION_EXHAUSTED",
-          message: unusableInvitation.EXHAUSTED,
-        });
+      await this.claim(tx, invitation.id);
       const membership = await tx.membership.upsert({
         where: { treeId_userId: { treeId, userId } },
         update: {},
         create: { treeId, userId, role: invitation.role },
       });
+      if (personId) await this.linkPersonIfFree(tx, treeId, userId, personId);
       return { treeId, role: membership.role, alreadyMember: false };
+    });
+  }
+
+  /** Tăng lượt dùng. Điều kiện nằm trong câu UPDATE để hai người bấm cùng lúc không vượt maxUses. */
+  private async claim(tx: Prisma.TransactionClient, invitationId: string) {
+    const claimed = await tx.invitation.updateMany({
+      where: {
+        id: invitationId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        OR: [
+          { maxUses: null },
+          { useCount: { lt: tx.invitation.fields.maxUses } },
+        ],
+      },
+      data: { useCount: { increment: 1 } },
+    });
+    if (!claimed.count)
+      throw new GoneException({
+        code: "INVITATION_EXHAUSTED",
+        message: unusableInvitation.EXHAUSTED,
+      });
+  }
+
+  /** Person đã rời gia phả hoặc đã gắn tài khoản khác thì bỏ qua, người nhận vẫn vào được gia phả. */
+  private async linkPersonIfFree(
+    tx: Prisma.TransactionClient,
+    treeId: string,
+    userId: string,
+    personId: string,
+  ) {
+    const person = await this.linkablePerson(tx, treeId, personId);
+    if (!person.inTree || person.linked) return;
+    await tx.membership.update({
+      where: { treeId_userId: { treeId, userId } },
+      data: { personId },
     });
   }
 }

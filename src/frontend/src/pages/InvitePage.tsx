@@ -70,7 +70,7 @@ export function InvitePage() {
       </>
     );
   else {
-    const { tree, invitedBy, role, status } = preview.data;
+    const { tree, invitedBy, role, status, emailHint, person } = preview.data;
     content = (
       <>
         <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
@@ -89,7 +89,23 @@ export function InvitePage() {
           <strong className="text-content-primary">{invitedBy.name}</strong> mời
           bạn tham gia với quyền{" "}
           <strong className="text-content-primary">{roleLabel[role]}</strong>.
+          {person && (
+            <>
+              {" "}
+              Tài khoản của bạn sẽ được gắn với hồ sơ{" "}
+              <strong className="text-content-primary">
+                {person.fullName}
+              </strong>
+              .
+            </>
+          )}
         </p>
+        {emailHint && (
+          <p className="m-0 text-sm text-content-secondary">
+            Lời mời dành riêng cho <strong>{emailHint}</strong>. Hãy đăng nhập
+            hoặc đăng ký bằng đúng email này.
+          </p>
+        )}
         {status !== "ACTIVE" ? (
           <p className="m-0 rounded-xl border border-[#d9a49d] bg-[#fff8f6] p-3 text-[#a33d32]">
             {unusableMessage[status]}

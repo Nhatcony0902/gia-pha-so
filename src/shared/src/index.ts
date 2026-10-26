@@ -266,6 +266,11 @@ export interface CloudinarySignature {
   folder: string;
 }
 
+export interface LinkedPerson {
+  id: string;
+  fullName: string;
+}
+
 export interface TreeMember {
   userId: string;
   name: string;
@@ -273,6 +278,7 @@ export interface TreeMember {
   avatarUrl: string | null;
   role: TreeRole;
   joinedAt: string;
+  person: LinkedPerson | null;
 }
 
 export interface TreeMemberListResponse {
@@ -290,11 +296,14 @@ export interface TreeInvitation {
   expiresAt: string;
   createdAt: string;
   createdBy: { id: string; name: string };
+  /** Có email: lời mời đích danh, dùng một lần. Không có: link chung. */
+  email: string | null;
+  person: LinkedPerson | null;
 }
 
-/** Token chỉ trả về đúng một lần, lúc tạo lời mời. */
 export interface CreatedTreeInvitation extends TreeInvitation {
-  token: string;
+  /** Link chung: token trả về đúng một lần, lúc tạo. Lời mời email: null, link chỉ nằm trong email. */
+  token: string | null;
 }
 
 export interface TreeInvitationListResponse {
@@ -304,6 +313,9 @@ export interface TreeInvitationListResponse {
 export interface TreeInvitationInput {
   expiresInDays?: number;
   maxUses?: number | null;
+  /** Có thì gửi lời mời đích danh qua email (bỏ qua maxUses). */
+  email?: string;
+  personId?: string | null;
 }
 
 export interface InvitationPreview {
@@ -317,6 +329,9 @@ export interface InvitationPreview {
   invitedBy: { name: string };
   status: InvitationStatus;
   expiresAt: string;
+  /** Email đã che bớt (vd: ng***@gmail.com) nếu là lời mời đích danh. */
+  emailHint: string | null;
+  person: { fullName: string } | null;
 }
 
 export interface AcceptInvitationResponse {

@@ -3,7 +3,7 @@ import type {
   CreatedTreeInvitation,
   InvitationStatus,
 } from "@family-tree/shared-types";
-import { Check, Copy, Link2, Trash2, UserMinus } from "lucide-react";
+import { Check, Copy, Link2, Mail, Trash2, UserMinus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { useNotifications } from "../../app/providers/NotificationProvider";
@@ -14,6 +14,7 @@ import {
   formFieldClass,
   formLabelClass,
 } from "../../lib/ui-classes";
+import { getTreePersons } from "../family-tree/api";
 import { DialogShell } from "../family-tree/ManagementDialogs";
 import {
   createTreeInvitation,
@@ -46,10 +47,15 @@ export function ShareDialog({
   treeId,
   treeName,
   onClose,
+  initialPersonId,
+  initialEmail,
 }: {
   treeId: string;
   treeName: string;
   onClose: () => void;
+  /** Mở từ hồ sơ một người: điền sẵn Person và email của người đó. */
+  initialPersonId?: string;
+  initialEmail?: string | null;
 }) {
   const client = useQueryClient();
   const notice = useNotifications();
@@ -58,6 +64,8 @@ export function ShareDialog({
   const [maxUses, setMaxUses] = useState("");
   const [created, setCreated] = useState<CreatedTreeInvitation | null>(null);
   const [copied, setCopied] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState(initialEmail ?? "");
+  const [invitePersonId, setInvitePersonId] = useState(initialPersonId ?? "");
   const members = useQuery({
     queryKey: ["tree-members", treeId],
     queryFn: () => getTreeMembers(treeId),
@@ -65,6 +73,33 @@ export function ShareDialog({
   const invitations = useQuery({
     queryKey: ["tree-invitations", treeId],
     queryFn: () => getTreeInvitations(treeId),
+  });
+  const persons = useQuery({
+    queryKey: ["tree-persons", treeId],
+    queryFn: () => getTreePersons(treeId),
+  });
+  const linkedPersonIds = new Set(
+    members.data?.members.flatMap((member) =>
+      member.person ? [member.person.id] : [],
+    ),
+  );
+  const linkablePersons =
+    persons.data?.persons.filter((person) => !linkedPersonIds.has(person.id)) ??
+    [];
+  const sendEmail = useMutation({
+    mutationFn: () =>
+      createTreeInvitation(treeId, {
+        email: inviteEmail.trim(),
+        personId: invitePersonId || null,
+      }),
+    onSuccess: (invitation) => {
+      setInviteEmail("");
+      setInvitePersonId("");
+      client.invalidateQueries({ queryKey: ["tree-invitations", treeId] });
+      notice.toast(`Đã gửi lời mời tới ${invitation.email}`, "success");
+    },
+    onError: (error) =>
+      notice.alert("Không thể gửi lời mời", errorMessage(error)),
   });
   const create = useMutation({
     mutationFn: () =>
@@ -122,7 +157,59 @@ export function ShareDialog({
     <DialogShell title={`Chia sẻ "${treeName}"`} onClose={onClose}>
       <div className="grid gap-6">
         <section>
-          <h3 className={sectionTitleClass}>Tạo link mời</h3>
+          <h3 className={sectionTitleClass}>Mời qua email</h3>
+          <p className="mt-0 mb-3 text-sm text-ink-subtle">
+            Gửi lời mời đích danh: chỉ tài khoản đúng email này mới vào được,
+            link dùng một lần và hết hạn sau 7 ngày. Chọn hồ sơ để gắn tài khoản
+            của họ với đúng người trong cây.
+          </p>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              sendEmail.mutate();
+            }}
+            className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+          >
+            <label className={formLabelClass}>
+              Email
+              <input
+                type="email"
+                required
+                maxLength={320}
+                className={formFieldClass}
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                placeholder="ten@gmail.com"
+              />
+            </label>
+            <label className={formLabelClass}>
+              Gắn với hồ sơ
+              <select
+                className={formFieldClass}
+                value={invitePersonId}
+                onChange={(event) => setInvitePersonId(event.target.value)}
+              >
+                <option value="">Không gắn</option>
+                {linkablePersons.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className={compactPrimaryButtonClass}
+              disabled={sendEmail.isPending || !inviteEmail.trim()}
+            >
+              <Mail size={16} />
+              {sendEmail.isPending ? "Đang gửi…" : "Gửi lời mời"}
+            </button>
+          </form>
+        </section>
+
+        <section>
+          <h3 className={sectionTitleClass}>Tạo link chung</h3>
           <p className="mt-0 mb-3 text-sm text-ink-subtle">
             Ai có link và đăng nhập sẽ vào gia phả với quyền{" "}
             <strong>{roleLabel.VIEWER}</strong>. Gửi link vào nhóm Zalo của họ
@@ -167,7 +254,7 @@ export function ShareDialog({
               {create.isPending ? "Đang tạo…" : "Tạo link"}
             </button>
           </form>
-          {created && (
+          {created?.token && (
             <div className="mt-3 grid gap-2 rounded-xl border border-accent bg-[#fff9ee] p-3">
               <div className="flex gap-2">
                 <input
@@ -180,7 +267,7 @@ export function ShareDialog({
                 <button
                   type="button"
                   className={compactPrimaryButtonClass}
-                  onClick={() => void copy(inviteUrl(created.token))}
+                  onClick={() => void copy(inviteUrl(created.token!))}
                 >
                   {copied ? <Check size={16} /> : <Copy size={16} />}
                   {copied ? "Đã chép" : "Sao chép"}
@@ -195,18 +282,26 @@ export function ShareDialog({
         </section>
 
         <section>
-          <h3 className={sectionTitleClass}>Link đã tạo</h3>
+          <h3 className={sectionTitleClass}>Lời mời đã gửi</h3>
           {invitations.isLoading && (
             <p className="text-sm text-ink-subtle">Đang tải…</p>
           )}
           {invitations.data?.invitations.length === 0 && (
-            <p className="text-sm text-ink-subtle">Chưa có link mời nào.</p>
+            <p className="text-sm text-ink-subtle">Chưa có lời mời nào.</p>
           )}
           <div className="grid gap-2">
             {invitations.data?.invitations.map((invitation) => (
               <div key={invitation.id} className={rowClass}>
                 <div className="grid gap-0.5 text-sm">
-                  <strong>{statusLabel[invitation.status]}</strong>
+                  <strong>
+                    {invitation.email ?? "Link chung"} ·{" "}
+                    {statusLabel[invitation.status]}
+                  </strong>
+                  {invitation.person && (
+                    <span className="text-ink-subtle">
+                      Gắn với hồ sơ {invitation.person.fullName}
+                    </span>
+                  )}
                   <span className="text-ink-subtle">
                     Đã dùng {invitation.useCount}
                     {invitation.maxUses !== null
@@ -256,6 +351,7 @@ export function ShareDialog({
                   </strong>
                   <span className="text-ink-subtle">
                     {member.email} · {roleLabel[member.role]}
+                    {member.person ? ` · Hồ sơ: ${member.person.fullName}` : ""}
                   </span>
                 </div>
                 {member.role !== "ADMIN" && (

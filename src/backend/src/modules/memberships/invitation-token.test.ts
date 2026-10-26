@@ -4,7 +4,19 @@ import {
   generateInvitationToken,
   hashInvitationToken,
   invitationStatus,
+  maskEmail,
 } from "./invitation-token.js";
+
+describe("maskEmail", () => {
+  it("chỉ giữ 2 ký tự đầu và tên miền", () => {
+    assert.equal(maskEmail("nguyenvana@gmail.com"), "ng***@gmail.com");
+  });
+
+  it("phần trước @ quá ngắn thì không lộ ký tự nào", () => {
+    assert.equal(maskEmail("ab@x.vn"), "a***@x.vn");
+    assert.equal(maskEmail("a@x.vn"), "***@x.vn");
+  });
+});
 
 const now = new Date("2026-10-26T00:00:00Z");
 const active = {

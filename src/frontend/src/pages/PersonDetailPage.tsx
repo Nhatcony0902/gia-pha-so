@@ -15,6 +15,7 @@ import {
   Search,
   Trash2,
   Upload,
+  UserPlus,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -39,6 +40,7 @@ import {
   uploadPersonImage,
 } from "../features/family-tree/api";
 import { PersonSidebar } from "../features/family-tree/PersonSidebar";
+import { ShareDialog } from "../features/sharing/ShareDialog";
 import {
   compactDangerButtonClass,
   compactPrimaryButtonClass,
@@ -226,6 +228,7 @@ export function PersonDetailPage() {
     enabled: Boolean(candidateSidebar),
   });
   const [editing, setEditing] = useState(isCreating);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>(() =>
     isCreating ? { ...emptyForm } : {},
   );
@@ -950,6 +953,15 @@ export function PersonDetailPage() {
           </Link>
           {canEdit && (
             <div className="flex gap-2">
+              {!editing && (
+                <button
+                  type="button"
+                  className={compactSecondaryButtonClass}
+                  onClick={() => setInviteOpen(true)}
+                >
+                  <UserPlus size={16} /> Mời người này
+                </button>
+              )}
               {editing ? (
                 <>
                   <button
@@ -1224,6 +1236,15 @@ export function PersonDetailPage() {
           </div>
         </div>
       </div>
+      {inviteOpen && (
+        <ShareDialog
+          treeId={treeId}
+          treeName={currentTree?.name ?? "Gia phả"}
+          initialPersonId={person.id}
+          initialEmail={person.email}
+          onClose={() => setInviteOpen(false)}
+        />
+      )}
     </main>
   );
 }

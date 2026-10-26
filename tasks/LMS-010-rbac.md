@@ -31,6 +31,6 @@ Chốt các câu hỏi mở trong `specs/user-roles.md`.
 - [x] Link mời Viewer: tạo, xem trước công khai, chấp nhận, thu hồi, hết hạn, giới hạn lượt
 - [x] Admin xem và xóa người có quyền truy cập
 - [x] FE: hộp thoại "Chia sẻ", trang `/invite/:token`, ẩn nút sửa/xóa với Viewer
-- [ ] Mời qua email (gắn Person, cấp được quyền Editor)
-- [ ] Đổi vai trò, giao nhánh cho Editor (cần LMS-011 để Editor đề xuất qua duyệt)
-- [ ] Liên kết tài khoản với Person của chính mình
+- [x] Mời qua email, gắn tài khoản với Person khi chấp nhận (nút "Mời người này" ở trang hồ sơ)
+- [ ] Mời Editor qua email, đổi vai trò, giao nhánh cho Editor (cần LMS-011 để Editor đề xuất qua duyệt)
+- [ ] Người dùng tự nhận hồ sơ của mình khi không được mời kèm Person
