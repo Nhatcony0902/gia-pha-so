@@ -13,7 +13,7 @@ import {
   useNodesState,
   type Edge,
 } from "@xyflow/react";
-import { Plus } from "lucide-react";
+import { Plus, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Link,
@@ -52,7 +52,11 @@ import {
   RelationshipFormDialog,
 } from "../features/family-tree/ManagementDialogs";
 import { RelationshipList } from "../features/family-tree/RelationshipList";
-import { compactPrimaryButtonClass } from "../lib/ui-classes";
+import { ShareDialog } from "../features/sharing/ShareDialog";
+import {
+  compactPrimaryButtonClass,
+  compactSecondaryButtonClass,
+} from "../lib/ui-classes";
 
 const nodeTypes = { person: FamilyPersonNode, junction: FamilyJunctionNode };
 const edgeTypes = { "relationship-route": FamilyRelationshipEdge };
@@ -79,6 +83,7 @@ export function FamilyTreePage({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutReady, setLayoutReady] = useState(false);
   const [personChoiceOpen, setPersonChoiceOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [relationshipEditor, setRelationshipEditor] = useState<
     PrimitiveRelationship | "new" | null
   >(null);
@@ -171,7 +176,7 @@ export function FamilyTreePage({
         const personIds = (edge.data?.personIds as string[] | undefined) ?? [];
         const connected = Boolean(
           (selectedId && personIds.includes(selectedId)) ||
-            (relationshipKey && edge.data?.relationshipKey === relationshipKey),
+          (relationshipKey && edge.data?.relationshipKey === relationshipKey),
         );
         const baseWidth = edge.data?.kind === "pair" ? 2.5 : 2;
         return {
@@ -332,6 +337,7 @@ export function FamilyTreePage({
       </main>
     );
 
+  const canEdit = graph.data.tree.myRole === "ADMIN";
   return (
     <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-surface-page text-ink">
       <header className="z-3 flex flex-col items-start justify-between gap-4 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem] min-[801px]:flex-row min-[801px]:items-center">
@@ -362,7 +368,16 @@ export function FamilyTreePage({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {activeTab !== "relationships" && (
+            {canEdit && (
+              <button
+                type="button"
+                className={compactSecondaryButtonClass}
+                onClick={() => setShareOpen(true)}
+              >
+                <Share2 size={16} /> Chia sẻ
+              </button>
+            )}
+            {canEdit && activeTab !== "relationships" && (
               <button
                 type="button"
                 className={compactPrimaryButtonClass}
@@ -371,7 +386,7 @@ export function FamilyTreePage({
                 <Plus size={16} /> Thêm thành viên
               </button>
             )}
-            {activeTab !== "members" && (
+            {canEdit && activeTab !== "members" && (
               <button
                 type="button"
                 className={compactPrimaryButtonClass}
@@ -481,6 +496,7 @@ export function FamilyTreePage({
             onDelete={async (relationship) => {
               await confirmDeleteRelationship(relationship);
             }}
+            readOnly={!canEdit}
           />
         )}
         {selectedId && (
@@ -490,13 +506,18 @@ export function FamilyTreePage({
             loading={detail.isLoading}
             onClose={closeSidebar}
             onSelectPerson={selectPerson}
-            onDelete={() => void confirmDeletePerson(selectedId)}
-            deleting={removePerson.isPending}
+            {...(canEdit
+              ? {
+                  onDelete: () => void confirmDeletePerson(selectedId),
+                  deleting: removePerson.isPending,
+                }
+              : {})}
           />
         )}
         {selectedRelationship && (
           <RelationshipSidebar
             {...selectedRelationship}
+            readOnly={!canEdit}
             onClose={closeSidebar}
             onSelectPerson={selectPerson}
             onEdit={setRelationshipEditor}
@@ -511,6 +532,13 @@ export function FamilyTreePage({
           />
         )}
       </div>
+      {shareOpen && (
+        <ShareDialog
+          treeId={treeId}
+          treeName={graph.data.tree.name}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
       {personChoiceOpen && (
         <PersonAddChoiceDialog
           onClose={() => setPersonChoiceOpen(false)}

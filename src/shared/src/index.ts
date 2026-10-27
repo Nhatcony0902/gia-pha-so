@@ -35,6 +35,7 @@ export type DatePrecision = "YEAR" | "MONTH" | "DAY";
 export type ParentKind = "BIOLOGICAL" | "ADOPTIVE";
 export type MarriageStatus = "MARRIED" | "DIVORCED" | "SEPARATED" | "WIDOWED";
 export type PrimitiveRelationshipType = "PARENT_CHILD" | "SPOUSE";
+export type TreeRole = "ADMIN" | "EDITOR" | "VIEWER";
 
 export interface FamilyTreeSummary {
   id: string;
@@ -44,6 +45,7 @@ export interface FamilyTreeSummary {
   originPlace: string | null;
   personCount: number;
   updatedAt: string;
+  myRole: TreeRole;
 }
 
 export interface FamilyTreeListResponse {
@@ -262,4 +264,78 @@ export interface CloudinarySignature {
   timestamp: number;
   signature: string;
   folder: string;
+}
+
+export interface LinkedPerson {
+  id: string;
+  fullName: string;
+}
+
+export interface TreeMember {
+  userId: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  role: TreeRole;
+  joinedAt: string;
+  person: LinkedPerson | null;
+}
+
+export interface TreeMemberListResponse {
+  members: TreeMember[];
+}
+
+export type InvitationStatus = "ACTIVE" | "EXPIRED" | "REVOKED" | "EXHAUSTED";
+
+export interface TreeInvitation {
+  id: string;
+  role: TreeRole;
+  status: InvitationStatus;
+  maxUses: number | null;
+  useCount: number;
+  expiresAt: string;
+  createdAt: string;
+  createdBy: { id: string; name: string };
+  /** Có email: lời mời đích danh, dùng một lần. Không có: link chung. */
+  email: string | null;
+  person: LinkedPerson | null;
+}
+
+export interface CreatedTreeInvitation extends TreeInvitation {
+  /** Link chung: token trả về đúng một lần, lúc tạo. Lời mời email: null, link chỉ nằm trong email. */
+  token: string | null;
+}
+
+export interface TreeInvitationListResponse {
+  invitations: TreeInvitation[];
+}
+
+export interface TreeInvitationInput {
+  expiresInDays?: number;
+  maxUses?: number | null;
+  /** Có thì gửi lời mời đích danh qua email (bỏ qua maxUses). */
+  email?: string;
+  personId?: string | null;
+}
+
+export interface InvitationPreview {
+  tree: {
+    name: string;
+    coverUrl: string | null;
+    originPlace: string | null;
+    personCount: number;
+  };
+  role: TreeRole;
+  invitedBy: { name: string };
+  status: InvitationStatus;
+  expiresAt: string;
+  /** Email đã che bớt (vd: ng***@gmail.com) nếu là lời mời đích danh. */
+  emailHint: string | null;
+  person: { fullName: string } | null;
+}
+
+export interface AcceptInvitationResponse {
+  treeId: string;
+  role: TreeRole;
+  alreadyMember: boolean;
 }

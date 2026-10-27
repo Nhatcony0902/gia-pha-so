@@ -20,6 +20,8 @@ model User {
   refreshSessions RefreshSession[]
   resetTokens     PasswordResetToken[]
   familyTrees     FamilyTree[]
+  memberships     Membership[]
+  invitations     Invitation[]
 }
 
 enum Gender {
@@ -59,8 +61,54 @@ model FamilyTree {
   createdBy     User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
   persons       FamilyTreePerson[]
   relationships Relationship[]
+  memberships   Membership[]
+  invitations   Invitation[]
 
   @@index([createdById, updatedAt])
+}
+
+enum TreeRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Membership {
+  treeId   String
+  userId   String
+  role     TreeRole
+  /// Person của chính user trong gia phả này
+  personId String?
+  joinedAt DateTime   @default(now())
+  tree     FamilyTree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person   Person?    @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  @@id([treeId, userId])
+  @@unique([treeId, personId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String     @id @default(cuid())
+  treeId      String
+  tokenHash   String     @unique
+  role        TreeRole   @default(VIEWER)
+  maxUses     Int?
+  useCount    Int        @default(0)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  /// Có email: lời mời đích danh, chỉ tài khoản đúng email này chấp nhận được
+  email       String?
+  /// Gắn tài khoản người nhận với Person này khi chấp nhận
+  personId    String?
+  createdById String
+  createdAt   DateTime   @default(now())
+  tree        FamilyTree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  createdBy   User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  person      Person?    @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  @@index([treeId, createdAt])
 }
 
 model Person {
@@ -103,6 +151,8 @@ model Person {
   relationshipsFrom  Relationship[]     @relation("RelationshipFrom")
   relationshipsTo    Relationship[]     @relation("RelationshipTo")
   images             PersonImage[]
+  memberships        Membership[]
+  invitations        Invitation[]
 
   @@index([fullName])
 }

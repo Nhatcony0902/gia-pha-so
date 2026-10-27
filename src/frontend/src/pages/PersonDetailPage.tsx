@@ -15,6 +15,7 @@ import {
   Search,
   Trash2,
   Upload,
+  UserPlus,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -39,6 +40,7 @@ import {
   uploadPersonImage,
 } from "../features/family-tree/api";
 import { PersonSidebar } from "../features/family-tree/PersonSidebar";
+import { ShareDialog } from "../features/sharing/ShareDialog";
 import {
   compactDangerButtonClass,
   compactPrimaryButtonClass,
@@ -226,6 +228,7 @@ export function PersonDetailPage() {
     enabled: Boolean(candidateSidebar),
   });
   const [editing, setEditing] = useState(isCreating);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>(() =>
     isCreating ? { ...emptyForm } : {},
   );
@@ -924,6 +927,7 @@ export function PersonDetailPage() {
     );
   const person = query.data;
   const currentTree = person.visibleTrees.find((tree) => tree.id === treeId);
+  const canEdit = currentTree?.myRole === "ADMIN";
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-surface-page px-4 py-6 text-ink md:px-8">
       <div className="mx-auto w-full">
@@ -947,56 +951,67 @@ export function PersonDetailPage() {
           >
             <ArrowLeft size={18} /> Trở lại gia phả
           </Link>
-          <div className="flex gap-2">
-            {editing ? (
-              <>
+          {canEdit && (
+            <div className="flex gap-2">
+              {!editing && (
                 <button
                   type="button"
                   className={compactSecondaryButtonClass}
-                  onClick={() => {
-                    setForm(toForm(person));
-                    setEditing(false);
-                  }}
+                  onClick={() => setInviteOpen(true)}
                 >
-                  <X size={16} /> Hủy
+                  <UserPlus size={16} /> Mời người này
                 </button>
+              )}
+              {editing ? (
+                <>
+                  <button
+                    type="button"
+                    className={compactSecondaryButtonClass}
+                    onClick={() => {
+                      setForm(toForm(person));
+                      setEditing(false);
+                    }}
+                  >
+                    <X size={16} /> Hủy
+                  </button>
+                  <button
+                    type="button"
+                    className={compactPrimaryButtonClass}
+                    disabled={save.isPending}
+                    onClick={() => save.mutate()}
+                  >
+                    <Save size={16} />{" "}
+                    {save.isPending ? "Đang lưu…" : "Lưu thay đổi"}
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   className={compactPrimaryButtonClass}
-                  disabled={save.isPending}
-                  onClick={() => save.mutate()}
+                  onClick={() => setEditing(true)}
                 >
-                  <Save size={16} />{" "}
-                  {save.isPending ? "Đang lưu…" : "Lưu thay đổi"}
+                  <Edit3 size={16} /> Chỉnh sửa
                 </button>
-              </>
-            ) : (
+              )}
               <button
                 type="button"
-                className={compactPrimaryButtonClass}
-                onClick={() => setEditing(true)}
+                className={compactDangerButtonClass}
+                disabled={remove.isPending}
+                onClick={async () => {
+                  if (
+                    await notice.confirm(
+                      "Xóa thành viên",
+                      `Xóa ${person.fullName} khỏi gia phả và các quan hệ liên quan?`,
+                    )
+                  ) {
+                    remove.mutate();
+                  }
+                }}
               >
-                <Edit3 size={16} /> Chỉnh sửa
+                <Trash2 size={16} /> {remove.isPending ? "Đang xóa…" : "Xóa"}
               </button>
-            )}
-            <button
-              type="button"
-              className={compactDangerButtonClass}
-              disabled={remove.isPending}
-              onClick={async () => {
-                if (
-                  await notice.confirm(
-                    "Xóa thành viên",
-                    `Xóa ${person.fullName} khỏi gia phả và các quan hệ liên quan?`,
-                  )
-                ) {
-                  remove.mutate();
-                }
-              }}
-            >
-              <Trash2 size={16} /> {remove.isPending ? "Đang xóa…" : "Xóa"}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.65fr)]">
           <aside className="grid gap-5">
@@ -1123,23 +1138,25 @@ export function PersonDetailPage() {
                 <div>
                   <h2 className="m-0 font-display text-xl">Thư viện ảnh</h2>
                 </div>
-                <label
-                  className={`${compactPrimaryButtonClass} cursor-pointer`}
-                >
-                  <Upload size={16} /> {uploading ? "Đang tải…" : "Thêm ảnh"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    disabled={uploading}
-                    onChange={(event) =>
-                      Array.from(event.target.files ?? []).forEach(
-                        (file) => void upload(file, false),
-                      )
-                    }
-                  />
-                </label>
+                {canEdit && (
+                  <label
+                    className={`${compactPrimaryButtonClass} cursor-pointer`}
+                  >
+                    <Upload size={16} /> {uploading ? "Đang tải…" : "Thêm ảnh"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(event) =>
+                        Array.from(event.target.files ?? []).forEach(
+                          (file) => void upload(file, false),
+                        )
+                      }
+                    />
+                  </label>
+                )}
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {person.images.map((image) => (
@@ -1152,26 +1169,28 @@ export function PersonDetailPage() {
                       alt={image.caption ?? "Ảnh thành viên"}
                       className="size-full object-cover"
                     />
-                    <button
-                      type="button"
-                      aria-label="Xóa ảnh"
-                      onClick={async () => {
-                        if (
-                          await notice.confirm(
-                            "Xóa ảnh",
-                            "Ảnh sẽ bị xóa và không thể khôi phục.",
-                          )
-                        ) {
-                          await deletePersonImage(treeId, personId, image.id);
-                          await client.invalidateQueries({
-                            queryKey: ["person", treeId, personId],
-                          });
-                        }
-                      }}
-                      className="absolute top-2 right-2 grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        aria-label="Xóa ảnh"
+                        onClick={async () => {
+                          if (
+                            await notice.confirm(
+                              "Xóa ảnh",
+                              "Ảnh sẽ bị xóa và không thể khôi phục.",
+                            )
+                          ) {
+                            await deletePersonImage(treeId, personId, image.id);
+                            await client.invalidateQueries({
+                              queryKey: ["person", treeId, personId],
+                            });
+                          }
+                        }}
+                        className="absolute top-2 right-2 grid size-8 cursor-pointer place-items-center rounded-full border-0 bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </figure>
                 ))}
                 {!person.images.length && (
@@ -1217,6 +1236,15 @@ export function PersonDetailPage() {
           </div>
         </div>
       </div>
+      {inviteOpen && (
+        <ShareDialog
+          treeId={treeId}
+          treeName={currentTree?.name ?? "Gia phả"}
+          initialPersonId={person.id}
+          initialEmail={person.email}
+          onClose={() => setInviteOpen(false)}
+        />
+      )}
     </main>
   );
 }

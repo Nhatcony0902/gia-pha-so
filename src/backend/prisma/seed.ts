@@ -344,6 +344,11 @@ async function main() {
       createdById: admin.id,
     },
   });
+  await prisma.membership.upsert({
+    where: { treeId_userId: { treeId: TREE_ID, userId: admin.id } },
+    update: { role: "ADMIN" },
+    create: { treeId: TREE_ID, userId: admin.id, role: "ADMIN" },
+  });
   for (const person of people) {
     const data = {
       fullName: person.name,

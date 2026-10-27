@@ -141,22 +141,23 @@ export function AuthPage() {
       error instanceof ApiError && error.status === 429 ? "warning" : "error",
     );
   };
+  const returnTo = params.get("returnTo");
+  const safeReturnTo =
+    returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : null;
   const finishLogin = (result: AuthResponse, message: string) => {
     acceptSession(result);
     notifications.toast(message, "success");
-    const returnTo = params.get("returnTo");
-    navigate(
-      returnTo?.startsWith("/") && !returnTo.startsWith("//")
-        ? returnTo
-        : defaultAuthenticatedPath,
-      { replace: true },
-    );
+    navigate(safeReturnTo ?? defaultAuthenticatedPath, { replace: true });
   };
+  // Giữ returnTo khi đổi giữa đăng nhập/đăng ký, để người mở link mời quay lại đúng chỗ.
   const switchMode = (next: Mode) => {
     setRegisterEmail(null);
     setResetEmail(null);
     setResetToken(null);
-    setParams({ mode: next });
+    setParams({
+      mode: next,
+      ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+    });
   };
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -170,7 +171,7 @@ export function AuthPage() {
   };
 
   if (!isInitializing && isAuthenticated)
-    return <Navigate to={defaultAuthenticatedPath} replace />;
+    return <Navigate to={safeReturnTo ?? defaultAuthenticatedPath} replace />;
   return (
     <main className="relative grid min-h-[calc(100vh-4.5rem)] grid-cols-1 bg-[linear-gradient(135deg,#12211f,#1d3b34_62%,#315447)] text-content-primary min-[801px]:grid-cols-[minmax(0,1.15fr)_minmax(25rem,0.85fr)]">
       <Breadcrumbs
@@ -507,7 +508,7 @@ export function AuthPage() {
                   );
                   setResetToken(null);
                   setResetEmail(null);
-                  setParams({ mode: "login" });
+                  switchMode("login");
                 }),
               )}
             >

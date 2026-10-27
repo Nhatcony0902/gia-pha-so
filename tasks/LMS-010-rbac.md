@@ -1,6 +1,6 @@
 # LMS-010: Phân quyền Admin / Editor / Viewer
 
-- **Trạng thái:** Todo
+- **Trạng thái:** In Progress
 - **Owner:** Sơn + Quân
 - **Sprint:** Sprint 05
 - **Spec liên quan:** `specs/features.md` (D1)
@@ -24,3 +24,13 @@ Là Admin dòng họ, tôi muốn mời người khác và cấp quyền phù h�
 
 ## Ghi chú kỹ thuật
 Chốt các câu hỏi mở trong `specs/user-roles.md`.
+
+## Tiến độ
+- [x] Bảng `Membership` (vai trò theo từng gia phả) và `Invitation`. Migration tự gán người tạo gia phả cũ thành Admin
+- [x] Đọc gia phả theo Membership. Chỉ Admin ghi được, Viewer ghi nhận 403
+- [x] Link mời Viewer: tạo, xem trước công khai, chấp nhận, thu hồi, hết hạn, giới hạn lượt
+- [x] Admin xem và xóa người có quyền truy cập
+- [x] FE: hộp thoại "Chia sẻ", trang `/invite/:token`, ẩn nút sửa/xóa với Viewer
+- [x] Mời qua email, gắn tài khoản với Person khi chấp nhận (nút "Mời người này" ở trang hồ sơ)
+- [ ] Mời Editor qua email, đổi vai trò, giao nhánh cho Editor (cần LMS-011 để Editor đề xuất qua duyệt)
+- [ ] Người dùng tự nhận hồ sơ của mình khi không được mời kèm Person

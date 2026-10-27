@@ -240,8 +240,9 @@ export function PersonSidebar({
   loading: boolean;
   onClose: () => void;
   onSelectPerson: (personId: string) => void;
-  onDelete: () => void;
-  deleting: boolean;
+  /** Không truyền thì ẩn nút xóa (Viewer, hoặc nơi không cho xóa). */
+  onDelete?: () => void;
+  deleting?: boolean;
   placement?: "absolute" | "fixed";
 }) {
   const rows = person
@@ -334,22 +335,26 @@ export function PersonSidebar({
         )}
       </div>
       {!loading && person && (
-        <footer className="grid shrink-0 grid-cols-2 gap-2 border-t border-[#dae3de] bg-[#fbfcfb] pt-3">
+        <footer
+          className={`grid shrink-0 gap-2 border-t border-[#dae3de] bg-[#fbfcfb] pt-3 ${onDelete ? "grid-cols-2" : ""}`}
+        >
           <Link
             className={`${compactPrimaryButtonClass} px-2 text-center text-sm no-underline`}
             to={`/trees/${treeId}/persons/${person.id}`}
           >
             Xem chi tiết
           </Link>
-          <button
-            type="button"
-            className={`${compactDangerButtonClass} px-2 text-sm`}
-            onClick={onDelete}
-            disabled={deleting}
-          >
-            <Trash2 size={16} />
-            {deleting ? "Đang xóa…" : "Xóa"}
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className={`${compactDangerButtonClass} px-2 text-sm`}
+              onClick={onDelete}
+              disabled={deleting}
+            >
+              <Trash2 size={16} />
+              {deleting ? "Đang xóa…" : "Xóa"}
+            </button>
+          )}
         </footer>
       )}
     </aside>
@@ -362,6 +367,7 @@ type RelationshipSidebarProps = {
   onEdit: (relationship: PrimitiveRelationship) => void;
   onDelete: (relationship: PrimitiveRelationship) => void;
   deletingId?: string;
+  readOnly?: boolean;
 } & (
   | {
       type: "SPOUSE";
@@ -384,7 +390,8 @@ type RelationshipSidebarProps = {
 );
 
 export function RelationshipSidebar(props: RelationshipSidebarProps) {
-  const { onClose, onSelectPerson, onEdit, onDelete, deletingId } = props;
+  const { onClose, onSelectPerson, onEdit, onDelete, deletingId, readOnly } =
+    props;
   const relationshipActions = (item: PrimitiveRelationship) => (
     <div className="grid grid-cols-2 gap-2">
       <button
@@ -490,60 +497,62 @@ export function RelationshipSidebar(props: RelationshipSidebarProps) {
           </>
         )}
       </div>
-      <footer className="grid shrink-0 gap-2 border-t border-[#dae3de] bg-[#fbfcfb] pt-3">
-        {props.type === "PARENT_CHILD" && props.parents.length > 1 ? (
-          <>
-            <div className="grid grid-cols-2 gap-2">
-              {props.parents.map(({ person, relationship: parentRelationship }) => {
-                const role =
-                  person.gender === "MALE"
-                    ? "cha"
-                    : person.gender === "FEMALE"
-                      ? "mẹ"
-                      : "bố/mẹ";
-                return (
-                  <button
-                    key={parentRelationship.id}
-                    type="button"
-                    className={`${compactSecondaryButtonClass} min-h-9 px-2 py-1 text-xs`}
-                    onClick={() => onEdit(parentRelationship)}
-                  >
-                    <Pencil size={14} /> Sửa {role}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {props.parents.map(({ person, relationship: parentRelationship }) => {
-                const role =
-                  person.gender === "MALE"
-                    ? "cha"
-                    : person.gender === "FEMALE"
-                      ? "mẹ"
-                      : "bố/mẹ";
-                return (
-                  <button
-                    key={parentRelationship.id}
-                    type="button"
-                    className={`${compactDangerButtonClass} min-h-9 px-2 py-1 text-xs`}
-                    onClick={() => onDelete(parentRelationship)}
-                    disabled={deletingId === parentRelationship.id}
-                  >
-                    <Trash2 size={14} />
-                    {deletingId === parentRelationship.id
-                      ? "Đang xóa…"
-                      : `Xóa ${role}`}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : props.type === "PARENT_CHILD" && props.parents[0] ? (
-          relationshipActions(props.parents[0].relationship)
-        ) : props.relationship ? (
-          relationshipActions(props.relationship)
-        ) : null}
-      </footer>
+      {!readOnly && (
+        <footer className="grid shrink-0 gap-2 border-t border-[#dae3de] bg-[#fbfcfb] pt-3">
+          {props.type === "PARENT_CHILD" && props.parents.length > 1 ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {props.parents.map(({ person, relationship: parentRelationship }) => {
+                  const role =
+                    person.gender === "MALE"
+                      ? "cha"
+                      : person.gender === "FEMALE"
+                        ? "mẹ"
+                        : "bố/mẹ";
+                  return (
+                    <button
+                      key={parentRelationship.id}
+                      type="button"
+                      className={`${compactSecondaryButtonClass} min-h-9 px-2 py-1 text-xs`}
+                      onClick={() => onEdit(parentRelationship)}
+                    >
+                      <Pencil size={14} /> Sửa {role}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {props.parents.map(({ person, relationship: parentRelationship }) => {
+                  const role =
+                    person.gender === "MALE"
+                      ? "cha"
+                      : person.gender === "FEMALE"
+                        ? "mẹ"
+                        : "bố/mẹ";
+                  return (
+                    <button
+                      key={parentRelationship.id}
+                      type="button"
+                      className={`${compactDangerButtonClass} min-h-9 px-2 py-1 text-xs`}
+                      onClick={() => onDelete(parentRelationship)}
+                      disabled={deletingId === parentRelationship.id}
+                    >
+                      <Trash2 size={14} />
+                      {deletingId === parentRelationship.id
+                        ? "Đang xóa…"
+                        : `Xóa ${role}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : props.type === "PARENT_CHILD" && props.parents[0] ? (
+            relationshipActions(props.parents[0].relationship)
+          ) : props.relationship ? (
+            relationshipActions(props.relationship)
+          ) : null}
+        </footer>
+      )}
     </aside>
   );
 }

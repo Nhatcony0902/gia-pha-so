@@ -15,6 +15,7 @@ import {
   updateTree,
 } from "../features/family-tree/api";
 import { TreeFormDialog } from "../features/family-tree/ManagementDialogs";
+import { roleLabel } from "../features/sharing/api";
 import {
   compactDangerButtonClass,
   primaryButtonClass,
@@ -239,7 +240,7 @@ export function TreesPage() {
                 <strong className="text-content-primary">
                   {tree.personCount}
                 </strong>{" "}
-                thành viên
+                thành viên · Bạn là {roleLabel[tree.myRole].toLowerCase()}
               </span>
             </Link>
           ))}

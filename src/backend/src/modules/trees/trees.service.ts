@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -18,6 +19,7 @@ import type {
   PersonListResponse,
   PrimitiveRelationshipType,
   RelatedPerson,
+  TreeRole,
 } from "@family-tree/shared-types";
 import { PrismaService } from "../database/prisma.service.js";
 import type {
@@ -36,6 +38,12 @@ import {
 
 const iso = (value: Date | null) => value?.toISOString() ?? null;
 
+/** Kèm số người và vai trò của chính user trong gia phả, dùng cho `summary`. */
+const summaryInclude = (userId: string) => ({
+  _count: { select: { persons: true } },
+  memberships: { where: { userId }, select: { role: true } },
+});
+
 @Injectable()
 export class TreesService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -48,6 +56,7 @@ export class TreesService {
     originPlace: string | null;
     updatedAt: Date;
     _count: { persons: number };
+    memberships: { role: TreeRole }[];
   }): FamilyTreeSummary {
     return {
       id: tree.id,
@@ -57,6 +66,7 @@ export class TreesService {
       originPlace: tree.originPlace,
       personCount: tree._count.persons,
       updatedAt: tree.updatedAt.toISOString(),
+      myRole: tree.memberships[0]?.role ?? "VIEWER",
     };
   }
 
@@ -77,10 +87,11 @@ export class TreesService {
     };
   }
 
-  private async ownedTree(treeId: string, userId: string) {
+  /** Mọi thành viên của gia phả đều được đọc. Người ngoài nhận 404 để không lộ gia phả. */
+  private async readableTree(treeId: string, userId: string) {
     const tree = await this.prisma.familyTree.findFirst({
-      where: { id: treeId, createdById: userId },
-      include: { _count: { select: { persons: true } } },
+      where: { id: treeId, memberships: { some: { userId } } },
+      include: summaryInclude(userId),
     });
     if (!tree)
       throw new NotFoundException({
@@ -90,15 +101,30 @@ export class TreesService {
     return tree;
   }
 
+  /** Chỉ Admin được ghi trực tiếp. Editor sẽ đi qua luồng duyệt (LMS-011). */
+  private async writableTree(treeId: string, userId: string) {
+    const tree = await this.readableTree(treeId, userId);
+    if (tree.memberships[0]?.role !== "ADMIN")
+      throw new ForbiddenException({
+        code: "TREE_WRITE_FORBIDDEN",
+        message: "Bạn chỉ có quyền xem gia phả này",
+      });
+    return tree;
+  }
+
   async list(userId: string): Promise<FamilyTreeListResponse> {
     const trees = await this.prisma.familyTree.findMany({
-      where: { createdById: userId },
+      where: { memberships: { some: { userId } } },
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { persons: true } } },
+      include: summaryInclude(userId),
     });
     return {
-      createdByMe: trees.map((tree) => this.summary(tree)),
-      sharedWithMe: [],
+      createdByMe: trees
+        .filter((tree) => tree.createdById === userId)
+        .map((tree) => this.summary(tree)),
+      sharedWithMe: trees
+        .filter((tree) => tree.createdById !== userId)
+        .map((tree) => this.summary(tree)),
     };
   }
 
@@ -114,14 +140,15 @@ export class TreesService {
         ...body,
         name,
         createdById: userId,
+        memberships: { create: { userId, role: "ADMIN" } },
       },
-      include: { _count: { select: { persons: true } } },
+      include: summaryInclude(userId),
     });
     return this.summary(tree);
   }
 
   async updateTree(treeId: string, userId: string, body: UpdateTreeDto) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const name = body.name?.trim();
     if (body.name !== undefined && !name)
       throw new BadRequestException({
@@ -131,13 +158,13 @@ export class TreesService {
     const tree = await this.prisma.familyTree.update({
       where: { id: treeId },
       data: { ...body, ...(name ? { name } : {}) },
-      include: { _count: { select: { persons: true } } },
+      include: summaryInclude(userId),
     });
     return this.summary(tree);
   }
 
   async deleteTree(treeId: string, userId: string) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const memberships = await this.prisma.familyTreePerson.findMany({
       where: { treeId },
       select: { personId: true },
@@ -155,7 +182,7 @@ export class TreesService {
   }
 
   async graph(treeId: string, userId: string): Promise<FamilyTreeGraph> {
-    const tree = await this.ownedTree(treeId, userId);
+    const tree = await this.readableTree(treeId, userId);
     const [memberships, relationships] = await Promise.all([
       this.prisma.familyTreePerson.findMany({
         where: { treeId },
@@ -188,7 +215,7 @@ export class TreesService {
   }
 
   async persons(treeId: string, userId: string): Promise<PersonListResponse> {
-    const tree = await this.ownedTree(treeId, userId);
+    const tree = await this.readableTree(treeId, userId);
     const memberships = await this.prisma.familyTreePerson.findMany({
       where: { treeId },
       include: { person: true },
@@ -220,7 +247,7 @@ export class TreesService {
   }
 
   async createPerson(treeId: string, userId: string, body: CreatePersonDto) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const fullName = body.fullName?.trim();
     if (!fullName)
       throw new BadRequestException({
@@ -249,11 +276,11 @@ export class TreesService {
     treeId: string,
     userId: string,
   ): Promise<PersonLinkCandidatesResponse> {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const memberships = await this.prisma.familyTreePerson.findMany({
       where: {
         treeId: { not: treeId },
-        tree: { createdById: userId },
+        tree: { memberships: { some: { userId, role: "ADMIN" } } },
         person: { familyTrees: { none: { treeId } } },
       },
       include: {
@@ -298,7 +325,7 @@ export class TreesService {
   }
 
   async linkPerson(treeId: string, personId: string, userId: string) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const existing = await this.prisma.familyTreePerson.findUnique({
       where: { treeId_personId: { treeId, personId } },
     });
@@ -311,7 +338,7 @@ export class TreesService {
       where: {
         personId,
         treeId: { not: treeId },
-        tree: { createdById: userId },
+        tree: { memberships: { some: { userId, role: "ADMIN" } } },
       },
     });
     if (!sourceMembership)
@@ -452,7 +479,7 @@ export class TreesService {
     userId: string,
     body: CreateRelationshipDto,
   ) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const data = await this.normalizedRelationship(treeId, body);
     const relationship = await this.prisma.relationship.create({
       data: { treeId, ...data },
@@ -466,7 +493,7 @@ export class TreesService {
     userId: string,
     body: UpdateRelationshipDto,
   ) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const current = await this.prisma.relationship.findFirst({
       where: { id: relationshipId, treeId },
     });
@@ -510,7 +537,7 @@ export class TreesService {
     relationshipId: string,
     userId: string,
   ) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const deleted = await this.prisma.relationship.deleteMany({
       where: { id: relationshipId, treeId },
     });
@@ -527,7 +554,7 @@ export class TreesService {
     personId: string,
     userId: string,
   ): Promise<PersonSidebarDetail> {
-    await this.ownedTree(treeId, userId);
+    await this.readableTree(treeId, userId);
     const membership = await this.prisma.familyTreePerson.findUnique({
       where: { treeId_personId: { treeId, personId } },
       include: {
@@ -550,10 +577,8 @@ export class TreesService {
       spouseRelations,
     ] = await Promise.all([
       this.prisma.familyTreePerson.findMany({
-        where: { personId, tree: { createdById: userId } },
-        include: {
-          tree: { include: { _count: { select: { persons: true } } } },
-        },
+        where: { personId, tree: { memberships: { some: { userId } } } },
+        include: { tree: { include: summaryInclude(userId) } },
         orderBy: { tree: { updatedAt: "desc" } },
       }),
       this.prisma.relationship.findMany({
@@ -797,7 +822,7 @@ export class TreesService {
   }
 
   private async ownedPerson(treeId: string, personId: string, userId: string) {
-    await this.ownedTree(treeId, userId);
+    await this.writableTree(treeId, userId);
     const membership = await this.prisma.familyTreePerson.findUnique({
       where: { treeId_personId: { treeId, personId } },
       include: { person: true },
@@ -857,6 +882,15 @@ export class TreesService {
       });
       await tx.familyTreePerson.delete({
         where: { treeId_personId: { treeId, personId } },
+      });
+      // Person vẫn có thể còn ở gia phả khác, nên phải tự gỡ liên kết trong gia phả này.
+      await tx.membership.updateMany({
+        where: { treeId, personId },
+        data: { personId: null },
+      });
+      await tx.invitation.updateMany({
+        where: { treeId, personId },
+        data: { personId: null },
       });
       if ((await tx.familyTreePerson.count({ where: { personId } })) === 0)
         await tx.person.delete({ where: { id: personId } });
