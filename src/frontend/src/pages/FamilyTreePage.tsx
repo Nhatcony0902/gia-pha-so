@@ -341,8 +341,8 @@ export function FamilyTreePage({
   return (
     <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-surface-page text-ink">
       <PageBreadcrumbBar
-        headerClassName="z-3 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem]"
-        contentClassName="flex w-full flex-col items-start justify-between gap-4 min-[801px]:flex-row min-[801px]:items-center"
+        headerClassName="z-3 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5"
+        contentClassName="w-full justify-between gap-4"
         items={[
           { label: "Trang chủ", to: "/" },
           { label: "Danh sách gia phả", to: "/trees" },
@@ -439,7 +439,7 @@ export function FamilyTreePage({
               nodesDraggable={false}
               proOptions={{ hideAttribution: true }}
             >
-              <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-ink-strong shadow-[0_8px_24px_rgba(30,58,51,0.14)]">
+              <details className="absolute bottom-[0.8rem] left-[4.5rem] z-8 w-[min(14rem,calc(100%-1.6rem))] rounded-[0.6rem] border border-[#bdccc4] bg-[rgba(249,251,250,0.96)] text-ink-strong">
                 <summary className="cursor-pointer p-[0.65rem_0.8rem] text-[0.78rem] font-bold [list-style-position:inside]">
                   Chú thích quan hệ
                 </summary>

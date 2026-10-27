@@ -316,6 +316,9 @@ export interface EventGuest {
   name: string | null;
   avatarUrl: string | null;
   invitedAt: string;
+  status: "PENDING" | "ACCEPTED" | "DECLINED";
+  acceptedAt: string | null;
+  declinedAt: string | null;
 }
 
 export interface EventMedia {
@@ -350,6 +353,7 @@ export interface FamilyEventDetail {
   media: EventMedia[];
   canManage: boolean;
   canUploadMedia: boolean;
+  myInvitationStatus: "PENDING" | "ACCEPTED" | "DECLINED" | null;
 }
 
 export interface AddEventGuestsInput {

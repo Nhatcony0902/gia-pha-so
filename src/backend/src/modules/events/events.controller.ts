@@ -102,6 +102,24 @@ export class EventsController {
     );
   }
 
+  @Post("events/:eventId/guests/accept")
+  acceptGuest(
+    @Param("treeId") treeId: string,
+    @Param("eventId") eventId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.events.acceptGuest(treeId, eventId, request.user.userId);
+  }
+
+  @Post("events/:eventId/guests/decline")
+  declineGuest(
+    @Param("treeId") treeId: string,
+    @Param("eventId") eventId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.events.declineGuest(treeId, eventId, request.user.userId);
+  }
+
   @Post("events/:eventId/uploads/signature")
   uploadSignature(
     @Param("treeId") treeId: string,

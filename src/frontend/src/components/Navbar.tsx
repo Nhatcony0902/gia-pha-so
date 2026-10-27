@@ -136,7 +136,7 @@ export function Navbar() {
     <div ref={treeSelectorRef} className="relative min-w-0 shrink">
       <button
         type="button"
-        className="flex h-10 w-[clamp(10rem,20vw,16rem)] max-w-[calc(100vw-7rem)] cursor-pointer items-center gap-1.5 rounded-lg border border-white/50 bg-[rgba(18,38,33,0.58)] px-2.5 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition hover:border-white hover:bg-[rgba(18,38,33,0.82)] focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-10 w-[clamp(10rem,20vw,16rem)] max-w-[calc(100vw-7rem)] cursor-pointer items-center gap-1.5 rounded-lg border border-white/50 bg-[rgba(18,38,33,0.58)] px-2.5 text-left text-white outline-none transition-colors hover:border-white hover:bg-[rgba(18,38,33,0.82)] focus-visible:border-white disabled:cursor-not-allowed disabled:opacity-60"
         aria-label="Chuyển gia phả"
         aria-haspopup="menu"
         aria-controls="tree-selector-menu"
@@ -159,7 +159,7 @@ export function Navbar() {
           id="tree-selector-menu"
           role="menu"
           aria-label="Danh sách gia phả"
-          className="absolute top-[calc(100%+0.55rem)] left-0 z-50 w-full overflow-hidden rounded-xl border border-[#cad8d1] bg-[#f7faf8] p-2 text-ink shadow-[0_18px_50px_rgba(6,24,19,0.3)]"
+          className="absolute top-[calc(100%+0.55rem)] left-0 z-50 w-full overflow-hidden rounded-xl border border-[#cad8d1] bg-[#f7faf8] p-2 text-ink"
         >
           {trees.data?.createdByMe.length ? (
             <div className="mb-1 last:mb-0">
@@ -257,7 +257,9 @@ export function Navbar() {
         <GitFork size={16} /> Quan hệ
       </NavLink>
       <NavLink
-        className={menuItemClass}
+        className={({ isActive }) =>
+          menuItemClass({ isActive: isActive || treeView === "timeline" })
+        }
         to={`/trees/${treeId}/timeline`}
         onClick={() => setOpen(false)}
       >
@@ -316,7 +318,7 @@ export function Navbar() {
         </button>
         <div
           id="nav-actions"
-          className={`${open ? "flex" : "hidden"} absolute top-16 right-4 left-4 flex-col items-stretch gap-4 rounded-xl border border-outline bg-[#29483e] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.3)] min-[901px]:hidden`}
+          className={`${open ? "flex" : "hidden"} absolute top-16 right-4 left-4 flex-col items-stretch gap-4 rounded-xl border border-outline bg-[#29483e] p-4 min-[901px]:hidden`}
         >
           {treeNavigation}
           {accountActions}

@@ -352,6 +352,7 @@ async function main() {
   for (const person of people) {
     const data = {
       fullName: person.name,
+      email: `${person.key}@example.com`,
       aliases: person.aliases ?? [],
       gender: person.gender,
       birthDate: person.year ? yearDate(person.year) : null,
@@ -371,6 +372,31 @@ async function main() {
       },
       update: {},
       create: { treeId: TREE_ID, personId: personId(person.key) },
+    });
+    const member = await prisma.user.upsert({
+      where: { email: `${person.key}@example.com` },
+      update: {
+        name: person.name,
+        passwordHash,
+        emailVerifiedAt: new Date(),
+      },
+      create: {
+        id: `seed-user-${person.key}`,
+        email: `${person.key}@example.com`,
+        name: person.name,
+        passwordHash,
+        emailVerifiedAt: new Date(),
+      },
+    });
+    await prisma.membership.upsert({
+      where: { treeId_userId: { treeId: TREE_ID, userId: member.id } },
+      update: { role: "VIEWER", personId: personId(person.key) },
+      create: {
+        treeId: TREE_ID,
+        userId: member.id,
+        role: "VIEWER",
+        personId: personId(person.key),
+      },
     });
   }
   for (const [parent, child, order] of parentLinks) {

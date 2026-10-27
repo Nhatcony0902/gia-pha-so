@@ -141,7 +141,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           id: `birth-${person.id}`,
           kind: "BIRTH",
           category: "BIRTH",
-          title: `Ngày sinh · ${person.fullName}`,
+          title: person.fullName,
           description: null,
           location: person.birthPlace,
           startAt: person.birthDate.toISOString(),
@@ -155,7 +155,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           id: `death-${person.id}`,
           kind: "DEATH",
           category: "DEATH",
-          title: `Ngày mất · ${person.fullName}`,
+          title: person.fullName,
           description: null,
           location: person.deathPlace,
           startAt: person.deathDate.toISOString(),
@@ -267,6 +267,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         name: guest.user?.name ?? null,
         avatarUrl: guest.user?.avatarUrl ?? null,
         invitedAt: guest.invitedAt.toISOString(),
+        status: guest.declinedAt
+          ? ("DECLINED" as const)
+          : guest.acceptedAt
+            ? ("ACCEPTED" as const)
+            : ("PENDING" as const),
+        acceptedAt: iso(guest.acceptedAt),
+        declinedAt: iso(guest.declinedAt),
       })),
       media: event.media.map((media) => ({
         ...media,
@@ -274,6 +281,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       })),
       canManage,
       canUploadMedia: canManage && (event.endAt ?? event.startAt) <= new Date(),
+      myInvitationStatus: (() => {
+        const invitation = event.guests.find((guest) => guest.userId === userId);
+        if (invitation?.declinedAt) return "DECLINED" as const;
+        if (invitation?.acceptedAt) return "ACCEPTED" as const;
+        return invitation ? ("PENDING" as const) : null;
+      })(),
     };
   }
 
@@ -352,7 +365,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     await this.assertManager(treeId, userId);
     const event = await this.prisma.familyEvent.findFirst({
       where: { id: eventId, treeId },
-      select: { id: true },
+      select: { id: true, title: true, tree: { select: { name: true } } },
     });
     if (!event)
       throw new NotFoundException({
@@ -368,17 +381,172 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       where: { email: { in: emails }, memberships: { some: { treeId } } },
       select: { id: true, email: true },
     });
-    const userByEmail = new Map(
-      users.map((user) => [user.email.toLowerCase(), user.id]),
-    );
-    await this.prisma.eventGuest.createMany({
-      data: emails.map((email) => ({
-        eventId,
-        email,
-        userId: userByEmail.get(email),
-      })),
-      skipDuplicates: true,
+    const existing = await this.prisma.eventGuest.findMany({
+      where: { eventId, userId: { in: users.map((user) => user.id) } },
+      select: { userId: true, declinedAt: true },
     });
+    const existingUserIds = new Set(existing.map((guest) => guest.userId));
+    const invitees = users.filter((user) => !existingUserIds.has(user.id));
+    const declinedUserIds = new Set(
+      existing
+        .filter((guest) => guest.declinedAt)
+        .map((guest) => guest.userId),
+    );
+    const reinvitees = users.filter((user) => declinedUserIds.has(user.id));
+    const notificationRecipients = [...invitees, ...reinvitees];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventGuest.createMany({
+        data: invitees.map((user) => ({
+          eventId,
+          email: user.email.toLowerCase(),
+          userId: user.id,
+        })),
+        skipDuplicates: true,
+      });
+      await Promise.all(
+        reinvitees.map((user) =>
+          tx.eventGuest.updateMany({
+            where: { eventId, userId: user.id },
+            data: { acceptedAt: null, declinedAt: null, invitedAt: new Date() },
+          }),
+        ),
+      );
+      await Promise.all(
+        notificationRecipients.map((user) =>
+          tx.notification.upsert({
+            where: { userId_eventId: { userId: user.id, eventId } },
+            create: {
+              userId: user.id,
+              treeId,
+              eventId,
+              title: `Lời mời tham gia: ${event.title}`,
+              message: `${event.tree.name} mời bạn tham gia sự kiện. Mở thông báo để xác nhận.`,
+            },
+            update: {
+              title: `Lời mời tham gia: ${event.title}`,
+              message: `${event.tree.name} mời bạn tham gia sự kiện. Mở thông báo để xác nhận.`,
+              readAt: null,
+            },
+          }),
+        ),
+      );
+    });
+    return this.detail(treeId, eventId, userId);
+  }
+
+  async acceptGuest(treeId: string, eventId: string, userId: string) {
+    await this.treeAccess(treeId, userId);
+    const guest = await this.prisma.eventGuest.findFirst({
+      where: { eventId, userId, event: { treeId } },
+      select: {
+        id: true,
+        email: true,
+        acceptedAt: true,
+        user: { select: { name: true } },
+        event: {
+          select: {
+            title: true,
+            createdById: true,
+            tree: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!guest)
+      throw new NotFoundException({
+        code: "EVENT_INVITATION_NOT_FOUND",
+        message: "Không tìm thấy lời mời tham gia sự kiện",
+      });
+    if (!guest.acceptedAt)
+      await this.prisma.$transaction([
+        this.prisma.eventGuest.update({
+          where: { id: guest.id },
+          data: { acceptedAt: new Date(), declinedAt: null },
+        }),
+        this.prisma.notification.updateMany({
+          where: { userId, eventId },
+          data: { readAt: new Date() },
+        }),
+        this.prisma.notification.upsert({
+          where: {
+            userId_eventId: {
+              userId: guest.event.createdById,
+              eventId,
+            },
+          },
+          create: {
+            userId: guest.event.createdById,
+            treeId,
+            eventId,
+            title: `${guest.user?.name ?? guest.email} đã chấp nhận lời mời`,
+            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
+          },
+          update: {
+            title: `${guest.user?.name ?? guest.email} đã chấp nhận lời mời`,
+            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
+            readAt: null,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
+    return this.detail(treeId, eventId, userId);
+  }
+
+  async declineGuest(treeId: string, eventId: string, userId: string) {
+    await this.treeAccess(treeId, userId);
+    const guest = await this.prisma.eventGuest.findFirst({
+      where: { eventId, userId, event: { treeId } },
+      select: {
+        id: true,
+        email: true,
+        declinedAt: true,
+        user: { select: { name: true } },
+        event: {
+          select: {
+            title: true,
+            createdById: true,
+            tree: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!guest)
+      throw new NotFoundException({
+        code: "EVENT_INVITATION_NOT_FOUND",
+        message: "Không tìm thấy lời mời tham gia sự kiện",
+      });
+    if (!guest.declinedAt)
+      await this.prisma.$transaction([
+        this.prisma.eventGuest.update({
+          where: { id: guest.id },
+          data: { acceptedAt: null, declinedAt: new Date() },
+        }),
+        this.prisma.notification.updateMany({
+          where: { userId, eventId },
+          data: { readAt: new Date() },
+        }),
+        this.prisma.notification.upsert({
+          where: {
+            userId_eventId: {
+              userId: guest.event.createdById,
+              eventId,
+            },
+          },
+          create: {
+            userId: guest.event.createdById,
+            treeId,
+            eventId,
+            title: `${guest.user?.name ?? guest.email} đã từ chối lời mời`,
+            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
+          },
+          update: {
+            title: `${guest.user?.name ?? guest.email} đã từ chối lời mời`,
+            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
+            readAt: null,
+            createdAt: new Date(),
+          },
+        }),
+      ]);
     return this.detail(treeId, eventId, userId);
   }
 
@@ -389,14 +557,55 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     userId: string,
   ) {
     await this.assertManager(treeId, userId);
-    const result = await this.prisma.eventGuest.deleteMany({
+    const guest = await this.prisma.eventGuest.findFirst({
       where: { id: guestId, eventId, event: { treeId } },
+      select: {
+        id: true,
+        userId: true,
+        acceptedAt: true,
+        declinedAt: true,
+        event: {
+          select: {
+            title: true,
+            tree: { select: { name: true } },
+          },
+        },
+      },
     });
-    if (!result.count)
+    if (!guest)
       throw new NotFoundException({
         code: "EVENT_GUEST_NOT_FOUND",
         message: "Không tìm thấy người được mời",
       });
+
+    const invitationPending = !guest.acceptedAt && !guest.declinedAt;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.eventGuest.delete({ where: { id: guest.id } });
+      if (guest.userId) {
+        const title = invitationPending
+          ? `Lời mời đã được thu hồi: ${guest.event.title}`
+          : `Bạn đã bị xóa khỏi sự kiện: ${guest.event.title}`;
+        const message = invitationPending
+          ? `${guest.event.tree.name} đã thu hồi lời mời tham gia sự kiện.`
+          : `${guest.event.tree.name} đã xóa bạn khỏi danh sách người tham gia.`;
+        await tx.notification.upsert({
+          where: { userId_eventId: { userId: guest.userId, eventId } },
+          create: {
+            userId: guest.userId,
+            treeId,
+            eventId,
+            title,
+            message,
+          },
+          update: {
+            title,
+            message,
+            readAt: null,
+            createdAt: new Date(),
+          },
+        });
+      }
+    });
     return { success: true as const };
   }
 

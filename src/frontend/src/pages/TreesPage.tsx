@@ -158,8 +158,6 @@ export function TreesPage() {
         eyebrowClassName="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase"
         title="Gia phả của bạn"
         titleClassName="my-[0.7rem] font-display text-[clamp(1.9rem,3vw,2.8rem)] leading-tight font-semibold"
-        description="Chọn một gia phả để khám phá các thế hệ và mối quan hệ."
-        descriptionClassName="m-0 text-base text-content-secondary"
       />
       <section className="mt-9" aria-labelledby="owned-trees-title">
         <div className={sectionHeadingClass}>

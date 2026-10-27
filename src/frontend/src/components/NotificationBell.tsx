@@ -108,7 +108,7 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <section className="absolute top-[calc(100%+0.65rem)] right-0 z-60 w-[min(26rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-[#c9d7d0] bg-[#f9fbfa] text-ink shadow-[0_20px_60px_rgba(3,18,14,0.34)]">
+        <section className="absolute top-[calc(100%+0.65rem)] right-0 z-60 w-[min(26rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-[#c9d7d0] bg-[#f9fbfa] text-ink">
           <header className="flex items-center justify-between border-b border-border-default px-4 py-3">
             <div>
               <h2 className="m-0 font-display text-lg">Thông báo</h2>

@@ -1,42 +1,58 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { FamilyEventInput } from "@family-tree/shared-types";
+import type {
+  EventCategory,
+  FamilyEventDetail,
+  FamilyEventInput,
+} from "@family-tree/shared-types";
 import {
-  CalendarClock,
+  CalendarPlus,
+  Check,
+  Clock3,
   Download,
   FileText,
   Image as ImageIcon,
-  Mail,
-  MapPin,
   Pencil,
+  Save,
   Search,
+  Send,
   Trash2,
+  Undo2,
   Upload,
-  UserPlus,
   Users,
+  UserPlus,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { PageBreadcrumbBar } from "../components/PageHeader";
+import { PageBreadcrumbBar, PageHeading } from "../components/PageHeader";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import {
   addEventGuests,
   addEventMedia,
+  acceptEventInvitation,
+  createEvent,
   deleteEvent,
   deleteEventGuest,
   deleteEventMedia,
+  declineEventInvitation,
   getEvent,
+  getTimeline,
   updateEvent,
   uploadEventFile,
 } from "../features/events/api";
-import { categoryLabel, categoryTone } from "../features/events/constants";
-import { EventFormDialog } from "../features/events/EventFormDialog";
+import { eventCategories } from "../features/events/constants";
 import { getTreeMembers } from "../features/sharing/api";
+import { getTreePersons } from "../features/family-tree/api";
+import { StyledCheckbox } from "../features/family-tree/ListFilterControls";
 import {
   compactDangerButtonClass,
   compactPrimaryButtonClass,
   compactSecondaryButtonClass,
   formFieldClass,
+  formInputClass,
+  formLabelClass,
+  formSelectClass,
+  formTextareaClass,
   surfaceCardClass,
 } from "../lib/ui-classes";
 
@@ -44,30 +60,109 @@ const dateTime = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "full",
   timeStyle: "short",
 });
-const shortDate = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" });
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Vui lòng thử lại";
 
+type EventFormState = {
+  title: string;
+  category: EventCategory;
+  description: string;
+  location: string;
+  isAllDay: boolean;
+  startAt: string;
+  endAt: string;
+};
+
+const localInputValue = (value?: string | null, allDay = false) => {
+  if (!value) return "";
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return allDay
+    ? day
+    : `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const toIso = (value: string, allDay: boolean) =>
+  new Date(allDay ? `${value}T00:00:00` : value).toISOString();
+
+const emptyForm: EventFormState = {
+  title: "",
+  category: "DEATH_ANNIVERSARY",
+  description: "",
+  location: "",
+  isAllDay: false,
+  startAt: "",
+  endAt: "",
+};
+
+const toForm = (event: FamilyEventDetail): EventFormState => ({
+  title: event.title,
+  category: event.category,
+  description: event.description ?? "",
+  location: event.location ?? "",
+  isAllDay: event.isAllDay,
+  startAt: localInputValue(event.startAt, event.isAllDay),
+  endAt: localInputValue(event.endAt, event.isAllDay),
+});
+
+const toPayload = (form: EventFormState): FamilyEventInput => ({
+  title: form.title.trim(),
+  category: form.category,
+  description: form.description.trim() || null,
+  location: form.location.trim() || null,
+  startAt: toIso(form.startAt, form.isAllDay),
+  endAt: form.endAt ? toIso(form.endAt, form.isAllDay) : null,
+  isAllDay: form.isAllDay,
+});
+
 export function EventDetailPage() {
   const { treeId = "", eventId = "" } = useParams();
+  const isCreating = eventId === "new";
   const navigate = useNavigate();
   const client = useQueryClient();
   const notice = useNotifications();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [editing, setEditing] = useState(false);
-  const [email, setEmail] = useState("");
+  const guestPickerRef = useRef<HTMLDivElement>(null);
+  const [editing, setEditing] = useState(isCreating);
+  const [form, setForm] = useState<EventFormState>(() => ({ ...emptyForm }));
+  const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [selectedGuestEmails, setSelectedGuestEmails] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const event = useQuery({
     queryKey: ["event", treeId, eventId],
     queryFn: () => getEvent(treeId, eventId),
-    enabled: Boolean(treeId && eventId),
+    enabled: Boolean(treeId && eventId && !isCreating),
+  });
+  const creationContext = useQuery({
+    queryKey: ["timeline", treeId],
+    queryFn: () => getTimeline(treeId),
+    enabled: Boolean(treeId && isCreating),
   });
   const members = useQuery({
     queryKey: ["tree-members", treeId],
     queryFn: () => getTreeMembers(treeId),
     enabled: Boolean(event.data?.canManage),
   });
+  const persons = useQuery({
+    queryKey: ["tree-persons", treeId],
+    queryFn: () => getTreePersons(treeId),
+    enabled: Boolean(event.data?.canManage),
+  });
+  useEffect(() => {
+    if (event.data) setForm(toForm(event.data));
+  }, [event.data]);
+  useEffect(() => {
+    if (!guestPickerOpen) return;
+    const close = (pointerEvent: PointerEvent) => {
+      if (!guestPickerRef.current?.contains(pointerEvent.target as Node)) {
+        setGuestPickerOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [guestPickerOpen]);
   const refresh = async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["event", treeId, eventId] }),
@@ -84,13 +179,24 @@ export function EventDetailPage() {
     },
     onError: (error) => notice.alert("Không thể cập nhật", errorText(error)),
   });
+  const create = useMutation({
+    mutationFn: (body: FamilyEventInput) => createEvent(treeId, body),
+    onSuccess: async ({ id }) => {
+      await client.invalidateQueries({ queryKey: ["timeline", treeId] });
+      notice.toast("Đã tạo sự kiện", "success");
+      navigate(`/trees/${treeId}/events/${id}`, { replace: true });
+      setEditing(false);
+    },
+    onError: (error) => notice.alert("Không thể tạo sự kiện", errorText(error)),
+  });
   const addGuests = useMutation({
     mutationFn: (emails: string[]) =>
       addEventGuests(treeId, eventId, { emails }),
     onSuccess: async () => {
       await refresh();
-      setEmail("");
-      notice.toast("Đã cập nhật danh sách khách mời", "success");
+      setSelectedGuestEmails([]);
+      setGuestPickerOpen(false);
+      notice.toast("Đã gửi lời mời tham gia sự kiện", "success");
     },
     onError: (error) =>
       notice.alert("Không thể thêm khách mời", errorText(error)),
@@ -100,6 +206,41 @@ export function EventDetailPage() {
     onSuccess: refresh,
     onError: (error) =>
       notice.alert("Không thể xóa khách mời", errorText(error)),
+  });
+  const confirmGuestRemoval = async (guest: FamilyEventDetail["guests"][number]) => {
+    const pending = guest.status === "PENDING";
+    const confirmed = await notice.confirm(
+      pending ? "Thu hồi lời mời?" : "Xóa người khỏi sự kiện?",
+      pending
+        ? `Lời mời gửi đến ${guest.email} sẽ bị thu hồi.`
+        : `${guest.name ?? guest.email} sẽ bị xóa khỏi danh sách người tham gia.`,
+    );
+    if (confirmed) removeGuest.mutate(guest.id);
+  };
+  const reinviteGuest = async (guest: FamilyEventDetail["guests"][number]) => {
+    const confirmed = await notice.confirm(
+      "Mời lại thành viên?",
+      `Một thông báo mời tham gia mới sẽ được gửi đến ${guest.email}.`,
+    );
+    if (confirmed) addGuests.mutate([guest.email]);
+  };
+  const acceptInvitation = useMutation({
+    mutationFn: () => acceptEventInvitation(treeId, eventId),
+    onSuccess: async () => {
+      await refresh();
+      notice.toast("Bạn đã chấp nhận tham gia sự kiện", "success");
+    },
+    onError: (error) =>
+      notice.alert("Không thể chấp nhận lời mời", errorText(error)),
+  });
+  const declineInvitation = useMutation({
+    mutationFn: () => declineEventInvitation(treeId, eventId),
+    onSuccess: async () => {
+      await refresh();
+      notice.toast("Bạn đã từ chối lời mời tham gia sự kiện", "success");
+    },
+    onError: (error) =>
+      notice.alert("Không thể từ chối lời mời", errorText(error)),
   });
   const removeMedia = useMutation({
     mutationFn: (mediaId: string) => deleteEventMedia(treeId, eventId, mediaId),
@@ -140,30 +281,91 @@ export function EventDetailPage() {
       ),
     [members.data?.members, event.data?.guests],
   );
-  const availableMembers = useMemo(() => {
-    const keyword = memberSearch.trim().toLowerCase();
-    return uninvitedMembers.filter(
-      (member) =>
-        !keyword ||
-        `${member.name} ${member.email}`.toLowerCase().includes(keyword),
+  const selectedMembers = useMemo(() => {
+    const selected = new Set(selectedGuestEmails);
+    return uninvitedMembers.filter((member) => selected.has(member.email));
+  }, [selectedGuestEmails, uninvitedMembers]);
+  const invitationOptions = useMemo(() => {
+    const accountMembers = members.data?.members ?? [];
+    const invited = new Set(
+      (event.data?.guests ?? []).map((guest) => guest.email.toLowerCase()),
     );
-  }, [uninvitedMembers, memberSearch]);
+    const keyword = memberSearch.trim().toLowerCase();
+    return (persons.data?.persons ?? [])
+      .map((person) => {
+        const account = accountMembers.find(
+          (member) =>
+            member.person?.id === person.id ||
+            (person.email != null &&
+              member.email.toLowerCase() === person.email.toLowerCase()),
+        );
+        return {
+          id: person.id,
+          name: person.preferredName?.trim() || person.fullName,
+          email: account?.email ?? person.email,
+          inviteEmail: account?.email ?? null,
+          avatarUrl: person.avatarUrl ?? account?.avatarUrl ?? null,
+          fullName: person.fullName,
+        };
+      })
+      .filter(
+        (person) =>
+          !person.inviteEmail ||
+          !invited.has(person.inviteEmail.toLowerCase()),
+      )
+      .filter(
+        (person) =>
+          !keyword ||
+          `${person.name} ${person.fullName} ${person.email ?? ""}`
+            .toLowerCase()
+            .includes(keyword),
+      );
+  }, [
+    members.data?.members,
+    persons.data?.persons,
+    event.data?.guests,
+    memberSearch,
+  ]);
+  const availableInviteEmails = invitationOptions.flatMap((person) =>
+    person.inviteEmail ? [person.inviteEmail] : [],
+  );
+  const allAvailableSelected =
+    availableInviteEmails.length > 0 &&
+    availableInviteEmails.every((email) => selectedGuestEmails.includes(email));
+  const toggleAllAvailable = () => {
+    const availableEmails = new Set(availableInviteEmails);
+    setSelectedGuestEmails((current) =>
+      allAvailableSelected
+        ? current.filter((emailAddress) => !availableEmails.has(emailAddress))
+        : [...new Set([...current, ...availableEmails])],
+    );
+  };
   const images =
     event.data?.media.filter((item) => item.type === "IMAGE") ?? [];
   const documents =
     event.data?.media.filter((item) => item.type === "DOCUMENT") ?? [];
 
-  if (event.isLoading)
+  const pageLoading = isCreating ? creationContext.isLoading : event.isLoading;
+  const pageError = isCreating
+    ? creationContext.isError ||
+      (creationContext.data != null && !creationContext.data.canManage)
+    : event.isError || !event.data;
+
+  if (pageLoading)
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-surface-page p-6 text-ink-muted">
         Đang tải sự kiện…
       </main>
     );
-  if (event.isError || !event.data)
+  if (pageError)
     return (
       <main className="min-h-[calc(100vh-4rem)] bg-surface-page p-6 text-ink">
         <section className={`${surfaceCardClass} mx-auto max-w-3xl p-6`}>
-          <h1 className="font-display text-xl">Không thể mở sự kiện</h1>
+          <h1 className="font-display text-xl">
+            {isCreating
+              ? "Bạn không có quyền tạo sự kiện"
+              : "Không thể mở sự kiện"}
+          </h1>
           <button
             className={compactSecondaryButtonClass}
             onClick={() => navigate(`/trees/${treeId}/timeline`)}
@@ -174,11 +376,35 @@ export function EventDetailPage() {
       </main>
     );
   const detail = event.data;
-  const submitEmail = (formEvent: FormEvent) => {
+  const guestGroups = (
+    [
+      ["ACCEPTED", "Đã chấp nhận"],
+      ["PENDING", "Chờ xác nhận"],
+      ["DECLINED", "Đã từ chối"],
+    ] as const
+  ).map(([status, label]) => ({
+    status,
+    label,
+    guests: (detail?.guests ?? []).filter((guest) => guest.status === status),
+  }));
+  const treeName =
+    detail?.treeName ?? creationContext.data?.tree.name ?? "Gia phả";
+  const canManage = isCreating ? true : Boolean(detail?.canManage);
+  const saveDetails = (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
-    if (email.trim()) addGuests.mutate([email.trim()]);
+    if (!form.title.trim() || !form.startAt) return;
+    const payload = toPayload(form);
+    if (isCreating) create.mutate(payload);
+    else update.mutate(payload);
   };
+  const toggleGuest = (email: string) =>
+    setSelectedGuestEmails((current) =>
+      current.includes(email)
+        ? current.filter((item) => item !== email)
+        : [...current, email],
+    );
   const removeEvent = async () => {
+    if (!detail) return;
     if (
       !(await notice.confirm(
         "Xóa sự kiện?",
@@ -196,84 +422,280 @@ export function EventDetailPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-surface-page px-4 py-5 text-ink md:px-6">
-      <div className="mx-auto max-w-[92rem]">
+    <main className="min-h-[calc(100vh-4.5rem)] bg-surface-page px-4 py-6 text-ink md:px-8">
+      <div className="mx-auto w-full">
         <PageBreadcrumbBar
           items={[
+            { label: "Trang chủ", to: "/" },
             { label: "Danh sách gia phả", to: "/trees" },
-            { label: detail.treeName, to: `/trees/${treeId}/tree` },
+            { label: treeName, to: `/trees/${treeId}/tree` },
             { label: "Dòng thời gian", to: `/trees/${treeId}/timeline` },
-            { label: detail.title },
+            { label: isCreating ? "Thêm sự kiện" : detail?.title ?? "Sự kiện" },
           ]}
-          headerClassName="mb-4"
-          contentClassName="flex items-center"
-        />
-        <header className={`${surfaceCardClass} mb-4 overflow-hidden`}>
-          <div
-            className="h-1.5"
-            style={{ background: categoryTone[detail.category] }}
-          />
-          <div className="flex flex-wrap items-start justify-between gap-4 p-5">
-            <div className="min-w-0">
-              <span className="inline-flex rounded-full bg-[#edf3ef] px-2.5 py-1 text-[0.7rem] font-bold text-ink-soft">
-                {categoryLabel[detail.category]}
-              </span>
-              <h1 className="mt-2 mb-2 font-display text-2xl md:text-3xl">
-                {detail.title}
-              </h1>
-              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-muted">
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarClock size={15} />
-                  {detail.isAllDay
-                    ? shortDate.format(new Date(detail.startAt))
-                    : dateTime.format(new Date(detail.startAt))}
-                  {detail.endAt
-                    ? ` – ${detail.isAllDay ? shortDate.format(new Date(detail.endAt)) : dateTime.format(new Date(detail.endAt))}`
-                    : ""}
-                </span>
-                {detail.location && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <MapPin size={15} />
-                    {detail.location}
-                  </span>
-                )}
-              </div>
+          headerClassName="z-3 -mx-4 -mt-6 mb-5 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 md:-mx-8"
+        >
+          {canManage && (
+            <div className="flex w-full flex-wrap items-center gap-2 min-[801px]:w-auto">
+              {editing ? (
+                <>
+                  <button
+                    type="button"
+                    className={compactSecondaryButtonClass}
+                    onClick={() => {
+                      if (isCreating) {
+                        navigate(`/trees/${treeId}/timeline`);
+                        return;
+                      }
+                      if (detail) setForm(toForm(detail));
+                      setEditing(false);
+                    }}
+                  >
+                    <X size={15} /> Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    form="event-details-form"
+                    className={compactPrimaryButtonClass}
+                    disabled={
+                      create.isPending ||
+                      update.isPending ||
+                      !form.title.trim() ||
+                      !form.startAt
+                    }
+                  >
+                    {isCreating ? (
+                      <CalendarPlus size={15} />
+                    ) : (
+                      <Save size={15} />
+                    )}
+                    {create.isPending || update.isPending
+                      ? "Đang lưu…"
+                      : isCreating
+                        ? "Tạo sự kiện"
+                        : "Lưu thay đổi"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={compactSecondaryButtonClass}
+                    onClick={() => setEditing(true)}
+                  >
+                    <Pencil size={15} /> Chỉnh sửa
+                  </button>
+                  <button
+                    type="button"
+                    className={compactDangerButtonClass}
+                    onClick={() => void removeEvent()}
+                  >
+                    <Trash2 size={15} /> Xóa
+                  </button>
+                </>
+              )}
             </div>
-            {detail.canManage && (
-              <div className="flex gap-2">
+          )}
+        </PageBreadcrumbBar>
+        <PageHeading
+          title={isCreating ? "Thêm sự kiện" : "Chi tiết sự kiện"}
+          className="mb-5"
+        />
+        {detail?.myInvitationStatus && (
+          <section className={`${surfaceCardClass} mb-5 flex flex-wrap items-center justify-between gap-3 p-4`}>
+            <div>
+              <h2 className="m-0 font-display text-base">
+                {detail.myInvitationStatus === "PENDING"
+                  ? "Bạn được mời tham gia sự kiện này"
+                  : detail.myInvitationStatus === "ACCEPTED"
+                    ? "Bạn đã chấp nhận lời mời"
+                    : "Bạn đã từ chối lời mời"}
+              </h2>
+              <p className="mt-1 mb-0 text-sm text-ink-muted">
+                {detail.myInvitationStatus === "PENDING"
+                  ? "Xác nhận để tham gia cùng gia đình."
+                  : detail.myInvitationStatus === "ACCEPTED"
+                    ? "Trạng thái tham gia: Đã chấp nhận."
+                    : "Trạng thái tham gia: Đã từ chối."}
+              </p>
+            </div>
+            {detail.myInvitationStatus === "PENDING" && (
+              <div className="flex flex-wrap gap-2">
                 <button
+                  type="button"
                   className={compactSecondaryButtonClass}
-                  onClick={() => setEditing(true)}
+                  disabled={declineInvitation.isPending}
+                  onClick={() => declineInvitation.mutate()}
                 >
-                  <Pencil size={15} /> Sửa
+                  <X size={15} />
+                  {declineInvitation.isPending ? "Đang từ chối…" : "Từ chối"}
                 </button>
                 <button
-                  className={compactDangerButtonClass}
-                  onClick={() => void removeEvent()}
+                  type="button"
+                  className={compactPrimaryButtonClass}
+                  disabled={acceptInvitation.isPending}
+                  onClick={() => acceptInvitation.mutate()}
                 >
-                  <Trash2 size={15} /> Xóa
+                  <Check size={15} />
+                  {acceptInvitation.isPending ? "Đang xác nhận…" : "Chấp nhận lời mời"}
                 </button>
               </div>
             )}
-          </div>
-        </header>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)]">
-          <div className="grid content-start gap-4">
-            <section className={`${surfaceCardClass} p-5`}>
-              <h2 className="mt-0 mb-3 font-display text-lg">
-                Thông tin sự kiện
-              </h2>
-              <p className="m-0 whitespace-pre-wrap text-sm leading-6 text-ink-muted">
-                {detail.description || "Chưa có mô tả cho sự kiện này."}
-              </p>
-              <p className="mt-4 mb-0 border-t border-border-default pt-3 text-xs text-ink-subtle">
-                Tạo bởi {detail.createdBy.name} · cập nhật{" "}
-                {dateTime.format(new Date(detail.updatedAt))}
-              </p>
+          </section>
+        )}
+        <div className="grid items-start gap-5 min-[801px]:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.95fr)]">
+          <div className="grid content-start gap-5">
+            <section className={surfaceCardClass}>
+              <div className="p-5">
+                <form
+                  id="event-details-form"
+                  className="grid gap-4"
+                  onSubmit={saveDetails}
+                >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className={formLabelClass}>
+                        Tên sự kiện
+                        <input
+                          className={formInputClass}
+                          disabled={!editing}
+                          required
+                          maxLength={200}
+                          value={form.title}
+                          onChange={(input) =>
+                            setForm((current) => ({
+                              ...current,
+                              title: input.target.value,
+                            }))
+                          }
+                          placeholder="Ví dụ: Giỗ họ năm 2027"
+                          autoFocus={isCreating}
+                        />
+                      </label>
+                      <label className={formLabelClass}>
+                        Phân loại
+                        <select
+                          className={formSelectClass}
+                          disabled={!editing}
+                          value={form.category}
+                          onChange={(input) =>
+                            setForm((current) => ({
+                              ...current,
+                              category: input.target.value as EventCategory,
+                            }))
+                          }
+                        >
+                          {eventCategories.map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-ink-label">
+                      <input
+                        type="checkbox"
+                        disabled={!editing}
+                        checked={form.isAllDay}
+                        onChange={(input) => {
+                          const checked = input.target.checked;
+                          setForm((current) => ({
+                            ...current,
+                            isAllDay: checked,
+                            startAt: current.startAt
+                              ? localInputValue(
+                                  toIso(current.startAt, current.isAllDay),
+                                  checked,
+                                )
+                              : "",
+                            endAt: current.endAt
+                              ? localInputValue(
+                                  toIso(current.endAt, current.isAllDay),
+                                  checked,
+                                )
+                              : "",
+                          }));
+                        }}
+                      />
+                      Sự kiện cả ngày
+                    </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className={formLabelClass}>
+                        Bắt đầu
+                        <input
+                          className={formInputClass}
+                          disabled={!editing}
+                          required
+                          type={form.isAllDay ? "date" : "datetime-local"}
+                          value={form.startAt}
+                          onChange={(input) =>
+                            setForm((current) => ({
+                              ...current,
+                              startAt: input.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className={formLabelClass}>
+                        Kết thúc (không bắt buộc)
+                        <input
+                          className={formInputClass}
+                          disabled={!editing}
+                          type={form.isAllDay ? "date" : "datetime-local"}
+                          min={form.startAt || undefined}
+                          value={form.endAt}
+                          onChange={(input) =>
+                            setForm((current) => ({
+                              ...current,
+                              endAt: input.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <label className={formLabelClass}>
+                      Địa điểm
+                      <input
+                        className={formInputClass}
+                        disabled={!editing}
+                        maxLength={500}
+                        value={form.location}
+                        onChange={(input) =>
+                          setForm((current) => ({
+                            ...current,
+                            location: input.target.value,
+                          }))
+                        }
+                        placeholder="Nhà thờ họ, địa chỉ…"
+                      />
+                    </label>
+                    <label className={formLabelClass}>
+                      Mô tả
+                      <textarea
+                        className={`${formTextareaClass} min-h-28`}
+                        disabled={!editing}
+                        maxLength={5000}
+                        value={form.description}
+                        onChange={(input) =>
+                          setForm((current) => ({
+                            ...current,
+                            description: input.target.value,
+                          }))
+                        }
+                        placeholder="Nội dung, chương trình, lưu ý cho người tham gia…"
+                      />
+                    </label>
+                </form>
+                {detail && !editing && (
+                  <p className="mt-4 mb-0 border-t border-border-default pt-4 text-xs text-ink-subtle">
+                    Tạo bởi {detail.createdBy.name} · cập nhật{" "}
+                    {dateTime.format(new Date(detail.updatedAt))}
+                  </p>
+                )}
+              </div>
             </section>
 
-            <section className={`${surfaceCardClass} p-5`}>
+            {detail ? (
+              <section className={`${surfaceCardClass} p-5`}>
               <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="m-0 font-display text-lg">Ảnh & tài liệu</h2>
@@ -392,141 +814,304 @@ export function EventDetailPage() {
                   ))}
                 </div>
               )}
-            </section>
+              </section>
+            ) : (
+              <section className={`${surfaceCardClass} p-5`}>
+                <h2 className="mt-0 mb-3 font-display text-lg">
+                  Ảnh & tài liệu
+                </h2>
+                <p className="m-0 text-sm text-ink-muted">
+                  Bạn có thể tải tư liệu lên sau khi tạo sự kiện.
+                </p>
+              </section>
+            )}
           </div>
 
-          <aside className={`${surfaceCardClass} self-start p-5`}>
-            <div className="mb-4 flex items-center justify-between">
+          {detail ? (
+            <aside className={`${surfaceCardClass} self-start p-5`}>
+            <div className="mb-4 flex items-center">
               <h2 className="m-0 flex items-center gap-2 font-display text-lg">
-                <Users size={18} /> Người được mời
+                <Users size={18} /> Người được mời ({detail.guests.length})
               </h2>
-              <span className="rounded-full bg-[#e4eee9] px-2 py-0.5 text-xs font-bold">
-                {detail.guests.length}
-              </span>
             </div>
             {detail.canManage && (
-              <div className="mb-4 grid gap-3 border-b border-border-default pb-4">
-                <form className="flex gap-2" onSubmit={submitEmail}>
-                  <input
-                    className={`${formFieldClass} min-w-0 py-2 text-sm`}
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(input) => setEmail(input.target.value)}
-                    placeholder="Thêm email bất kỳ"
+              <div className="mb-4 grid gap-3">
+                <div ref={guestPickerRef} className="relative">
+                  <Search
+                    className="absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-subtle"
+                    size={14}
                   />
+                  <input
+                    className={`${formFieldClass} py-2 pl-8 text-sm`}
+                    type="search"
+                    aria-label="Tìm tên hoặc email trong gia phả"
+                    aria-expanded={guestPickerOpen}
+                    aria-controls="event-guest-picker"
+                    value={memberSearch}
+                    onFocus={() => setGuestPickerOpen(true)}
+                    onChange={(input) => {
+                      setMemberSearch(input.target.value);
+                      setGuestPickerOpen(true);
+                    }}
+                    placeholder="Tìm tên hoặc email…"
+                  />
+                  {guestPickerOpen && (
+                    <div
+                      id="event-guest-picker"
+                      className="absolute top-full left-0 z-30 mt-2 flex max-h-96 w-full min-w-0 flex-col rounded-xl border border-border-control bg-white p-2 shadow-xl"
+                    >
+                      <div className="grid min-h-0 gap-1 overflow-y-auto">
+                        <StyledCheckbox
+                          className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-surface-hover"
+                          checked={allAvailableSelected}
+                          indeterminate={
+                            selectedGuestEmails.some((email) =>
+                              availableInviteEmails.includes(email),
+                            ) && !allAvailableSelected
+                          }
+                          disabled={!availableInviteEmails.length}
+                          onChange={toggleAllAvailable}
+                          label={`Chọn tất cả email (${availableInviteEmails.length})`}
+                        />
+                        {invitationOptions.map((person) => (
+                          <div
+                            key={person.id}
+                            title={
+                              person.inviteEmail
+                                ? undefined
+                                : "Chưa có tài khoản."
+                            }
+                          >
+                            <StyledCheckbox
+                              className="rounded-lg px-2 py-2 text-sm hover:bg-surface-hover"
+                              checked={
+                                person.inviteEmail != null &&
+                                selectedGuestEmails.includes(person.inviteEmail)
+                              }
+                              disabled={!person.inviteEmail}
+                              onChange={() => {
+                                if (person.inviteEmail) {
+                                  toggleGuest(person.inviteEmail);
+                                }
+                              }}
+                              label={
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#d9e7e0] text-sm font-bold text-ink-soft">
+                                    {person.avatarUrl ? (
+                                      <img
+                                        src={person.avatarUrl}
+                                        alt=""
+                                        className="size-full object-cover"
+                                      />
+                                    ) : (
+                                      person.name.slice(0, 1).toUpperCase()
+                                    )}
+                                  </span>
+                                  <span className="flex min-w-0 flex-col">
+                                    <strong className="truncate">{person.name}</strong>
+                                    <span className="truncate text-sm text-ink-subtle">
+                                      {person.email ?? "Chưa có tài khoản"}
+                                    </span>
+                                  </span>
+                                </span>
+                              }
+                            />
+                          </div>
+                        ))}
+                        {(members.isLoading || persons.isLoading) && (
+                          <p className="m-0 px-2 py-3 text-center text-xs text-ink-subtle">
+                            Đang tải danh sách thành viên…
+                          </p>
+                        )}
+                        {!members.isLoading &&
+                          !persons.isLoading &&
+                          !invitationOptions.length && (
+                          <p className="m-0 px-2 py-3 text-center text-xs text-ink-subtle">
+                            Không có thành viên phù hợp.
+                          </p>
+                          )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {selectedMembers.length > 0 && (
+                  <div className="grid gap-2">
+                    <p className="m-0 text-sm font-bold text-ink-soft">
+                      Người sẽ được mời ({selectedMembers.length})
+                    </p>
+                    <div className="grid gap-1">
+                      {selectedMembers.map((member) => (
+                        <div
+                          key={member.userId}
+                          className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f3f7f4] px-3 py-2"
+                        >
+                          <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#d9e7e0] text-sm font-bold text-ink-soft">
+                            {member.avatarUrl ? (
+                              <img
+                                src={member.avatarUrl}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              member.name.slice(0, 1).toUpperCase()
+                            )}
+                          </span>
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <strong className="truncate text-sm">{member.name}</strong>
+                            <span className="truncate text-xs text-ink-subtle">
+                              {member.email}
+                            </span>
+                             <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-[#986c2b]">
+                               <Clock3 size={12} /> Chưa gửi lời mời
+                             </span>
+                          </span>
+                          <button
+                            type="button"
+                            className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-ink-subtle hover:bg-surface-hover hover:text-ink"
+                            aria-label={`Bỏ chọn ${member.email}`}
+                            onClick={() => toggleGuest(member.email)}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   <button
-                    className={compactPrimaryButtonClass}
+                    type="button"
+                    className={`${compactPrimaryButtonClass} w-full`}
                     disabled={addGuests.isPending}
+                    onClick={() => addGuests.mutate(selectedGuestEmails)}
                   >
-                    <Mail size={14} />
-                    <span className="sr-only">Thêm</span>
+                    <Send size={14} />
+                    {addGuests.isPending
+                      ? "Đang gửi lời mời…"
+                      : `Gửi lời mời (${selectedMembers.length})`}
                   </button>
-                </form>
-                <div>
-                  <div className="relative mb-2">
-                    <Search
-                      className="absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-subtle"
-                      size={14}
-                    />
-                    <input
-                      className={`${formFieldClass} py-1.5 pl-8 text-xs`}
-                      value={memberSearch}
-                      onChange={(input) => setMemberSearch(input.target.value)}
-                      placeholder="Tìm email trong gia phả…"
-                    />
                   </div>
-                  <div className="max-h-40 overflow-y-auto rounded-lg border border-border-default bg-[#f8faf9] p-1">
-                    {availableMembers.slice(0, 20).map((member) => (
-                      <button
-                        key={member.userId}
-                        type="button"
-                        className="flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 text-left text-xs hover:bg-[#e5eee9]"
-                        onClick={() => addGuests.mutate([member.email])}
+                )}
+              </div>
+            )}
+            <div className="grid gap-4">
+              {guestGroups.map((group) => (
+                <section key={group.status}>
+                  <div className="mb-2 border-b border-border-default pb-2">
+                    <h3 className="m-0 text-sm font-bold text-ink-soft">
+                      {group.label} ({group.guests.length})
+                    </h3>
+                  </div>
+                  <div className="grid gap-2">
+                    {group.guests.map((guest) => (
+                      <div
+                        key={guest.id}
+                        className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f3f7f4] px-3 py-2"
                       >
-                        <UserPlus size={13} />
-                        <span className="min-w-0 flex-1 truncate">
-                          <strong>{member.name}</strong> · {member.email}
+                        <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#d9e7e0] text-sm font-bold">
+                          {guest.avatarUrl ? (
+                            <img
+                              src={guest.avatarUrl}
+                              alt=""
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            (guest.name ?? guest.email)
+                              .slice(0, 1)
+                              .toUpperCase()
+                          )}
                         </span>
-                      </button>
+                        <div className="min-w-0 flex-1">
+                          <strong className="block truncate text-sm">
+                            {guest.name ?? guest.email}
+                          </strong>
+                          {guest.name && (
+                            <span className="block truncate text-xs text-ink-subtle">
+                              {guest.email}
+                            </span>
+                          )}
+                          <span
+                            className={`mt-0.5 inline-flex items-center gap-1 text-xs font-semibold ${guest.status === "ACCEPTED" ? "text-[#28634f]" : guest.status === "DECLINED" ? "text-[#a33d32]" : "text-[#986c2b]"}`}
+                          >
+                            {guest.status === "ACCEPTED" ? (
+                              <Check size={12} />
+                            ) : guest.status === "DECLINED" ? (
+                              <X size={12} />
+                            ) : (
+                              <Clock3 size={12} />
+                            )}
+                            {guest.status === "ACCEPTED"
+                              ? "Đã chấp nhận"
+                              : guest.status === "DECLINED"
+                                ? "Đã từ chối"
+                                : "Chờ xác nhận"}
+                          </span>
+                        </div>
+                        {detail.canManage && (
+                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                            {guest.status === "PENDING" && (
+                              <button
+                                type="button"
+                                className={`${compactDangerButtonClass} text-xs`}
+                                onClick={() => void confirmGuestRemoval(guest)}
+                                aria-label={`Thu hồi lời mời cho ${guest.email}`}
+                              >
+                                <Undo2 size={13} /> Thu hồi
+                              </button>
+                            )}
+                            {guest.status === "ACCEPTED" && (
+                              <button
+                                type="button"
+                                className={`${compactDangerButtonClass} text-xs`}
+                                onClick={() => void confirmGuestRemoval(guest)}
+                                aria-label={`Xóa ${guest.email} khỏi sự kiện`}
+                              >
+                                <Trash2 size={13} /> Xóa
+                              </button>
+                            )}
+                            {guest.status === "DECLINED" && (
+                              <>
+                                <button
+                                  type="button"
+                                  className={`${compactSecondaryButtonClass} text-xs`}
+                                  onClick={() => void reinviteGuest(guest)}
+                                  aria-label={`Mời lại ${guest.email}`}
+                                >
+                                  <UserPlus size={13} /> Mời lại
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`${compactDangerButtonClass} min-h-7 px-1.5 py-0.5 text-xs`}
+                                  onClick={() => void confirmGuestRemoval(guest)}
+                                  aria-label={`Xóa ${guest.email}`}
+                                >
+                                  <Trash2 size={13} /> Xóa
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                    {!availableMembers.length && (
-                      <p className="m-0 px-2 py-3 text-center text-xs text-ink-subtle">
-                        Không còn thành viên phù hợp.
+                    {!group.guests.length && (
+                      <p className="m-0 py-2 text-xs text-ink-subtle">
+                        Chưa có người nào.
                       </p>
                     )}
                   </div>
-                  {uninvitedMembers.length > 0 && (
-                    <button
-                      type="button"
-                      className="mt-2 w-full cursor-pointer border-0 bg-transparent text-xs font-bold text-accent-deep"
-                      onClick={() =>
-                        addGuests.mutate(
-                          uninvitedMembers.map((member) => member.email),
-                        )
-                      }
-                    >
-                      Mời tất cả email trong gia phả ({uninvitedMembers.length})
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            <div className="grid gap-2">
-              {detail.guests.map((guest) => (
-                <div
-                  key={guest.id}
-                  className="flex min-w-0 items-center gap-2 rounded-lg bg-[#f3f7f4] px-3 py-2"
-                >
-                  <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-[#d9e7e0] text-[0.65rem] font-bold">
-                    {guest.avatarUrl ? (
-                      <img
-                        src={guest.avatarUrl}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      (guest.name ?? guest.email).slice(0, 1).toUpperCase()
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <strong className="block truncate text-xs">
-                      {guest.name ?? guest.email}
-                    </strong>
-                    {guest.name && (
-                      <span className="block truncate text-[0.68rem] text-ink-subtle">
-                        {guest.email}
-                      </span>
-                    )}
-                  </div>
-                  {detail.canManage && (
-                    <button
-                      className="cursor-pointer border-0 bg-transparent text-ink-subtle hover:text-[#a33d32]"
-                      onClick={() => removeGuest.mutate(guest.id)}
-                      aria-label={`Xóa ${guest.email}`}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
+                </section>
               ))}
-              {!detail.guests.length && (
-                <p className="m-0 py-4 text-center text-sm text-ink-muted">
-                  Chưa mời thành viên nào.
-                </p>
-              )}
             </div>
-          </aside>
+            </aside>
+          ) : (
+            <aside className={`${surfaceCardClass} self-start p-5`}>
+              <h2 className="mt-0 mb-3 flex items-center gap-2 font-display text-lg">
+                <Users size={18} /> Người được mời
+              </h2>
+              <p className="m-0 text-sm text-ink-muted">
+                Bạn có thể thêm người được mời sau khi tạo sự kiện.
+              </p>
+            </aside>
+          )}
         </div>
       </div>
-      {editing && (
-        <EventFormDialog
-          event={detail}
-          onClose={() => setEditing(false)}
-          onSave={(input) => update.mutate(input)}
-          pending={update.isPending}
-        />
-      )}
       {preview && (
         <div
           className="fixed inset-0 z-100 grid place-items-center bg-black/85 p-4"

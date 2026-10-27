@@ -86,7 +86,6 @@
   overflow: hidden;
   border: 1px solid #b6c8bf;
   border-radius: 0.5rem;
-  box-shadow: 0 8px 25px rgba(23, 48, 42, 0.12);
 }
 
 .react-flow__controls-button {

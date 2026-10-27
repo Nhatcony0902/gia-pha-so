@@ -6,8 +6,8 @@ export function PageBreadcrumbBar({
   children,
   light = false,
   breadcrumbClassName,
-  headerClassName = "border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem]",
-  contentClassName = "flex w-full flex-col items-start justify-between gap-4 min-[801px]:flex-row min-[801px]:items-center",
+  headerClassName = "border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5",
+  contentClassName = "w-full justify-between gap-4",
 }: {
   items: BreadcrumbItem[];
   children?: ReactNode;
@@ -17,8 +17,8 @@ export function PageBreadcrumbBar({
   contentClassName?: string;
 }) {
   return (
-    <header className={headerClassName}>
-      <div className={contentClassName}>
+    <header className={`h-16 ${headerClassName}`}>
+      <div className={`flex h-full items-center ${contentClassName}`}>
         <Breadcrumbs
           items={items}
           light={light}
@@ -33,21 +33,17 @@ export function PageBreadcrumbBar({
 export function PageHeading({
   title,
   eyebrow,
-  description,
   children,
   className = "mb-4",
   eyebrowClassName = "m-0 text-xs font-bold tracking-widest text-accent-deep",
   titleClassName = "m-0 font-display text-2xl",
-  descriptionClassName = "mt-1 mb-0 text-sm text-ink-muted",
 }: {
   title: ReactNode;
   eyebrow?: ReactNode;
-  description?: ReactNode;
   children?: ReactNode;
   className?: string;
   eyebrowClassName?: string;
   titleClassName?: string;
-  descriptionClassName?: string;
 }) {
   return (
     <header
@@ -56,9 +52,6 @@ export function PageHeading({
       <div className="min-w-0">
         {eyebrow != null && <p className={eyebrowClassName}>{eyebrow}</p>}
         <h1 className={titleClassName}>{title}</h1>
-        {description != null && (
-          <p className={descriptionClassName}>{description}</p>
-        )}
       </div>
       {children}
     </header>

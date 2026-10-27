@@ -202,9 +202,6 @@ export function MemberList({
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[95rem] flex-col">
         <PageHeading
           title="Danh sách thành viên"
-          description={
-            <>Hiển thị {rows.length}/{query.data?.persons.length ?? 0} thành viên</>
-          }
         >
           <div className="flex flex-wrap items-center gap-2">
             <div
@@ -226,7 +223,7 @@ export function MemberList({
                 <Columns3 size={17} /> Chọn cột
               </button>
               {open === "columns" && (
-                <div className="absolute top-full right-0 z-20 mt-2 flex max-h-96 w-72 flex-col rounded-xl border border-border-control bg-white p-2 shadow-xl">
+                <div className="absolute top-full right-0 z-20 mt-2 flex max-h-96 w-72 flex-col rounded-xl border border-border-control bg-white p-2">
                   <div className="grid min-h-0 gap-1 overflow-auto">
                     <StyledCheckbox
                       className="rounded-lg px-2 py-2 text-sm font-bold hover:bg-surface-hover"

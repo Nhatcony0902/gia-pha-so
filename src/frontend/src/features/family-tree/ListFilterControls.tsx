@@ -19,21 +19,26 @@ type FilterableColumn = {
 export function StyledCheckbox({
   checked,
   indeterminate = false,
+  disabled = false,
   onChange,
   label,
   className,
 }: {
   checked: boolean;
   indeterminate?: boolean;
+  disabled?: boolean;
   onChange: () => void;
   label: ReactNode;
   className: string;
 }) {
   return (
-    <label className={`flex cursor-pointer items-center gap-2 ${className}`}>
+    <label
+      className={`flex items-center gap-2 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"} ${className}`}
+    >
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         aria-checked={indeterminate ? "mixed" : checked}
         ref={(input) => {
           if (input) input.indeterminate = indeterminate;
@@ -77,7 +82,7 @@ export function ColumnFilterPopup({
   return (
     <div
       ref={popupRef}
-      className="absolute top-[calc(100%-0.25rem)] left-3 z-30 mt-2 w-72 rounded-xl border border-border-control bg-white p-3 font-normal shadow-2xl"
+      className="absolute top-[calc(100%-0.25rem)] left-3 z-30 mt-2 w-72 rounded-xl border border-border-control bg-white p-3 font-normal"
       onClick={(event) => event.stopPropagation()}
     >
       <p className="mt-0 mb-2 text-xs font-bold tracking-wider text-ink-subtle uppercase">

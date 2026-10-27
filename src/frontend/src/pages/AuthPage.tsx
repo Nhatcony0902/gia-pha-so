@@ -66,7 +66,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="my-4 grid gap-[0.45rem] text-sm font-semibold [&_input]:min-h-12 [&_input]:w-full [&_input]:rounded-lg [&_input]:border [&_input]:border-[#b9c8c0] [&_input]:bg-white [&_input]:px-[0.85rem] [&_input]:py-[0.7rem] [&_input]:text-[#152824] [&_input]:outline-none [&_input]:focus:border-[#9b6928] [&_input]:focus:shadow-[0_0_0_3px_rgba(178,125,49,0.15)]">
+    <label className="my-4 grid gap-[0.45rem] text-sm font-semibold [&_input]:min-h-12 [&_input]:w-full [&_input]:rounded-lg [&_input]:border [&_input]:border-[#b9c8c0] [&_input]:bg-white [&_input]:px-[0.85rem] [&_input]:py-[0.7rem] [&_input]:text-[#152824] [&_input]:outline-none [&_input]:focus:border-[#9b6928]">
       <span>{label}</span>
       {children}
       {error && (
@@ -203,7 +203,7 @@ export function AuthPage() {
         </p>
       </section>
       <section
-        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-surface-soft p-[clamp(1.5rem,4vw,2.4rem)] text-ink shadow-[0_24px_70px_rgba(0,0,0,0.28)] [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
+        className="mx-auto my-4 max-h-none w-[min(100%-2rem,30rem)] overflow-y-auto rounded-2xl bg-surface-soft p-[clamp(1.5rem,4vw,2.4rem)] text-ink [&>h2]:mt-6 [&>h2]:mb-[0.45rem] [&>h2]:font-display [&>h2]:text-[2rem] min-[801px]:max-h-[calc(100vh-6.5rem)]"
         aria-labelledby="auth-title"
       >
         {mode !== "forgot-password" && !registerEmail && (

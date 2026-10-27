@@ -37,6 +37,14 @@ export const deleteEventGuest = (
   apiDelete<{ success: true }>(
     `/trees/${treeId}/events/${eventId}/guests/${guestId}`,
   );
+export const acceptEventInvitation = (treeId: string, eventId: string) =>
+  apiPost<FamilyEventDetail>(
+    `/trees/${treeId}/events/${eventId}/guests/accept`,
+  );
+export const declineEventInvitation = (treeId: string, eventId: string) =>
+  apiPost<FamilyEventDetail>(
+    `/trees/${treeId}/events/${eventId}/guests/decline`,
+  );
 export const getEventUploadSignature = (treeId: string, eventId: string) =>
   apiPost<CloudinarySignature>(
     `/trees/${treeId}/events/${eventId}/uploads/signature`,
