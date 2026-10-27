@@ -286,7 +286,6 @@ export interface TimelineEntry {
   location: string | null;
   startAt: string;
   endAt: string | null;
-  isAllDay: boolean;
   eventId: string | null;
   personId: string | null;
 }
@@ -304,7 +303,6 @@ export interface FamilyEventInput {
   location?: string | null;
   startAt: string;
   endAt?: string | null;
-  isAllDay?: boolean;
 }
 
 export type FamilyEventUpdateInput = Partial<FamilyEventInput>;
@@ -345,7 +343,6 @@ export interface FamilyEventDetail {
   location: string | null;
   startAt: string;
   endAt: string | null;
-  isAllDay: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: { id: string; name: string };
@@ -374,11 +371,12 @@ export interface AddEventMediaInput {
 
 export interface AppNotification {
   id: string;
-  treeId: string;
-  treeName: string;
-  eventId: string | null;
+  type: string;
+  sourceType: string;
+  sourceName: string;
   title: string;
   message: string;
+  actionUrl: string | null;
   readAt: string | null;
   createdAt: string;
 }

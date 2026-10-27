@@ -131,7 +131,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       location: event.location,
       startAt: event.startAt.toISOString(),
       endAt: iso(event.endAt),
-      isAllDay: event.isAllDay,
       eventId: event.id,
       personId: null,
     }));
@@ -146,7 +145,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           location: person.birthPlace,
           startAt: person.birthDate.toISOString(),
           endAt: null,
-          isAllDay: true,
           eventId: null,
           personId: person.id,
         });
@@ -160,7 +158,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           location: person.deathPlace,
           startAt: person.deathDate.toISOString(),
           endAt: null,
-          isAllDay: true,
           eventId: null,
           personId: person.id,
         });
@@ -188,7 +185,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         location: body.location?.trim() || null,
         startAt,
         endAt,
-        isAllDay: body.isAllDay ?? false,
         ...((
           endAt
             ? endAt <= new Date()
@@ -256,7 +252,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       location: event.location,
       startAt: event.startAt.toISOString(),
       endAt: iso(event.endAt),
-      isAllDay: event.isAllDay,
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
       createdBy: event.createdBy,
@@ -319,7 +314,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       : startAt.getTime() < Date.now() - 10 * 60_000;
     await this.prisma.$transaction(async (tx) => {
       if (startChanged)
-        await tx.notification.deleteMany({ where: { eventId } });
+        await tx.notification.deleteMany({
+          where: {
+            type: "EVENT_STARTED",
+            actionUrl: `/trees/${treeId}/events/${eventId}`,
+          },
+        });
       await tx.familyEvent.update({
         where: { id: eventId },
         data: {
@@ -333,7 +333,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
             : {}),
           startAt,
           endAt,
-          ...(body.isAllDay !== undefined ? { isAllDay: body.isAllDay } : {}),
           ...(startChanged
             ? { notifiedAt: historical ? new Date() : null }
             : {}),
@@ -393,7 +392,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         .map((guest) => guest.userId),
     );
     const reinvitees = users.filter((user) => declinedUserIds.has(user.id));
-    const notificationRecipients = [...invitees, ...reinvitees];
     await this.prisma.$transaction(async (tx) => {
       await tx.eventGuest.createMany({
         data: invitees.map((user) => ({
@@ -412,20 +410,21 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         ),
       );
       await Promise.all(
-        notificationRecipients.map((user) =>
-          tx.notification.upsert({
-            where: { userId_eventId: { userId: user.id, eventId } },
-            create: {
+        [
+          ...invitees.map((user) => ({ user, reinvited: false })),
+          ...reinvitees.map((user) => ({ user, reinvited: true })),
+        ].map(({ user, reinvited }) =>
+          tx.notification.create({
+            data: {
               userId: user.id,
-              treeId,
-              eventId,
-              title: `Lời mời tham gia: ${event.title}`,
-              message: `${event.tree.name} mời bạn tham gia sự kiện. Mở thông báo để xác nhận.`,
-            },
-            update: {
-              title: `Lời mời tham gia: ${event.title}`,
-              message: `${event.tree.name} mời bạn tham gia sự kiện. Mở thông báo để xác nhận.`,
-              readAt: null,
+              type: reinvited
+                ? "EVENT_REINVITATION"
+                : "EVENT_INVITATION",
+              sourceType: "FAMILY_TREE",
+              sourceName: event.tree.name,
+              title: `Lời mời tham gia sự kiện: ${event.title}`,
+              message: "",
+              actionUrl: `/trees/${treeId}/events/${eventId}`,
             },
           }),
         ),
@@ -464,28 +463,21 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           data: { acceptedAt: new Date(), declinedAt: null },
         }),
         this.prisma.notification.updateMany({
-          where: { userId, eventId },
+          where: {
+            userId,
+            actionUrl: `/trees/${treeId}/events/${eventId}`,
+          },
           data: { readAt: new Date() },
         }),
-        this.prisma.notification.upsert({
-          where: {
-            userId_eventId: {
-              userId: guest.event.createdById,
-              eventId,
-            },
-          },
-          create: {
+        this.prisma.notification.create({
+          data: {
             userId: guest.event.createdById,
-            treeId,
-            eventId,
-            title: `${guest.user?.name ?? guest.email} đã chấp nhận lời mời`,
-            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
-          },
-          update: {
-            title: `${guest.user?.name ?? guest.email} đã chấp nhận lời mời`,
-            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
-            readAt: null,
-            createdAt: new Date(),
+            type: "EVENT_INVITATION_ACCEPTED",
+            sourceType: "FAMILY_TREE",
+            sourceName: guest.event.tree.name,
+            title: `${guest.user?.name ?? guest.email} đã chấp nhận lời mời tham gia sự kiện: ${guest.event.title}`,
+            message: "",
+            actionUrl: `/trees/${treeId}/events/${eventId}`,
           },
         }),
       ]);
@@ -522,28 +514,21 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           data: { acceptedAt: null, declinedAt: new Date() },
         }),
         this.prisma.notification.updateMany({
-          where: { userId, eventId },
+          where: {
+            userId,
+            actionUrl: `/trees/${treeId}/events/${eventId}`,
+          },
           data: { readAt: new Date() },
         }),
-        this.prisma.notification.upsert({
-          where: {
-            userId_eventId: {
-              userId: guest.event.createdById,
-              eventId,
-            },
-          },
-          create: {
+        this.prisma.notification.create({
+          data: {
             userId: guest.event.createdById,
-            treeId,
-            eventId,
-            title: `${guest.user?.name ?? guest.email} đã từ chối lời mời`,
-            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
-          },
-          update: {
-            title: `${guest.user?.name ?? guest.email} đã từ chối lời mời`,
-            message: `Sự kiện ${guest.event.title} · ${guest.event.tree.name}`,
-            readAt: null,
-            createdAt: new Date(),
+            type: "EVENT_INVITATION_DECLINED",
+            sourceType: "FAMILY_TREE",
+            sourceName: guest.event.tree.name,
+            title: `${guest.user?.name ?? guest.email} đã từ chối tham gia sự kiện: ${guest.event.title}`,
+            message: "",
+            actionUrl: `/trees/${treeId}/events/${eventId}`,
           },
         }),
       ]);
@@ -561,6 +546,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       where: { id: guestId, eventId, event: { treeId } },
       select: {
         id: true,
+        email: true,
         userId: true,
         acceptedAt: true,
         declinedAt: true,
@@ -579,29 +565,31 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       });
 
     const invitationPending = !guest.acceptedAt && !guest.declinedAt;
+    const recipientUserId =
+      guest.userId ??
+      (
+        await this.prisma.user.findUnique({
+          where: { email: guest.email.toLowerCase() },
+          select: { id: true },
+        })
+      )?.id;
     await this.prisma.$transaction(async (tx) => {
       await tx.eventGuest.delete({ where: { id: guest.id } });
-      if (guest.userId) {
+      if (recipientUserId) {
         const title = invitationPending
           ? `Lời mời đã được thu hồi: ${guest.event.title}`
           : `Bạn đã bị xóa khỏi sự kiện: ${guest.event.title}`;
-        const message = invitationPending
-          ? `${guest.event.tree.name} đã thu hồi lời mời tham gia sự kiện.`
-          : `${guest.event.tree.name} đã xóa bạn khỏi danh sách người tham gia.`;
-        await tx.notification.upsert({
-          where: { userId_eventId: { userId: guest.userId, eventId } },
-          create: {
-            userId: guest.userId,
-            treeId,
-            eventId,
+        await tx.notification.create({
+          data: {
+            userId: recipientUserId,
+            type: invitationPending
+              ? "EVENT_INVITATION_REVOKED"
+              : "EVENT_GUEST_REMOVED",
+            sourceType: "FAMILY_TREE",
+            sourceName: guest.event.tree.name,
             title,
-            message,
-          },
-          update: {
-            title,
-            message,
-            readAt: null,
-            createdAt: new Date(),
+            message: "",
+            actionUrl: `/trees/${treeId}/events/${eventId}`,
           },
         });
       }
@@ -704,10 +692,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
             await tx.notification.createMany({
               data: event.tree.memberships.map(({ userId }) => ({
                 userId,
-                treeId: event.treeId,
-                eventId: event.id,
+                type: "EVENT_STARTED",
+                sourceType: "FAMILY_TREE",
+                sourceName: event.tree.name,
                 title: `Sự kiện đang diễn ra: ${event.title}`,
                 message: `${event.tree.name}${event.location ? ` · ${event.location}` : ""}`,
+                actionUrl: `/trees/${event.treeId}/events/${event.id}`,
               })),
               skipDuplicates: true,
             });
@@ -747,18 +737,18 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     await this.processDueEvents();
     const notifications = await this.prisma.notification.findMany({
       where: { userId },
-      include: { tree: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 200,
     });
     return {
       notifications: notifications.map((item) => ({
         id: item.id,
-        treeId: item.treeId,
-        treeName: item.tree.name,
-        eventId: item.eventId,
+        type: item.type,
+        sourceType: item.sourceType,
+        sourceName: item.sourceName,
         title: item.title,
         message: item.message,
+        actionUrl: item.actionUrl,
         readAt: iso(item.readAt),
         createdAt: item.createdAt.toISOString(),
       })),

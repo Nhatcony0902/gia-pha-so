@@ -10,6 +10,13 @@ import {
 } from "../features/events/api";
 import { formFieldClass } from "../lib/ui-classes";
 
+const notificationTypeLabel = (type: string) => {
+  if (type.startsWith("ACCOUNT_")) return "Tài khoản";
+  if (type.startsWith("FAMILY_TREE_")) return "Gia phả";
+  if (type.startsWith("EVENT_")) return "Sự kiện";
+  return "Hệ thống";
+};
+
 const relativeTime = (value: string) => {
   const seconds = Math.round((new Date(value).getTime() - Date.now()) / 1000);
   const formatter = new Intl.RelativeTimeFormat("vi-VN", { numeric: "auto" });
@@ -29,7 +36,6 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | "UNREAD" | "READ">("ALL");
-  const [tree, setTree] = useState("ALL");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const query = useQuery({
     queryKey: ["app-notifications"],
@@ -61,13 +67,6 @@ export function NotificationBell() {
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
-  const trees = useMemo(() => {
-    const map = new Map<string, string>();
-    query.data?.notifications.forEach((item) =>
-      map.set(item.treeId, item.treeName),
-    );
-    return [...map.entries()];
-  }, [query.data]);
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     return [...(query.data?.notifications ?? [])]
@@ -76,11 +75,10 @@ export function NotificationBell() {
           status === "ALL" ||
           (status === "UNREAD" ? !item.readAt : Boolean(item.readAt)),
       )
-      .filter((item) => tree === "ALL" || item.treeId === tree)
       .filter(
         (item) =>
           !keyword ||
-          `${item.title} ${item.message} ${item.treeName}`
+          `${item.title} ${item.message} ${item.type} ${item.sourceName}`
             .toLowerCase()
             .includes(keyword),
       )
@@ -89,7 +87,7 @@ export function NotificationBell() {
           (sort === "desc" ? -1 : 1) *
           left.createdAt.localeCompare(right.createdAt),
       );
-  }, [query.data, search, status, tree, sort]);
+  }, [query.data, search, status, sort]);
   if (!user) return null;
   return (
     <div ref={panelRef} className="relative shrink-0">
@@ -98,7 +96,11 @@ export function NotificationBell() {
         className="relative grid size-9 cursor-pointer place-items-center rounded-full border border-white/25 bg-white/5 text-white hover:bg-white/12"
         aria-label={`Thông báo${query.data?.unreadCount ? `, ${query.data.unreadCount} chưa đọc` : ""}`}
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          const nextOpen = !open;
+          setOpen(nextOpen);
+          if (nextOpen) void query.refetch();
+        }}
       >
         <Bell size={17} />
         {Boolean(query.data?.unreadCount) && (
@@ -138,7 +140,7 @@ export function NotificationBell() {
                 placeholder="Tìm thông báo…"
               />
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <select
                 className={`${formFieldClass} py-1.5 text-[0.68rem]`}
                 value={status}
@@ -149,18 +151,6 @@ export function NotificationBell() {
                 <option value="ALL">Tất cả trạng thái</option>
                 <option value="UNREAD">Chưa đọc</option>
                 <option value="READ">Đã đọc</option>
-              </select>
-              <select
-                className={`${formFieldClass} py-1.5 text-[0.68rem]`}
-                value={tree}
-                onChange={(input) => setTree(input.target.value)}
-              >
-                <option value="ALL">Mọi gia phả</option>
-                {trees.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
               </select>
               <button
                 type="button"
@@ -193,25 +183,26 @@ export function NotificationBell() {
                 onClick={() => {
                   if (!item.readAt) read.mutate(item.id);
                   setOpen(false);
-                  navigate(
-                    item.eventId
-                      ? `/trees/${item.treeId}/events/${item.eventId}`
-                      : `/trees/${item.treeId}/timeline`,
-                  );
+                  if (item.actionUrl) navigate(item.actionUrl);
                 }}
               >
                 <span
                   className={`mt-1.5 size-2 shrink-0 rounded-full ${item.readAt ? "bg-transparent" : "bg-[#c8862f]"}`}
                 />
                 <span className="min-w-0 flex-1">
+                  <span className="mb-0.5 block text-[0.6rem] font-bold tracking-wide text-accent-deep uppercase">
+                    {notificationTypeLabel(item.type)}
+                  </span>
                   <strong className="block truncate text-xs">
                     {item.title}
                   </strong>
-                  <span className="mt-1 block line-clamp-2 text-[0.7rem] leading-4 text-ink-muted">
-                    {item.message}
-                  </span>
+                  {item.message && (
+                    <span className="mt-1 block line-clamp-2 text-[0.7rem] leading-4 text-ink-muted">
+                      {item.message}
+                    </span>
+                  )}
                   <span className="mt-1 block text-[0.63rem] text-ink-subtle">
-                    {item.treeName} · {relativeTime(item.createdAt)}
+                    {item.sourceName} · {relativeTime(item.createdAt)}
                   </span>
                 </span>
               </button>

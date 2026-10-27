@@ -1,1 +1,0 @@
-ALTER TABLE "EventGuest" ADD COLUMN "declinedAt" TIMESTAMP(3);

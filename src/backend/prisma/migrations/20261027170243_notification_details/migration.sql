@@ -14,11 +14,11 @@ CREATE TABLE "FamilyEvent" (
     "location" TEXT,
     "startAt" TIMESTAMP(3) NOT NULL,
     "endAt" TIMESTAMP(3),
-    "isAllDay" BOOLEAN NOT NULL DEFAULT false,
     "createdById" TEXT NOT NULL,
     "notifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+
     CONSTRAINT "FamilyEvent_pkey" PRIMARY KEY ("id")
 );
 
@@ -29,6 +29,9 @@ CREATE TABLE "EventGuest" (
     "email" TEXT NOT NULL,
     "userId" TEXT,
     "invitedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "acceptedAt" TIMESTAMP(3),
+    "declinedAt" TIMESTAMP(3),
+
     CONSTRAINT "EventGuest_pkey" PRIMARY KEY ("id")
 );
 
@@ -46,6 +49,7 @@ CREATE TABLE "EventMedia" (
     "width" INTEGER,
     "height" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
     CONSTRAINT "EventMedia_pkey" PRIMARY KEY ("id")
 );
 
@@ -53,29 +57,53 @@ CREATE TABLE "EventMedia" (
 CREATE TABLE "Notification" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "treeId" TEXT NOT NULL,
-    "eventId" TEXT,
+    "type" TEXT NOT NULL DEFAULT 'SYSTEM',
+    "sourceType" TEXT NOT NULL DEFAULT 'SYSTEM',
+    "sourceName" TEXT NOT NULL DEFAULT 'Hệ thống',
     "title" TEXT NOT NULL,
     "message" TEXT NOT NULL,
+    "actionUrl" TEXT,
     "readAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateIndex
 CREATE INDEX "FamilyEvent_treeId_startAt_idx" ON "FamilyEvent"("treeId", "startAt");
+
+-- CreateIndex
 CREATE INDEX "FamilyEvent_notifiedAt_startAt_idx" ON "FamilyEvent"("notifiedAt", "startAt");
-CREATE UNIQUE INDEX "EventGuest_eventId_email_key" ON "EventGuest"("eventId", "email");
+
+-- CreateIndex
 CREATE INDEX "EventGuest_userId_idx" ON "EventGuest"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "EventGuest_eventId_email_key" ON "EventGuest"("eventId", "email");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "EventMedia_publicId_key" ON "EventMedia"("publicId");
+
+-- CreateIndex
 CREATE INDEX "EventMedia_eventId_createdAt_idx" ON "EventMedia"("eventId", "createdAt");
-CREATE UNIQUE INDEX "Notification_userId_eventId_key" ON "Notification"("userId", "eventId");
+
+-- CreateIndex
 CREATE INDEX "Notification_userId_readAt_createdAt_idx" ON "Notification"("userId", "readAt", "createdAt");
 
+-- AddForeignKey
 ALTER TABLE "FamilyEvent" ADD CONSTRAINT "FamilyEvent_treeId_fkey" FOREIGN KEY ("treeId") REFERENCES "FamilyTree"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "FamilyEvent" ADD CONSTRAINT "FamilyEvent_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "EventGuest" ADD CONSTRAINT "EventGuest_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "FamilyEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "EventGuest" ADD CONSTRAINT "EventGuest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "EventMedia" ADD CONSTRAINT "EventMedia_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "FamilyEvent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "Notification" ADD CONSTRAINT "Notification_treeId_fkey" FOREIGN KEY ("treeId") REFERENCES "FamilyTree"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "Notification" ADD CONSTRAINT "Notification_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "FamilyEvent"("id") ON DELETE SET NULL ON UPDATE CASCADE;

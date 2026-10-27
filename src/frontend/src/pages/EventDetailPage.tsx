@@ -68,30 +68,25 @@ type EventFormState = {
   category: EventCategory;
   description: string;
   location: string;
-  isAllDay: boolean;
   startAt: string;
   endAt: string;
 };
 
-const localInputValue = (value?: string | null, allDay = false) => {
+const localInputValue = (value?: string | null) => {
   if (!value) return "";
   const date = new Date(value);
   const pad = (part: number) => String(part).padStart(2, "0");
   const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  return allDay
-    ? day
-    : `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-const toIso = (value: string, allDay: boolean) =>
-  new Date(allDay ? `${value}T00:00:00` : value).toISOString();
+const toIso = (value: string) => new Date(value).toISOString();
 
 const emptyForm: EventFormState = {
   title: "",
   category: "DEATH_ANNIVERSARY",
   description: "",
   location: "",
-  isAllDay: false,
   startAt: "",
   endAt: "",
 };
@@ -101,9 +96,8 @@ const toForm = (event: FamilyEventDetail): EventFormState => ({
   category: event.category,
   description: event.description ?? "",
   location: event.location ?? "",
-  isAllDay: event.isAllDay,
-  startAt: localInputValue(event.startAt, event.isAllDay),
-  endAt: localInputValue(event.endAt, event.isAllDay),
+  startAt: localInputValue(event.startAt),
+  endAt: localInputValue(event.endAt),
 });
 
 const toPayload = (form: EventFormState): FamilyEventInput => ({
@@ -111,9 +105,8 @@ const toPayload = (form: EventFormState): FamilyEventInput => ({
   category: form.category,
   description: form.description.trim() || null,
   location: form.location.trim() || null,
-  startAt: toIso(form.startAt, form.isAllDay),
-  endAt: form.endAt ? toIso(form.endAt, form.isAllDay) : null,
-  isAllDay: form.isAllDay,
+  startAt: toIso(form.startAt),
+  endAt: form.endAt ? toIso(form.endAt) : null,
 });
 
 export function EventDetailPage() {
@@ -536,7 +529,7 @@ export function EventDetailPage() {
                   onClick={() => acceptInvitation.mutate()}
                 >
                   <Check size={15} />
-                  {acceptInvitation.isPending ? "Đang xác nhận…" : "Chấp nhận lời mời"}
+                  {acceptInvitation.isPending ? "Đang xác nhận…" : "Chấp nhận"}
                 </button>
               </div>
             )}
@@ -591,33 +584,6 @@ export function EventDetailPage() {
                         </select>
                       </label>
                     </div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-ink-label">
-                      <input
-                        type="checkbox"
-                        disabled={!editing}
-                        checked={form.isAllDay}
-                        onChange={(input) => {
-                          const checked = input.target.checked;
-                          setForm((current) => ({
-                            ...current,
-                            isAllDay: checked,
-                            startAt: current.startAt
-                              ? localInputValue(
-                                  toIso(current.startAt, current.isAllDay),
-                                  checked,
-                                )
-                              : "",
-                            endAt: current.endAt
-                              ? localInputValue(
-                                  toIso(current.endAt, current.isAllDay),
-                                  checked,
-                                )
-                              : "",
-                          }));
-                        }}
-                      />
-                      Sự kiện cả ngày
-                    </label>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className={formLabelClass}>
                         Bắt đầu
@@ -625,7 +591,7 @@ export function EventDetailPage() {
                           className={formInputClass}
                           disabled={!editing}
                           required
-                          type={form.isAllDay ? "date" : "datetime-local"}
+                          type="datetime-local"
                           value={form.startAt}
                           onChange={(input) =>
                             setForm((current) => ({
@@ -640,7 +606,7 @@ export function EventDetailPage() {
                         <input
                           className={formInputClass}
                           disabled={!editing}
-                          type={form.isAllDay ? "date" : "datetime-local"}
+                          type="datetime-local"
                           min={form.startAt || undefined}
                           value={form.endAt}
                           onChange={(input) =>

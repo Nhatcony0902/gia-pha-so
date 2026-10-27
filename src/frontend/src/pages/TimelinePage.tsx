@@ -69,7 +69,7 @@ const lunarLabel = (date: Date, includeYear = true) => {
   }
 };
 const eventTime = (entry: TimelineEntry) =>
-  entry.isAllDay
+  entry.kind !== "EVENT"
     ? "Cả ngày"
     : new Date(entry.startAt).toLocaleTimeString("vi-VN", {
         hour: "2-digit",

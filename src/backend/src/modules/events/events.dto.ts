@@ -3,7 +3,6 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
-  IsBoolean,
   IsEmail,
   IsEnum,
   IsInt,
@@ -23,7 +22,6 @@ export class CreateEventDto {
   @IsOptional() @IsString() @MaxLength(500) location?: string | null;
   @IsISO8601() startAt!: string;
   @IsOptional() @IsISO8601() endAt?: string | null;
-  @IsOptional() @IsBoolean() isAllDay?: boolean;
 }
 
 export class UpdateEventDto {
@@ -33,7 +31,6 @@ export class UpdateEventDto {
   @IsOptional() @IsString() @MaxLength(500) location?: string | null;
   @IsOptional() @IsISO8601() startAt?: string;
   @IsOptional() @IsISO8601() endAt?: string | null;
-  @IsOptional() @IsBoolean() isAllDay?: boolean;
 }
 
 export class AddEventGuestsDto {

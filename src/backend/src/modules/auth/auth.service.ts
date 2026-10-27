@@ -220,6 +220,17 @@ export class AuthService {
         where: { email, purpose: VerificationPurpose.REGISTER, usedAt: null },
         data: { usedAt: new Date() },
       });
+      await tx.notification.create({
+        data: {
+          userId: created.id,
+          type: "ACCOUNT_WELCOME",
+          sourceType: "SYSTEM",
+          sourceName: "Hệ thống",
+          title: "'Đăng ký thành công",
+          message: `Chào mừng ${created.name} đến với Gia Phả Số`,
+          actionUrl: "/trees",
+        },
+      });
       return created;
     });
     return this.issueSession(user, client);
@@ -278,16 +289,18 @@ export class AuthService {
         code: "GOOGLE_ACCOUNT_CONFLICT",
         message: "Email đã liên kết với tài khoản Google khác",
       });
-    user = user
-      ? await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleSubject: payload.sub,
-            avatarUrl: user.avatarUrl ?? payload.picture,
-            emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
-          },
-        })
-      : await this.prisma.user.create({
+    if (user) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleSubject: payload.sub,
+          avatarUrl: user.avatarUrl ?? payload.picture,
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+        },
+      });
+    } else {
+      user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
           data: {
             email,
             name: payload.name ?? email.split("@")[0]!,
@@ -296,6 +309,20 @@ export class AuthService {
             emailVerifiedAt: new Date(),
           },
         });
+        await tx.notification.create({
+          data: {
+            userId: created.id,
+            type: "ACCOUNT_WELCOME",
+            sourceType: "SYSTEM",
+            sourceName: "Hệ thống",
+            title: "Đăng ký thành công",
+            message: `Chào mừng ${created.name} đến với Gia Phả Số`,
+            actionUrl: "/trees",
+          },
+        });
+        return created;
+      });
+    }
     await this.prisma.verificationChallenge.updateMany({
       where: { email, purpose: VerificationPurpose.REGISTER, usedAt: null },
       data: { usedAt: new Date() },
