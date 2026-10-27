@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PersonListItem } from "@family-tree/shared-types";
 import { Columns3, FilterX, ListFilter } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PageHeading } from "../../components/PageHeader";
 import { SurfaceCard } from "../../components/ui/SurfaceCard";
 import { compactSecondaryButtonClass } from "../../lib/ui-classes";
 import {
@@ -199,14 +200,12 @@ export function MemberList({
       aria-label="Danh sách thành viên"
     >
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[95rem] flex-col">
-        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="m-0 font-display text-2xl">Danh sách thành viên</h1>
-            <p className="mt-1 mb-0 text-sm text-ink-muted">
-              Hiển thị {rows.length}/{query.data?.persons.length ?? 0} thành
-              viên
-            </p>
-          </div>
+        <PageHeading
+          title="Danh sách thành viên"
+          description={
+            <>Hiển thị {rows.length}/{query.data?.persons.length ?? 0} thành viên</>
+          }
+        >
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="relative"
@@ -298,7 +297,7 @@ export function MemberList({
               <span>Xóa bộ lọc ({activeFilterCount})</span>
             </button>
           </div>
-        </div>
+        </PageHeading>
         <SurfaceCard as="div" variant="table">
           <table
             className="table-fixed border-collapse text-left text-sm"

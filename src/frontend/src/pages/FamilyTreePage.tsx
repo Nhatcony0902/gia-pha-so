@@ -22,7 +22,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
-import { Breadcrumbs } from "../components/Breadcrumbs";
+import { PageBreadcrumbBar } from "../components/PageHeader";
 import {
   createRelationship,
   deletePerson,
@@ -340,24 +340,25 @@ export function FamilyTreePage({
   const canEdit = graph.data.tree.myRole === "ADMIN";
   return (
     <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-surface-page text-ink">
-      <header className="z-3 flex flex-col items-start justify-between gap-4 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem] min-[801px]:flex-row min-[801px]:items-center">
-        <Breadcrumbs
-          items={[
-            { label: "Trang chủ", to: "/" },
-            { label: "Danh sách gia phả", to: "/trees" },
-            {
-              label: graph.data.tree.name,
-              ...(activeTab === "tree" ? {} : { to: `/trees/${treeId}/tree` }),
-            },
-            ...(activeTab === "tree"
-              ? []
-              : [
-                  {
-                    label: activeTab === "members" ? "Thành viên" : "Quan hệ",
-                  },
-                ]),
-          ]}
-        />
+      <PageBreadcrumbBar
+        headerClassName="z-3 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 py-[0.85rem]"
+        contentClassName="flex w-full flex-col items-start justify-between gap-4 min-[801px]:flex-row min-[801px]:items-center"
+        items={[
+          { label: "Trang chủ", to: "/" },
+          { label: "Danh sách gia phả", to: "/trees" },
+          {
+            label: graph.data.tree.name,
+            ...(activeTab === "tree" ? {} : { to: `/trees/${treeId}/tree` }),
+          },
+          ...(activeTab === "tree"
+            ? []
+            : [
+                {
+                  label: activeTab === "members" ? "Thành viên" : "Quan hệ",
+                },
+              ]),
+        ]}
+      >
         <div className="flex w-full flex-wrap items-center justify-between gap-[1.2rem] text-[0.84rem] text-[#5d7167] min-[801px]:w-auto">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {activeTab !== "relationships" && (
@@ -403,7 +404,7 @@ export function FamilyTreePage({
             )}
           </div>
         </div>
-      </header>
+      </PageBreadcrumbBar>
       <div className="relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
         {activeTab === "tree" ? (
           <section

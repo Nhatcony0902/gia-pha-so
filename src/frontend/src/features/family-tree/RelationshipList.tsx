@@ -5,6 +5,7 @@ import type {
 import { Columns3, FilterX, ListFilter, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SurfaceCard } from "../../components/ui/SurfaceCard";
+import { PageHeading } from "../../components/PageHeader";
 import {
   ColumnFilterPopup,
   StyledCheckbox,
@@ -270,13 +271,10 @@ export function RelationshipList({
       aria-label="Danh sách quan hệ"
     >
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[95rem] flex-col">
-        <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="m-0 font-display text-2xl">Danh sách quan hệ</h1>
-            <p className="mt-1 mb-0 text-sm text-ink-muted">
-              Hiển thị {rows.length}/{relationships.length} quan hệ
-            </p>
-          </div>
+        <PageHeading
+          title="Danh sách quan hệ"
+          description={`Hiển thị ${rows.length}/${relationships.length} quan hệ`}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="relative"
@@ -362,7 +360,7 @@ export function RelationshipList({
               <FilterX size={16} /> Xóa bộ lọc ({activeFilterCount})
             </button>
           </div>
-        </div>
+        </PageHeading>
         <SurfaceCard as="div" variant="table">
           <table
             className="table-fixed border-collapse text-left text-sm"

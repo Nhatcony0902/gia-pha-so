@@ -21,6 +21,7 @@ import { useNotifications } from "../app/providers/NotificationProvider";
 import logo from "../assets/images/logo.svg";
 import { getTrees } from "../features/family-tree/api";
 import { primaryButtonClass } from "../lib/ui-classes";
+import { NotificationBell } from "./NotificationBell";
 
 const menuItemClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-semibold no-underline transition-colors ${isActive ? "border-accent text-white" : "border-transparent text-content-secondary hover:text-white"}`;
@@ -42,13 +43,15 @@ export function Navbar() {
   });
   const treePathSegment = location.pathname.split("/")[3] ?? "";
   const treeView =
-    treePathSegment === "persons"
-      ? "members"
-      : ["tree", "members", "relationships", "timeline"].includes(
-            treePathSegment,
-          )
-        ? treePathSegment
-        : "tree";
+    treePathSegment === "events"
+      ? "timeline"
+      : treePathSegment === "persons"
+        ? "members"
+        : ["tree", "members", "relationships", "timeline"].includes(
+              treePathSegment,
+            )
+          ? treePathSegment
+          : "tree";
   const availableTrees = [
     ...(trees.data?.createdByMe ?? []),
     ...(trees.data?.sharedWithMe ?? []),
@@ -295,11 +298,15 @@ export function Navbar() {
         <div className="hidden min-w-0 flex-1 justify-center min-[901px]:flex">
           {treeNavigation}
         </div>
-        <div className="ml-auto hidden min-w-0 min-[901px]:block">
+        <div className="ml-auto hidden min-w-0 items-center gap-3 min-[901px]:flex">
+          <NotificationBell />
           {accountActions}
         </div>
+        <div className="ml-auto min-[901px]:hidden">
+          <NotificationBell />
+        </div>
         <button
-          className="ml-auto rounded-lg border border-outline bg-transparent px-3 py-2 text-white min-[901px]:hidden"
+          className="rounded-lg border border-outline bg-transparent px-3 py-2 text-white min-[901px]:hidden"
           type="button"
           aria-expanded={open}
           aria-controls="nav-actions"

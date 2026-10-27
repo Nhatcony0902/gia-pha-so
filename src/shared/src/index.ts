@@ -266,6 +266,124 @@ export interface CloudinarySignature {
   folder: string;
 }
 
+export type EventCategory =
+  | "DEATH_ANNIVERSARY"
+  | "REUNION"
+  | "CEREMONY"
+  | "WEDDING"
+  | "BIRTHDAY"
+  | "MEETING"
+  | "OTHER";
+
+export type TimelineEntryKind = "EVENT" | "BIRTH" | "DEATH";
+
+export interface TimelineEntry {
+  id: string;
+  kind: TimelineEntryKind;
+  category: EventCategory | "BIRTH" | "DEATH";
+  title: string;
+  description: string | null;
+  location: string | null;
+  startAt: string;
+  endAt: string | null;
+  isAllDay: boolean;
+  eventId: string | null;
+  personId: string | null;
+}
+
+export interface TimelineResponse {
+  tree: FamilyTreeSummary;
+  entries: TimelineEntry[];
+  canManage: boolean;
+}
+
+export interface FamilyEventInput {
+  title: string;
+  category: EventCategory;
+  description?: string | null;
+  location?: string | null;
+  startAt: string;
+  endAt?: string | null;
+  isAllDay?: boolean;
+}
+
+export type FamilyEventUpdateInput = Partial<FamilyEventInput>;
+
+export interface EventGuest {
+  id: string;
+  email: string;
+  userId: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+  invitedAt: string;
+}
+
+export interface EventMedia {
+  id: string;
+  url: string;
+  publicId: string;
+  type: "IMAGE" | "DOCUMENT";
+  originalName: string;
+  mimeType: string | null;
+  format: string | null;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+}
+
+export interface FamilyEventDetail {
+  id: string;
+  treeId: string;
+  treeName: string;
+  title: string;
+  category: EventCategory;
+  description: string | null;
+  location: string | null;
+  startAt: string;
+  endAt: string | null;
+  isAllDay: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id: string; name: string };
+  guests: EventGuest[];
+  media: EventMedia[];
+  canManage: boolean;
+  canUploadMedia: boolean;
+}
+
+export interface AddEventGuestsInput {
+  emails: string[];
+}
+
+export interface AddEventMediaInput {
+  url: string;
+  publicId: string;
+  type: "IMAGE" | "DOCUMENT";
+  originalName: string;
+  mimeType?: string | null;
+  format?: string | null;
+  bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface AppNotification {
+  id: string;
+  treeId: string;
+  treeName: string;
+  eventId: string | null;
+  title: string;
+  message: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
+
 export interface LinkedPerson {
   id: string;
   fullName: string;

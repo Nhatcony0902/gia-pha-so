@@ -75,4 +75,32 @@ export class MailService {
     });
     this.logger.log(`Sent tree invitation email to ${input.email}`);
   }
+
+  async sendEventReminder(input: {
+    email: string;
+    eventTitle: string;
+    treeName: string;
+    startAt: Date;
+    location: string | null;
+    url: string;
+  }) {
+    const title = `Nhắc sự kiện: ${input.eventTitle}`;
+    const time = input.startAt.toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      dateStyle: "full",
+      timeStyle: "short",
+    });
+    const location = input.location
+      ? `<p><strong>Địa điểm:</strong> ${escapeHtml(input.location)}</p>`
+      : "";
+    const html = `<!doctype html><html><body style="margin:0;background:#f2f5f3;font-family:Arial,sans-serif;color:#18332e"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="100%" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden"><tr><td style="background:#18332e;padding:26px;color:#fff"><div style="font-size:13px;letter-spacing:.12em;color:#d7a95d;font-weight:700">GIA PHẢ SỐ</div><h1 style="font-size:24px;margin:10px 0 0">${escapeHtml(input.eventTitle)}</h1></td></tr><tr><td style="padding:30px"><p>Sự kiện của gia phả <strong>${escapeHtml(input.treeName)}</strong> đang diễn ra.</p><p><strong>Thời gian:</strong> ${escapeHtml(time)}</p>${location}<p style="margin:28px 0;text-align:center"><a href="${escapeHtml(input.url)}" style="display:inline-block;padding:12px 22px;background:#d7a95d;color:#182b27;border-radius:9px;font-weight:700;text-decoration:none">Xem chi tiết sự kiện</a></p></td></tr></table></td></tr></table></body></html>`;
+    await this.transporter.sendMail({
+      from: process.env.SMTP_FROM ?? "Gia Phả Số <no-reply@example.local>",
+      to: input.email,
+      subject: title,
+      text: `${input.eventTitle} của ${input.treeName} đang diễn ra lúc ${time}.${input.location ? ` Địa điểm: ${input.location}.` : ""} ${input.url}`,
+      html,
+    });
+    this.logger.log(`Sent event reminder email to ${input.email}`);
+  }
 }

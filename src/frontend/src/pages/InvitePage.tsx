@@ -3,7 +3,7 @@ import { Users } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useNotifications } from "../app/providers/NotificationProvider";
-import { Breadcrumbs } from "../components/Breadcrumbs";
+import { PageBreadcrumbBar } from "../components/PageHeader";
 import {
   acceptInvitation,
   getInvitationPreview,
@@ -142,10 +142,11 @@ export function InvitePage() {
   return (
     <main className="bg-page-gradient min-h-[calc(100vh-4.5rem)] px-5 py-8 text-content-primary sm:px-8">
       <div className="mx-auto max-w-xl">
-        <Breadcrumbs
+        <PageBreadcrumbBar
           items={[{ label: "Trang chủ", to: "/" }, { label: "Lời mời" }]}
           light
-          className="mb-8"
+          headerClassName="mb-8"
+          contentClassName="flex items-center"
         />
         <section className="grid gap-4 overflow-hidden rounded-card border border-[rgba(130,167,151,0.4)] bg-[rgba(245,249,246,0.07)]">
           {preview.data?.tree.coverUrl && (

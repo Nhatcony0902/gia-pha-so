@@ -26,7 +26,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
-import { Breadcrumbs } from "../components/Breadcrumbs";
+import { PageBreadcrumbBar } from "../components/PageHeader";
 import {
   addPersonImage,
   createPerson,
@@ -501,7 +501,7 @@ export function PersonDetailPage() {
         <div
           className={`mx-auto w-full transition-[padding-right] duration-250 ${creationMode === "existing" && candidateSidebar ? "min-[801px]:pr-92" : ""}`}
         >
-          <Breadcrumbs
+          <PageBreadcrumbBar
             items={[
               { label: "Trang chủ", to: "/" },
               { label: "Danh sách gia phả", to: "/trees" },
@@ -509,7 +509,8 @@ export function PersonDetailPage() {
               { label: "Thành viên", to: `/trees/${treeId}/members` },
               { label: "Thêm thành viên" },
             ]}
-            className="mb-5"
+            headerClassName="mb-5"
+            contentClassName="flex items-center"
           />
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <Link
@@ -931,7 +932,7 @@ export function PersonDetailPage() {
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-surface-page px-4 py-6 text-ink md:px-8">
       <div className="mx-auto w-full">
-        <Breadcrumbs
+        <PageBreadcrumbBar
           items={[
             { label: "Trang chủ", to: "/" },
             { label: "Danh sách gia phả", to: "/trees" },
@@ -942,7 +943,8 @@ export function PersonDetailPage() {
             { label: "Thành viên", to: `/trees/${treeId}/members` },
             { label: person.fullName },
           ]}
-          className="mb-5"
+          headerClassName="mb-5"
+          contentClassName="flex items-center"
         />
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Link
