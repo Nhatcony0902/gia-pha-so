@@ -87,25 +87,29 @@ enum EventMediaType {
 }
 
 model FamilyEvent {
-  id          String        @id @default(cuid())
-  treeId      String
-  title       String
-  category    EventCategory
-  description String?
-  location    String?
-  startAt     DateTime
-  endAt       DateTime?
-  createdById String
-  notifiedAt  DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  tree        FamilyTree    @relation(fields: [treeId], references: [id], onDelete: Cascade)
-  createdBy   User          @relation("EventCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  guests      EventGuest[]
-  media       EventMedia[]
+  id              String        @id @default(cuid())
+  treeId          String
+  title           String
+  category        EventCategory
+  description     String?
+  location        String?
+  coverUrl        String?
+  coverPublicId   String?
+  startAt         DateTime
+  endAt           DateTime?
+  createdById     String
+  notifiedAt      DateTime?
+  endedNotifiedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tree            FamilyTree    @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  createdBy       User          @relation("EventCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  guests          EventGuest[]
+  media           EventMedia[]
 
   @@index([treeId, startAt])
   @@index([notifiedAt, startAt])
+  @@index([endedNotifiedAt, endAt])
 }
 
 model EventGuest {

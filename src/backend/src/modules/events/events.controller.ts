@@ -16,6 +16,7 @@ import {
   AddEventGuestsDto,
   AddEventMediaDto,
   CreateEventDto,
+  SetEventCoverDto,
   UpdateEventDto,
 } from "./events.dto.js";
 import { EventsService } from "./events.service.js";
@@ -141,6 +142,30 @@ export class EventsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.events.addMedia(treeId, eventId, request.user.userId, body);
+  }
+
+  @Patch("events/:eventId/cover")
+  setCover(
+    @Param("treeId") treeId: string,
+    @Param("eventId") eventId: string,
+    @Body() body: SetEventCoverDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.events.setCover(
+      treeId,
+      eventId,
+      request.user.userId,
+      body,
+    );
+  }
+
+  @Delete("events/:eventId/cover")
+  removeCover(
+    @Param("treeId") treeId: string,
+    @Param("eventId") eventId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.events.removeCover(treeId, eventId, request.user.userId);
   }
 
   @Delete("events/:eventId/media/:mediaId")

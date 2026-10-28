@@ -2,6 +2,7 @@ import type {
   AddEventGuestsInput,
   AddEventMediaInput,
   CloudinarySignature,
+  EventCoverInput,
   FamilyEventDetail,
   FamilyEventInput,
   FamilyEventUpdateInput,
@@ -62,6 +63,17 @@ export const deleteEventMedia = (
   apiDelete<{ success: true }>(
     `/trees/${treeId}/events/${eventId}/media/${mediaId}`,
   );
+export const setEventCover = (
+  treeId: string,
+  eventId: string,
+  body: EventCoverInput,
+) =>
+  apiPatch<FamilyEventDetail>(
+    `/trees/${treeId}/events/${eventId}/cover`,
+    body,
+  );
+export const deleteEventCover = (treeId: string, eventId: string) =>
+  apiDelete<FamilyEventDetail>(`/trees/${treeId}/events/${eventId}/cover`);
 
 export async function uploadEventFile(
   treeId: string,

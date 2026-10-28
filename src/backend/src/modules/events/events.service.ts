@@ -22,6 +22,7 @@ import { MailService } from "../mail/mail.service.js";
 import type {
   AddEventMediaDto,
   CreateEventDto,
+  SetEventCoverDto,
   UpdateEventDto,
 } from "./events.dto.js";
 
@@ -96,10 +97,26 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         code: "EVENT_DATE_INVALID",
         message: "Thời gian sự kiện không hợp lệ",
       });
-    if (endAt && endAt < startAt)
+    if (endAt && endAt <= startAt)
       throw new BadRequestException({
         code: "EVENT_END_BEFORE_START",
         message: "Thời gian kết thúc phải sau thời gian bắt đầu",
+      });
+  }
+
+  private validateFutureStart(startAt: Date) {
+    if (startAt <= new Date())
+      throw new BadRequestException({
+        code: "EVENT_START_IN_PAST",
+        message: "Thời gian bắt đầu không được ở trong quá khứ",
+      });
+  }
+
+  private assertNotStarted(startAt: Date) {
+    if (startAt <= new Date())
+      throw new BadRequestException({
+        code: "EVENT_ALREADY_STARTED",
+        message: "Không thể thay đổi sự kiện sau khi sự kiện đã bắt đầu",
       });
   }
 
@@ -119,6 +136,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           birthPlace: true,
           deathDate: true,
           deathPlace: true,
+          avatarUrl: true,
         },
       }),
     ]);
@@ -129,6 +147,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       title: event.title,
       description: event.description,
       location: event.location,
+      imageUrl: event.coverUrl,
       startAt: event.startAt.toISOString(),
       endAt: iso(event.endAt),
       eventId: event.id,
@@ -143,6 +162,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           title: person.fullName,
           description: null,
           location: person.birthPlace,
+          imageUrl: person.avatarUrl,
           startAt: person.birthDate.toISOString(),
           endAt: null,
           eventId: null,
@@ -156,6 +176,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           title: person.fullName,
           description: null,
           location: person.deathPlace,
+          imageUrl: person.avatarUrl,
           startAt: person.deathDate.toISOString(),
           endAt: null,
           eventId: null,
@@ -175,6 +196,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     const startAt = new Date(body.startAt);
     const endAt = body.endAt ? new Date(body.endAt) : null;
     this.validateDates(startAt, endAt);
+    this.validateFutureStart(startAt);
     const event = await this.prisma.familyEvent.create({
       data: {
         treeId,
@@ -185,13 +207,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         location: body.location?.trim() || null,
         startAt,
         endAt,
-        ...((
-          endAt
-            ? endAt <= new Date()
-            : startAt.getTime() < Date.now() - 10 * 60_000
-        )
-          ? { notifiedAt: new Date() }
-          : {}),
       },
     });
     return { id: event.id };
@@ -215,7 +230,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       where: { id: eventId, treeId },
       include: {
         tree: { select: { name: true } },
-        createdBy: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
         guests: {
           include: { user: { select: { name: true, avatarUrl: true } } },
           orderBy: { invitedAt: "asc" },
@@ -250,6 +265,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       category: event.category,
       description: event.description,
       location: event.location,
+      coverUrl: event.coverUrl,
       startAt: event.startAt.toISOString(),
       endAt: iso(event.endAt),
       createdAt: event.createdAt.toISOString(),
@@ -275,7 +291,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         createdAt: media.createdAt.toISOString(),
       })),
       canManage,
-      canUploadMedia: canManage && (event.endAt ?? event.startAt) <= new Date(),
+      canEdit: canManage && event.startAt > new Date(),
+      canUploadMedia: canManage,
       myInvitationStatus: (() => {
         const invitation = event.guests.find((guest) => guest.userId === userId);
         if (invitation?.declinedAt) return "DECLINED" as const;
@@ -300,6 +317,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         code: "EVENT_NOT_FOUND",
         message: "Không tìm thấy sự kiện",
       });
+    this.assertNotStarted(current.startAt);
     const startAt = body.startAt ? new Date(body.startAt) : current.startAt;
     const endAt =
       body.endAt === null
@@ -308,10 +326,8 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           ? new Date(body.endAt)
           : current.endAt;
     this.validateDates(startAt, endAt);
+    this.validateFutureStart(startAt);
     const startChanged = startAt.getTime() !== current.startAt.getTime();
-    const historical = endAt
-      ? endAt <= new Date()
-      : startAt.getTime() < Date.now() - 10 * 60_000;
     await this.prisma.$transaction(async (tx) => {
       if (startChanged)
         await tx.notification.deleteMany({
@@ -333,9 +349,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
             : {}),
           startAt,
           endAt,
-          ...(startChanged
-            ? { notifiedAt: historical ? new Date() : null }
-            : {}),
+          ...(startChanged ? { notifiedAt: null } : {}),
         },
       });
     });
@@ -364,13 +378,19 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     await this.assertManager(treeId, userId);
     const event = await this.prisma.familyEvent.findFirst({
       where: { id: eventId, treeId },
-      select: { id: true, title: true, tree: { select: { name: true } } },
+      select: {
+        id: true,
+        title: true,
+        startAt: true,
+        tree: { select: { name: true } },
+      },
     });
     if (!event)
       throw new NotFoundException({
         code: "EVENT_NOT_FOUND",
         message: "Không tìm thấy sự kiện",
       });
+    this.assertNotStarted(event.startAt);
     const emails = [
       ...new Set(
         values.map((email) => email.trim().toLowerCase()).filter(Boolean),
@@ -445,6 +465,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         event: {
           select: {
             title: true,
+            startAt: true,
             createdById: true,
             tree: { select: { name: true } },
           },
@@ -456,6 +477,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         code: "EVENT_INVITATION_NOT_FOUND",
         message: "Không tìm thấy lời mời tham gia sự kiện",
       });
+    this.assertNotStarted(guest.event.startAt);
     if (!guest.acceptedAt)
       await this.prisma.$transaction([
         this.prisma.eventGuest.update({
@@ -496,6 +518,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         event: {
           select: {
             title: true,
+            startAt: true,
             createdById: true,
             tree: { select: { name: true } },
           },
@@ -507,6 +530,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         code: "EVENT_INVITATION_NOT_FOUND",
         message: "Không tìm thấy lời mời tham gia sự kiện",
       });
+    this.assertNotStarted(guest.event.startAt);
     if (!guest.declinedAt)
       await this.prisma.$transaction([
         this.prisma.eventGuest.update({
@@ -553,6 +577,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         event: {
           select: {
             title: true,
+            startAt: true,
             tree: { select: { name: true } },
           },
         },
@@ -563,6 +588,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         code: "EVENT_GUEST_NOT_FOUND",
         message: "Không tìm thấy người được mời",
       });
+    this.assertNotStarted(guest.event.startAt);
 
     const invitationPending = !guest.acceptedAt && !guest.declinedAt;
     const recipientUserId =
@@ -597,7 +623,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return { success: true as const };
   }
 
-  private async assertUploadable(
+  private async assertMediaEditable(
     treeId: string,
     eventId: string,
     userId: string,
@@ -611,11 +637,6 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
         code: "EVENT_NOT_FOUND",
         message: "Không tìm thấy sự kiện",
       });
-    if ((event.endAt ?? event.startAt) > new Date())
-      throw new BadRequestException({
-        code: "EVENT_NOT_FINISHED",
-        message: "Chỉ có thể tải tư liệu lên sau khi sự kiện kết thúc",
-      });
     return event;
   }
 
@@ -624,7 +645,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     eventId: string,
     userId: string,
   ): Promise<CloudinarySignature> {
-    await this.assertUploadable(treeId, eventId, userId);
+    await this.assertMediaEditable(treeId, eventId, userId);
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const secret = process.env.CLOUDINARY_API_SECRET;
@@ -647,8 +668,34 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     userId: string,
     body: AddEventMediaDto,
   ) {
-    await this.assertUploadable(treeId, eventId, userId);
+    await this.assertMediaEditable(treeId, eventId, userId);
     return this.prisma.eventMedia.create({ data: { ...body, eventId } });
+  }
+
+  async setCover(
+    treeId: string,
+    eventId: string,
+    userId: string,
+    body: SetEventCoverDto,
+  ) {
+    const event = await this.assertMediaEditable(treeId, eventId, userId);
+    await this.prisma.familyEvent.update({
+      where: { id: eventId },
+      data: { coverUrl: body.url, coverPublicId: body.publicId },
+    });
+    if (event.coverPublicId && event.coverPublicId !== body.publicId)
+      await this.destroyCloudinaryImage(event.coverPublicId);
+    return this.detail(treeId, eventId, userId);
+  }
+
+  async removeCover(treeId: string, eventId: string, userId: string) {
+    const event = await this.assertMediaEditable(treeId, eventId, userId);
+    if (event.coverPublicId) await this.destroyCloudinaryImage(event.coverPublicId);
+    await this.prisma.familyEvent.update({
+      where: { id: eventId },
+      data: { coverUrl: null, coverPublicId: null },
+    });
+    return this.detail(treeId, eventId, userId);
   }
 
   async removeMedia(
@@ -657,7 +704,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     mediaId: string,
     userId: string,
   ) {
-    await this.assertManager(treeId, userId);
+    await this.assertMediaEditable(treeId, eventId, userId);
     const result = await this.prisma.eventMedia.deleteMany({
       where: { id: mediaId, eventId, event: { treeId } },
     });
@@ -669,34 +716,70 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     return { success: true as const };
   }
 
+  private async destroyCloudinaryImage(publicId: string) {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const secret = process.env.CLOUDINARY_API_SECRET;
+    if (!cloudName || !apiKey || !secret) return;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = createHash("sha1")
+      .update(`public_id=${publicId}&timestamp=${timestamp}${secret}`)
+      .digest("hex");
+    const body = new FormData();
+    body.set("public_id", publicId);
+    body.set("timestamp", String(timestamp));
+    body.set("api_key", apiKey);
+    body.set("signature", signature);
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
+      { method: "POST", body },
+    );
+    if (!response.ok)
+      throw new ServiceUnavailableException({
+        code: "CLOUDINARY_DELETE_FAILED",
+        message: "Không thể xóa ảnh trên Cloudinary",
+      });
+  }
+
   async processDueEvents() {
     try {
+      const now = new Date();
       const due = await this.prisma.familyEvent.findMany({
-        where: { notifiedAt: null, startAt: { lte: new Date() } },
+        where: { notifiedAt: null, startAt: { lte: now } },
         include: {
           tree: {
-            select: { name: true, memberships: { select: { userId: true } } },
+            select: { name: true },
           },
-          guests: { select: { email: true } },
+          guests: {
+            where: { acceptedAt: { not: null }, declinedAt: null },
+            select: { email: true, userId: true },
+          },
         },
         orderBy: { startAt: "asc" },
         take: 25,
       });
       for (const event of due) {
+        const acceptedUserIds = [
+          ...new Set(
+            event.guests.flatMap((guest) =>
+              guest.userId ? [guest.userId] : [],
+            ),
+          ),
+        ];
         const claimed = await this.prisma.$transaction(async (tx) => {
           const result = await tx.familyEvent.updateMany({
             where: { id: event.id, notifiedAt: null },
             data: { notifiedAt: new Date() },
           });
-          if (result.count)
+          if (result.count && acceptedUserIds.length)
             await tx.notification.createMany({
-              data: event.tree.memberships.map(({ userId }) => ({
+              data: acceptedUserIds.map((userId) => ({
                 userId,
                 type: "EVENT_STARTED",
                 sourceType: "FAMILY_TREE",
                 sourceName: event.tree.name,
                 title: `Sự kiện đang diễn ra: ${event.title}`,
-                message: `${event.tree.name}${event.location ? ` · ${event.location}` : ""}`,
+                message: "",
                 actionUrl: `/trees/${event.treeId}/events/${event.id}`,
               })),
               skipDuplicates: true,
@@ -724,6 +807,50 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
           this.logger.warn(
             `Could not send ${failed} reminder email(s) for event ${event.id}`,
           );
+      }
+
+      const ended = await this.prisma.familyEvent.findMany({
+        where: {
+          endedNotifiedAt: null,
+          endAt: { not: null, lte: now },
+        },
+        include: {
+          tree: { select: { name: true } },
+          guests: {
+            where: { acceptedAt: { not: null }, declinedAt: null },
+            select: { userId: true },
+          },
+        },
+        orderBy: { endAt: "asc" },
+        take: 25,
+      });
+      for (const event of ended) {
+        const acceptedUserIds = [
+          ...new Set(
+            event.guests.flatMap((guest) =>
+              guest.userId ? [guest.userId] : [],
+            ),
+          ),
+        ];
+        await this.prisma.$transaction(async (tx) => {
+          const result = await tx.familyEvent.updateMany({
+            where: { id: event.id, endedNotifiedAt: null },
+            data: { endedNotifiedAt: new Date() },
+          });
+          if (result.count && acceptedUserIds.length)
+            await tx.notification.createMany({
+              data: acceptedUserIds.map((userId) => ({
+                userId,
+                type: "EVENT_ENDED",
+                sourceType: "FAMILY_TREE",
+                sourceName: event.tree.name,
+                title: `Sự kiện đã kết thúc: ${event.title}`,
+                message: "",
+                actionUrl: `/trees/${event.treeId}/events/${event.id}`,
+              })),
+              skipDuplicates: true,
+            });
+        });
       }
     } catch (error) {
       this.logger.error(

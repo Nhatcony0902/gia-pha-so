@@ -284,6 +284,7 @@ export interface TimelineEntry {
   title: string;
   description: string | null;
   location: string | null;
+  imageUrl: string | null;
   startAt: string;
   endAt: string | null;
   eventId: string | null;
@@ -341,14 +342,16 @@ export interface FamilyEventDetail {
   category: EventCategory;
   description: string | null;
   location: string | null;
+  coverUrl: string | null;
   startAt: string;
   endAt: string | null;
   createdAt: string;
   updatedAt: string;
-  createdBy: { id: string; name: string };
+  createdBy: { id: string; name: string; email: string };
   guests: EventGuest[];
   media: EventMedia[];
   canManage: boolean;
+  canEdit: boolean;
   canUploadMedia: boolean;
   myInvitationStatus: "PENDING" | "ACCEPTED" | "DECLINED" | null;
 }
@@ -367,6 +370,11 @@ export interface AddEventMediaInput {
   bytes?: number | null;
   width?: number | null;
   height?: number | null;
+}
+
+export interface EventCoverInput {
+  url: string;
+  publicId: string;
 }
 
 export interface AppNotification {

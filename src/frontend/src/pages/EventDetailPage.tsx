@@ -6,6 +6,7 @@ import type {
 } from "@family-tree/shared-types";
 import {
   CalendarPlus,
+  Camera,
   Check,
   Clock3,
   Download,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../app/providers/AuthProvider";
 import { PageBreadcrumbBar, PageHeading } from "../components/PageHeader";
 import { useNotifications } from "../app/providers/NotificationProvider";
 import {
@@ -37,6 +39,7 @@ import {
   declineEventInvitation,
   getEvent,
   getTimeline,
+  setEventCover,
   updateEvent,
   uploadEventFile,
 } from "../features/events/api";
@@ -56,10 +59,6 @@ import {
   surfaceCardClass,
 } from "../lib/ui-classes";
 
-const dateTime = new Intl.DateTimeFormat("vi-VN", {
-  dateStyle: "full",
-  timeStyle: "short",
-});
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Vui lòng thử lại";
 
@@ -81,6 +80,13 @@ const localInputValue = (value?: string | null) => {
 };
 
 const toIso = (value: string) => new Date(value).toISOString();
+
+const nextMinuteInputValue = (value?: string) => {
+  const date = value ? new Date(value) : new Date();
+  date.setSeconds(0, 0);
+  date.setMinutes(date.getMinutes() + 1);
+  return localInputValue(date.toISOString());
+};
 
 const emptyForm: EventFormState = {
   title: "",
@@ -109,13 +115,46 @@ const toPayload = (form: EventFormState): FamilyEventInput => ({
   endAt: form.endAt ? toIso(form.endAt) : null,
 });
 
+const eventDateErrors = (form: EventFormState) => {
+  const errors: { startAt: string | null; endAt: string | null } = {
+    startAt: null,
+    endAt: null,
+  };
+  if (!form.startAt) return errors;
+  const startAt = new Date(form.startAt);
+  if (Number.isNaN(startAt.getTime())) {
+    errors.startAt = "Thời gian bắt đầu không hợp lệ.";
+  } else if (startAt <= new Date()) {
+    errors.startAt = "Thời gian bắt đầu không hợp lệ.";
+  }
+  if (form.endAt) {
+    const endAt = new Date(form.endAt);
+    if (
+      Number.isNaN(endAt.getTime()) ||
+      (!Number.isNaN(startAt.getTime()) && endAt <= startAt)
+    ) {
+      errors.endAt = "Thời gian kết thúc không hợp lệ.";
+    }
+  }
+  return errors;
+};
+
+const eventStatus = (startAt: string, endAt: string | null) => {
+  const now = Date.now();
+  if (new Date(startAt).getTime() > now) return "Chưa diễn ra";
+  if (endAt && new Date(endAt).getTime() <= now) return "Đã kết thúc";
+  return "Đang diễn ra";
+};
+
 export function EventDetailPage() {
   const { treeId = "", eventId = "" } = useParams();
   const isCreating = eventId === "new";
   const navigate = useNavigate();
   const client = useQueryClient();
   const notice = useNotifications();
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
   const guestPickerRef = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(isCreating);
   const [form, setForm] = useState<EventFormState>(() => ({ ...emptyForm }));
@@ -123,6 +162,11 @@ export function EventDetailPage() {
   const [selectedGuestEmails, setSelectedGuestEmails] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
+  const [pendingCover, setPendingCover] = useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+  const [statusVersion, setStatusVersion] = useState(0);
   const event = useQuery({
     queryKey: ["event", treeId, eventId],
     queryFn: () => getEvent(treeId, eventId),
@@ -136,16 +180,40 @@ export function EventDetailPage() {
   const members = useQuery({
     queryKey: ["tree-members", treeId],
     queryFn: () => getTreeMembers(treeId),
-    enabled: Boolean(event.data?.canManage),
+    enabled: Boolean(event.data?.canEdit),
   });
   const persons = useQuery({
     queryKey: ["tree-persons", treeId],
     queryFn: () => getTreePersons(treeId),
-    enabled: Boolean(event.data?.canManage),
+    enabled: Boolean(event.data?.canEdit),
   });
   useEffect(() => {
     if (event.data) setForm(toForm(event.data));
   }, [event.data]);
+  useEffect(
+    () => () => {
+      if (pendingCover) URL.revokeObjectURL(pendingCover.previewUrl);
+    },
+    [pendingCover],
+  );
+  useEffect(() => {
+    if (!event.data?.startAt) return;
+    const now = Date.now();
+    const nextTransition = [event.data.startAt, event.data.endAt]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => new Date(value).getTime())
+      .filter((value) => value > now)
+      .sort((left, right) => left - right)[0];
+    if (!nextTransition) return;
+    const timer = window.setTimeout(
+      () => {
+        setStatusVersion((current) => current + 1);
+        void event.refetch();
+      },
+      Math.min(nextTransition - now + 100, 2_147_483_647),
+    );
+    return () => window.clearTimeout(timer);
+  }, [event.data?.endAt, event.data?.startAt, event.refetch, statusVersion]);
   useEffect(() => {
     if (!guestPickerOpen) return;
     const close = (pointerEvent: PointerEvent) => {
@@ -164,18 +232,47 @@ export function EventDetailPage() {
     ]);
   };
   const update = useMutation({
-    mutationFn: (body: FamilyEventInput) => updateEvent(treeId, eventId, body),
+    mutationFn: async (body: FamilyEventInput) => {
+      const updated = await updateEvent(treeId, eventId, body);
+      if (!pendingCover) return updated;
+      const uploaded = await uploadEventFile(
+        treeId,
+        eventId,
+        pendingCover.file,
+      );
+      if (uploaded.resource_type !== "image")
+        throw new Error("Tệp tải lên không phải là hình ảnh");
+      return setEventCover(treeId, eventId, {
+        url: uploaded.secure_url,
+        publicId: uploaded.public_id,
+      });
+    },
     onSuccess: async () => {
       await refresh();
+      setPendingCover(null);
+      if (coverRef.current) coverRef.current.value = "";
       setEditing(false);
       notice.toast("Đã cập nhật sự kiện", "success");
     },
     onError: (error) => notice.alert("Không thể cập nhật", errorText(error)),
   });
   const create = useMutation({
-    mutationFn: (body: FamilyEventInput) => createEvent(treeId, body),
+    mutationFn: async (body: FamilyEventInput) => {
+      const created = await createEvent(treeId, body);
+      if (!pendingCover) return created;
+      const uploaded = await uploadEventFile(treeId, created.id, pendingCover.file);
+      if (uploaded.resource_type !== "image")
+        throw new Error("Tệp tải lên không phải là hình ảnh");
+      await setEventCover(treeId, created.id, {
+        url: uploaded.secure_url,
+        publicId: uploaded.public_id,
+      });
+      return created;
+    },
     onSuccess: async ({ id }) => {
       await client.invalidateQueries({ queryKey: ["timeline", treeId] });
+      setPendingCover(null);
+      if (coverRef.current) coverRef.current.value = "";
       notice.toast("Đã tạo sự kiện", "success");
       navigate(`/trees/${treeId}/events/${id}`, { replace: true });
       setEditing(false);
@@ -383,9 +480,32 @@ export function EventDetailPage() {
   const treeName =
     detail?.treeName ?? creationContext.data?.tree.name ?? "Gia phả";
   const canManage = isCreating ? true : Boolean(detail?.canManage);
+  const canEdit = isCreating ? true : Boolean(detail?.canEdit);
+  const canRespondToInvitation = Boolean(
+    detail && new Date(detail.startAt) > new Date(),
+  );
+  const minimumStartAt = nextMinuteInputValue();
+  const minimumEndAt = form.startAt
+    ? nextMinuteInputValue(form.startAt)
+    : undefined;
+  const dateErrors = editing
+    ? eventDateErrors(form)
+    : { startAt: null, endAt: null };
+  const hasDateError = Boolean(dateErrors.startAt || dateErrors.endAt);
+  const status = detail ? eventStatus(detail.startAt, detail.endAt) : null;
+  const displayStatus = status ?? "Chưa diễn ra";
+  const statusTextClass =
+    displayStatus === "Đang diễn ra"
+      ? "text-[#28634f]"
+      : displayStatus === "Đã kết thúc"
+        ? "text-ink-muted"
+        : "text-[#8a6428]";
+  const creatorName = detail?.createdBy.name ?? user?.name ?? "Chưa xác định";
+  const creatorEmail = detail?.createdBy.email ?? user?.email ?? "";
   const saveDetails = (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     if (!form.title.trim() || !form.startAt) return;
+    if (hasDateError) return;
     const payload = toPayload(form);
     if (isCreating) create.mutate(payload);
     else update.mutate(payload);
@@ -440,6 +560,8 @@ export function EventDetailPage() {
                         return;
                       }
                       if (detail) setForm(toForm(detail));
+                      setPendingCover(null);
+                      if (coverRef.current) coverRef.current.value = "";
                       setEditing(false);
                     }}
                   >
@@ -453,7 +575,8 @@ export function EventDetailPage() {
                       create.isPending ||
                       update.isPending ||
                       !form.title.trim() ||
-                      !form.startAt
+                      !form.startAt ||
+                      hasDateError
                     }
                   >
                     {isCreating ? (
@@ -470,13 +593,22 @@ export function EventDetailPage() {
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className={compactSecondaryButtonClass}
-                    onClick={() => setEditing(true)}
+                  <span
+                    title={
+                      canEdit
+                        ? undefined
+                        : "Không thể chỉnh sửa sau khi sự kiện đã bắt đầu"
+                    }
                   >
-                    <Pencil size={15} /> Chỉnh sửa
-                  </button>
+                    <button
+                      type="button"
+                      className={compactSecondaryButtonClass}
+                      disabled={!canEdit}
+                      onClick={() => setEditing(true)}
+                    >
+                      <Pencil size={15} /> Chỉnh sửa
+                    </button>
+                  </span>
                   <button
                     type="button"
                     className={compactDangerButtonClass}
@@ -491,7 +623,6 @@ export function EventDetailPage() {
         </PageBreadcrumbBar>
         <PageHeading
           title={isCreating ? "Thêm sự kiện" : "Chi tiết sự kiện"}
-          className="mb-5"
         />
         {detail?.myInvitationStatus && (
           <section className={`${surfaceCardClass} mb-5 flex flex-wrap items-center justify-between gap-3 p-4`}>
@@ -505,13 +636,16 @@ export function EventDetailPage() {
               </h2>
               <p className="mt-1 mb-0 text-sm text-ink-muted">
                 {detail.myInvitationStatus === "PENDING"
-                  ? "Xác nhận để tham gia cùng gia đình."
+                  ? canRespondToInvitation
+                    ? "Xác nhận để tham gia cùng gia đình."
+                    : "Sự kiện đã bắt đầu, lời mời không thể thay đổi."
                   : detail.myInvitationStatus === "ACCEPTED"
                     ? "Trạng thái tham gia: Đã chấp nhận."
                     : "Trạng thái tham gia: Đã từ chối."}
               </p>
             </div>
-            {detail.myInvitationStatus === "PENDING" && (
+            {detail.myInvitationStatus === "PENDING" &&
+              canRespondToInvitation && (
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -541,16 +675,68 @@ export function EventDetailPage() {
               <div className="p-5">
                 <form
                   id="event-details-form"
-                  className="grid gap-4"
+                  className="grid gap-5 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.4fr)]"
                   onSubmit={saveDetails}
                 >
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className={formLabelClass}>
-                        Tên sự kiện
-                        <input
-                          className={formInputClass}
-                          disabled={!editing}
+                  <aside className="grid content-start gap-5 rounded-xl bg-[#f1f6f3] p-4">
+                    <div className="grid gap-2">
+                      <div className="relative aspect-[16/10] overflow-hidden rounded-lg border border-border-default bg-[#dfe9e4]">
+                        {pendingCover?.previewUrl || detail?.coverUrl ? (
+                          <img
+                            src={pendingCover?.previewUrl ?? detail!.coverUrl!}
+                            alt={`Ảnh đại diện ${detail?.title ?? form.title}`}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <span className="grid size-full place-items-center text-ink-subtle">
+                            <span className="grid justify-items-center gap-2 text-xs">
+                              <ImageIcon size={28} />
+                              Chưa có ảnh đại diện
+                            </span>
+                          </span>
+                        )}
+                        {editing && (isCreating || detail?.canManage) && (
+                          <label
+                            className={`absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-black/55 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-black/65 ${update.isPending ? "cursor-wait" : "cursor-pointer"}`}
+                          >
+                            <Camera size={17} />
+                            {pendingCover || detail?.coverUrl
+                              ? "Thay ảnh đại diện"
+                              : "Thêm ảnh đại diện"}
+                            <input
+                              ref={coverRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={create.isPending || update.isPending}
+                              onChange={(input) => {
+                                const file = input.target.files?.[0];
+                                if (!file) return;
+                                if (!file.type.startsWith("image/")) {
+                                  notice.alert(
+                                    "Ảnh không hợp lệ",
+                                    "Ảnh đại diện phải là một tệp hình ảnh.",
+                                  );
+                                  input.target.value = "";
+                                  return;
+                                }
+                                setPendingCover({
+                                  file,
+                                  previewUrl: URL.createObjectURL(file),
+                                });
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                    {editing ? (
+                      <label className="grid gap-2">
+                        <textarea
+                          className={`${formTextareaClass} min-h-20 resize-none bg-white text-center font-display text-lg font-semibold`}
+                          aria-label="Tên sự kiện"
                           required
+                          rows={2}
                           maxLength={200}
                           value={form.title}
                           onChange={(input) =>
@@ -563,35 +749,73 @@ export function EventDetailPage() {
                           autoFocus={isCreating}
                         />
                       </label>
-                      <label className={formLabelClass}>
-                        Phân loại
-                        <select
-                          className={formSelectClass}
-                          disabled={!editing}
-                          value={form.category}
-                          onChange={(input) =>
-                            setForm((current) => ({
-                              ...current,
-                              category: input.target.value as EventCategory,
-                            }))
-                          }
+                    ) : (
+                      <h2 className="m-0 break-words text-center font-display text-xl leading-snug font-semibold text-ink">
+                        {form.title}
+                      </h2>
+                    )}
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex items-center justify-between gap-3 rounded-lg border border-white/80 bg-white/65 px-3 py-2.5">
+                        <span className="font-medium text-ink-subtle">
+                          Trạng thái
+                        </span>
+                        <strong
+                          className={`inline-flex items-center gap-2 ${statusTextClass}`}
                         >
-                          {eventCategories.map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          <span className="size-2 rounded-full bg-current opacity-75" />
+                          {displayStatus}
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-lg border border-white/80 bg-white/65 px-3 py-2.5">
+                        <span className="font-medium text-ink-subtle">
+                          Người tạo
+                        </span>
+                        <span className="grid min-w-0 justify-items-end">
+                          <strong className="max-w-full truncate text-right text-ink">
+                            {creatorName}
+                          </strong>
+                          {creatorEmail && (
+                            <span className="max-w-full truncate text-right text-xs text-ink-subtle">
+                              {creatorEmail}
+                            </span>
+                          )}
+                        </span>
+                      </div>
                     </div>
+                  </aside>
+                  <div className="grid content-start gap-4">
+                    <label className={formLabelClass}>
+                      Phân loại
+                      <select
+                        className={formSelectClass}
+                        disabled={!editing}
+                        value={form.category}
+                        onChange={(input) =>
+                          setForm((current) => ({
+                            ...current,
+                            category: input.target.value as EventCategory,
+                          }))
+                        }
+                      >
+                        {eventCategories.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <label className={formLabelClass}>
+                      <label className={`${formLabelClass} content-start`}>
                         Bắt đầu
                         <input
+                          id="event-start-at"
                           className={formInputClass}
+                          aria-invalid={Boolean(dateErrors.startAt)}
+                          aria-describedby={dateErrors.startAt ? "event-start-at-error" : undefined}
                           disabled={!editing}
                           required
                           type="datetime-local"
+                          min={minimumStartAt}
                           value={form.startAt}
                           onChange={(input) =>
                             setForm((current) => ({
@@ -600,14 +824,22 @@ export function EventDetailPage() {
                             }))
                           }
                         />
+                        {dateErrors.startAt && (
+                          <span id="event-start-at-error" className="text-xs font-medium text-red-600">
+                            {dateErrors.startAt}
+                          </span>
+                        )}
                       </label>
-                      <label className={formLabelClass}>
-                        Kết thúc (không bắt buộc)
+                      <label className={`${formLabelClass} content-start`}>
+                        Kết thúc
                         <input
+                          id="event-end-at"
                           className={formInputClass}
+                          aria-invalid={Boolean(dateErrors.endAt)}
+                          aria-describedby={dateErrors.endAt ? "event-end-at-error" : undefined}
                           disabled={!editing}
                           type="datetime-local"
-                          min={form.startAt || undefined}
+                          min={minimumEndAt}
                           value={form.endAt}
                           onChange={(input) =>
                             setForm((current) => ({
@@ -616,6 +848,11 @@ export function EventDetailPage() {
                             }))
                           }
                         />
+                        {dateErrors.endAt && (
+                          <span id="event-end-at-error" className="text-xs font-medium text-red-600">
+                            {dateErrors.endAt}
+                          </span>
+                        )}
                       </label>
                     </div>
                     <label className={formLabelClass}>
@@ -650,13 +887,8 @@ export function EventDetailPage() {
                         placeholder="Nội dung, chương trình, lưu ý cho người tham gia…"
                       />
                     </label>
+                  </div>
                 </form>
-                {detail && !editing && (
-                  <p className="mt-4 mb-0 border-t border-border-default pt-4 text-xs text-ink-subtle">
-                    Tạo bởi {detail.createdBy.name} · cập nhật{" "}
-                    {dateTime.format(new Date(detail.updatedAt))}
-                  </p>
-                )}
               </div>
             </section>
 
@@ -687,7 +919,7 @@ export function EventDetailPage() {
                       disabled={!detail.canUploadMedia || upload.isPending}
                       title={
                         !detail.canUploadMedia
-                          ? "Có thể tải lên sau khi sự kiện kết thúc"
+                          ? "Có thể tải lên khi sự kiện bắt đầu"
                           : undefined
                       }
                       onClick={() => fileRef.current?.click()}
@@ -700,7 +932,7 @@ export function EventDetailPage() {
               </header>
               {detail.canManage && !detail.canUploadMedia && (
                 <p className="rounded-lg bg-[#fff7e8] px-3 py-2 text-xs text-[#7a571e]">
-                  Tính năng tải ảnh và tài liệu sẽ mở sau khi sự kiện kết thúc.
+                  Tính năng tải ảnh và tài liệu sẽ mở khi sự kiện bắt đầu.
                 </p>
               )}
               {!detail.media.length && (
@@ -726,7 +958,7 @@ export function EventDetailPage() {
                           className="size-full object-cover"
                         />
                       </button>
-                      {detail.canManage && (
+                      {detail.canUploadMedia && (
                         <button
                           className="absolute top-1.5 right-1.5 grid size-7 cursor-pointer place-items-center rounded-full border-0 bg-black/60 text-white opacity-0 group-hover:opacity-100"
                           onClick={() => removeMedia.mutate(item.id)}
@@ -767,7 +999,7 @@ export function EventDetailPage() {
                       >
                         <Download size={16} />
                       </a>
-                      {detail.canManage && (
+                      {detail.canUploadMedia && (
                         <button
                           className="cursor-pointer border-0 bg-transparent text-[#a33d32]"
                           onClick={() => removeMedia.mutate(item.id)}
@@ -800,7 +1032,7 @@ export function EventDetailPage() {
                 <Users size={18} /> Người được mời ({detail.guests.length})
               </h2>
             </div>
-            {detail.canManage && (
+            {detail.canEdit && (
               <div className="mb-4 grid gap-3">
                 <div ref={guestPickerRef} className="relative">
                   <Search
@@ -837,7 +1069,7 @@ export function EventDetailPage() {
                           }
                           disabled={!availableInviteEmails.length}
                           onChange={toggleAllAvailable}
-                          label={`Chọn tất cả email (${availableInviteEmails.length})`}
+                          label={`Chọn tất cả (${availableInviteEmails.length})`}
                         />
                         {invitationOptions.map((person) => (
                           <div
@@ -1010,7 +1242,7 @@ export function EventDetailPage() {
                                 : "Chờ xác nhận"}
                           </span>
                         </div>
-                        {detail.canManage && (
+                        {detail.canEdit && (
                           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                             {guest.status === "PENDING" && (
                               <button

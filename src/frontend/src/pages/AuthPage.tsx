@@ -187,6 +187,7 @@ export function AuthPage() {
           },
         ]}
         light
+        sticky={false}
         headerClassName="absolute top-5 left-5 z-10"
         contentClassName=""
       />

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, Search, SlidersHorizontal } from "lucide-react";
+import { Bell, CheckCheck, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
@@ -28,6 +28,13 @@ const relativeTime = (value: string) => {
   return formatter.format(Math.round(hours / 24), "day");
 };
 
+const fullDateTime = (value: string) => {
+  const date = new Date(value);
+  const pad = (part: number) => part.toString().padStart(2, "0");
+
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -35,8 +42,6 @@ export function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"ALL" | "UNREAD" | "READ">("ALL");
-  const [sort, setSort] = useState<"desc" | "asc">("desc");
   const query = useQuery({
     queryKey: ["app-notifications"],
     queryFn: getNotifications,
@@ -69,12 +74,8 @@ export function NotificationBell() {
   }, [open]);
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
+
     return [...(query.data?.notifications ?? [])]
-      .filter(
-        (item) =>
-          status === "ALL" ||
-          (status === "UNREAD" ? !item.readAt : Boolean(item.readAt)),
-      )
       .filter(
         (item) =>
           !keyword ||
@@ -82,12 +83,8 @@ export function NotificationBell() {
             .toLowerCase()
             .includes(keyword),
       )
-      .sort(
-        (left, right) =>
-          (sort === "desc" ? -1 : 1) *
-          left.createdAt.localeCompare(right.createdAt),
-      );
-  }, [query.data, search, status, sort]);
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }, [query.data, search]);
   if (!user) return null;
   return (
     <div ref={panelRef} className="relative shrink-0">
@@ -110,17 +107,14 @@ export function NotificationBell() {
         )}
       </button>
       {open && (
-        <section className="absolute top-[calc(100%+0.65rem)] right-0 z-60 w-[min(26rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-[#c9d7d0] bg-[#f9fbfa] text-ink">
+        <section className="absolute top-[calc(100%+0.65rem)] right-0 z-60 w-[min(30rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-[#c9d7d0] bg-[#f9fbfa] text-ink shadow-[0_12px_30px_rgba(24,55,47,0.16)]">
           <header className="flex items-center justify-between border-b border-border-default px-4 py-3">
-            <div>
-              <h2 className="m-0 font-display text-lg">Thông báo</h2>
-              <p className="m-0 text-[0.68rem] text-ink-subtle">
-                {query.data?.unreadCount ?? 0} chưa đọc
-              </p>
-            </div>
+            <h2 className="m-0 font-display text-xl font-semibold">
+              Thông báo ({query.data?.notifications.length ?? 0})
+            </h2>
             <button
               type="button"
-              className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent text-xs font-bold text-accent-deep disabled:opacity-50"
+              className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent text-sm font-bold text-accent-deep disabled:opacity-50"
               disabled={!query.data?.unreadCount || readAll.isPending}
               onClick={() => readAll.mutate()}
             >
@@ -134,44 +128,21 @@ export function NotificationBell() {
                 size={13}
               />
               <input
-                className={`${formFieldClass} py-1.5 pl-8 text-xs`}
+                className={`${formFieldClass} py-2 pl-9 text-sm`}
                 value={search}
                 onChange={(input) => setSearch(input.target.value)}
                 placeholder="Tìm thông báo…"
               />
             </label>
-            <div className="grid grid-cols-2 gap-1.5">
-              <select
-                className={`${formFieldClass} py-1.5 text-[0.68rem]`}
-                value={status}
-                onChange={(input) =>
-                  setStatus(input.target.value as typeof status)
-                }
-              >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="UNREAD">Chưa đọc</option>
-                <option value="READ">Đã đọc</option>
-              </select>
-              <button
-                type="button"
-                className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-border-control bg-white px-2 text-[0.68rem] font-bold text-ink-soft"
-                onClick={() =>
-                  setSort((value) => (value === "desc" ? "asc" : "desc"))
-                }
-              >
-                <SlidersHorizontal size={12} />
-                {sort === "desc" ? "Mới nhất" : "Cũ nhất"}
-              </button>
-            </div>
           </div>
           <div className="max-h-[26rem] overflow-y-auto">
             {query.isLoading && (
-              <p className="p-4 text-center text-xs text-ink-muted">
+              <p className="p-4 text-center text-sm text-ink-muted">
                 Đang tải thông báo…
               </p>
             )}
             {!query.isLoading && !filtered.length && (
-              <p className="p-6 text-center text-xs text-ink-muted">
+              <p className="p-6 text-center text-sm text-ink-muted">
                 Không có thông báo phù hợp.
               </p>
             )}
@@ -179,32 +150,41 @@ export function NotificationBell() {
               <button
                 key={item.id}
                 type="button"
-                className={`flex w-full cursor-pointer gap-3 border-0 border-b border-border-default px-4 py-3 text-left last:border-b-0 ${item.readAt ? "bg-white" : "bg-[#edf6f1]"}`}
+                className={`flex w-full cursor-pointer gap-3 border-0 border-b border-border-default px-4 py-3 text-left transition-colors last:border-b-0 ${item.readAt ? "bg-white hover:bg-[#f4f7f5] focus-visible:bg-[#f4f7f5]" : "bg-[#edf6f1] hover:bg-[#e2f0e8] focus-visible:bg-[#e2f0e8]"}`}
                 onClick={() => {
                   if (!item.readAt) read.mutate(item.id);
                   setOpen(false);
                   if (item.actionUrl) navigate(item.actionUrl);
                 }}
               >
-                <span
-                  className={`mt-1.5 size-2 shrink-0 rounded-full ${item.readAt ? "bg-transparent" : "bg-[#c8862f]"}`}
-                />
                 <span className="min-w-0 flex-1">
-                  <span className="mb-0.5 block text-[0.6rem] font-bold tracking-wide text-accent-deep uppercase">
+                  <span className="mb-0.5 block text-[0.7rem] font-bold tracking-wide text-accent-deep uppercase">
                     {notificationTypeLabel(item.type)}
                   </span>
-                  <strong className="block truncate text-xs">
+                  <strong className="block truncate text-sm">
                     {item.title}
                   </strong>
                   {item.message && (
-                    <span className="mt-1 block line-clamp-2 text-[0.7rem] leading-4 text-ink-muted">
+                    <span className="mt-1 block line-clamp-2 text-xs leading-5 text-ink-muted">
                       {item.message}
                     </span>
                   )}
-                  <span className="mt-1 block text-[0.63rem] text-ink-subtle">
-                    {item.sourceName} · {relativeTime(item.createdAt)}
+                  <span className="mt-1 block text-xs text-ink-subtle">
+                    {item.sourceName} ·{" "}
+                    <time
+                      dateTime={item.createdAt}
+                      title={fullDateTime(item.createdAt)}
+                    >
+                      {relativeTime(item.createdAt)}
+                    </time>
                   </span>
                 </span>
+                {!item.readAt && (
+                  <span
+                    className="size-2.5 shrink-0 self-center rounded-full bg-[#c8862f]"
+                    aria-label="Chưa đọc"
+                  />
+                )}
               </button>
             ))}
           </div>

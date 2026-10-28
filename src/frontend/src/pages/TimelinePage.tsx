@@ -10,6 +10,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -384,6 +385,15 @@ function TimelineRow({
       className={`group relative mb-2 flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 outline-none transition-colors last:mb-0 hover:bg-[#f8fbf9] focus-visible:border-focus ${selected ? "border-focus bg-[#f8fbf9]" : "border-border-default bg-white hover:border-[#9eb4aa]"}`}
     >
       {marker}
+      <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#e1ebe6] text-ink-subtle">
+        {entry.imageUrl ? (
+          <img src={entry.imageUrl} alt="" className="size-full object-cover" />
+        ) : entry.kind === "EVENT" ? (
+          <CalendarDays size={19} />
+        ) : (
+          <UserRound size={19} />
+        )}
+      </span>
       <span className="min-w-0 flex-1">
         <strong className="line-clamp-2 text-sm leading-5" title={entry.title}>
           {entry.title}
@@ -497,7 +507,7 @@ export function TimelinePage() {
   return (
     <main className="min-h-[calc(100vh-4rem)] bg-surface-page px-4 py-4 text-ink md:px-6">
       <PageBreadcrumbBar
-        headerClassName="z-3 -mx-4 -mt-4 mb-5 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 md:-mx-6"
+        headerClassName="z-3 -mx-4 -mt-4 mb-6 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 md:-mx-6"
         contentClassName="w-full justify-between gap-4"
         items={[
           { label: "Trang chủ", to: "/" },
@@ -525,7 +535,7 @@ export function TimelinePage() {
         </div>
       </PageBreadcrumbBar>
       <div className="mx-auto max-w-[120rem]">
-        <div className="mb-5 grid items-start gap-4 xl:grid-cols-[minmax(12rem,0.35fr)_minmax(0,2fr)]">
+        <div className="mb-4 grid items-center gap-4 xl:grid-cols-[minmax(12rem,0.35fr)_minmax(0,2fr)]">
           <PageHeading
             className="mb-0"
             title="Dòng thời gian"

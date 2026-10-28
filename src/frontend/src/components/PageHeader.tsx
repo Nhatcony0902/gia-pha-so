@@ -5,6 +5,7 @@ export function PageBreadcrumbBar({
   items,
   children,
   light = false,
+  sticky = true,
   breadcrumbClassName,
   headerClassName = "border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5",
   contentClassName = "w-full justify-between gap-4",
@@ -12,12 +13,15 @@ export function PageBreadcrumbBar({
   items: BreadcrumbItem[];
   children?: ReactNode;
   light?: boolean;
+  sticky?: boolean;
   breadcrumbClassName?: string;
   headerClassName?: string;
   contentClassName?: string;
 }) {
   return (
-    <header className={`h-16 ${headerClassName}`}>
+    <header
+      className={`${sticky ? "sticky top-16 z-20" : ""} h-16 ${headerClassName}`}
+    >
       <div className={`flex h-full items-center ${contentClassName}`}>
         <Breadcrumbs
           items={items}
@@ -36,7 +40,7 @@ export function PageHeading({
   children,
   className = "mb-4",
   eyebrowClassName = "m-0 text-xs font-bold tracking-widest text-accent-deep",
-  titleClassName = "m-0 font-display text-2xl",
+  titleClassName = "m-0 font-display text-2xl font-semibold",
 }: {
   title: ReactNode;
   eyebrow?: ReactNode;

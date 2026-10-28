@@ -52,3 +52,8 @@ export class AddEventMediaDto {
   @IsOptional() @IsInt() @Min(0) width?: number | null;
   @IsOptional() @IsInt() @Min(0) height?: number | null;
 }
+
+export class SetEventCoverDto {
+  @IsUrl({ require_protocol: true }) url!: string;
+  @IsString() @IsNotEmpty() publicId!: string;
+}

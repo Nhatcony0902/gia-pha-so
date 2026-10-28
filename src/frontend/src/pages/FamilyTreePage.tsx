@@ -339,7 +339,7 @@ export function FamilyTreePage({
 
   const canEdit = graph.data.tree.myRole === "ADMIN";
   return (
-    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-surface-page text-ink">
+    <main className="relative grid h-[calc(100vh-4.5rem)] grid-rows-[auto_minmax(0,1fr)] bg-surface-page text-ink">
       <PageBreadcrumbBar
         headerClassName="z-3 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5"
         contentClassName="w-full justify-between gap-4"
