@@ -21,3 +21,11 @@ Là thành viên dòng họ, tôi muốn xem các sự kiện của dòng họ t
 - Timeline dạng social feed (Tailwind tự dựng hoặc vis-timeline)
 
 ## Ghi chú kỹ thuật
+
+## Tiến độ
+- [x] Timeline dòng họ gộp ngày sinh/mất suy ra từ hồ sơ và sự kiện dòng họ (`GET /trees/{id}/timeline`, PR #8)
+- [x] Lọc theo loại sự kiện, tìm kiếm, sắp xếp; xem dạng lịch kèm ngày âm lịch
+- [ ] Sự kiện cưới suy ra từ quan hệ `SPOUSE`
+- [ ] Sự kiện cá nhân nhập tay (LifeEvent, ví dụ chuyển nơi ở). Hiện chỉ có sự kiện cấp dòng họ (LMS-014)
+- [ ] Lọc theo khoảng năm, theo nhánh
+- [ ] Timeline cá nhân trong trang hồ sơ

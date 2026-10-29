@@ -1,6 +1,6 @@
 # LMS-016: AI Chatbot (RAG)
 
-- **Trạng thái:** Todo
+- **Trạng thái:** In Progress
 - **Owner:** Nhật
 - **Sprint:** Sprint 01–07
 - **Spec liên quan:** `specs/features.md` (C1)
@@ -50,3 +50,8 @@ Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên v�
 | Test | Chưa có test runner ở `backend` | Cần thêm (ví dụ Vitest) để test tool và chạy bộ câu hỏi đánh giá |
 | UI | Có layout, Navbar, route `/trees/:treeId/persons/:personId` cho link hồ sơ. Chưa có `features/chatbot/` | Làm được chat UI ngay |
 | Nhánh `feature/LMS-005-relationship` | Chưa merge, sửa nhiều `trees.service.ts` | Module `ai` gọi qua service, không copy truy vấn, để tránh conflict |
+
+## Tiến độ
+- [x] ADR-0004 kiến trúc agentic RAG (PR #6, đang `Proposed`)
+- [ ] Chốt LLM + embedding, bộ câu hỏi đánh giá ≥ 20 câu (việc S01, đang trễ)
+- [ ] Prototype pipeline RAG trên dữ liệu seed (S02)
