@@ -53,5 +53,8 @@ Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên v�
 
 ## Tiến độ
 - [x] ADR-0004 kiến trúc agentic RAG (PR #6, đang `Proposed`)
-- [ ] Chốt LLM + embedding, bộ câu hỏi đánh giá ≥ 20 câu (việc S01, đang trễ)
-- [ ] Prototype pipeline RAG trên dữ liệu seed (S02)
+- [x] Chốt LLM + embedding: Gemini (ADR-0005, đang `Proposed`)
+- [x] Bộ câu hỏi đánh giá 30 câu, 7 nhóm (`src/backend/src/modules/ai/eval/questions.ts`), dữ liệu đáp án được kiểm bằng test
+- [x] Seed dòng họ mẫu Lê Đình (54 người, 5 đời, tái hôn, con nuôi, tiểu sử) cho chatbot và demo
+- [x] Prototype agentic RAG chạy từ terminal: 5 tool, vòng lặp tool calling, `ai:chat`, `ai:eval` (xem `docs/ai/README.md`)
+- [ ] Chạy `ai:eval` với Gemini thật, ghi kết quả đầu tiên vào `docs/ai/eval-results/`
