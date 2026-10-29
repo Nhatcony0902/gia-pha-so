@@ -7,7 +7,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
-import { Breadcrumbs } from "../components/Breadcrumbs";
+import { PageBreadcrumbBar, PageHeading } from "../components/PageHeader";
 import {
   createTree,
   deleteTree,
@@ -143,25 +143,22 @@ export function TreesPage() {
   };
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(150deg,#203a34_0%,#29483e_55%,#355b4a_100%)] px-[max(1.25rem,calc((100vw-76rem)/2))] py-[clamp(1.5rem,3vw,3rem)] text-content-primary">
-      <header>
-        <Breadcrumbs
-          items={[
-            { label: "Trang chủ", to: "/" },
-            { label: "Danh sách gia phả" },
-          ]}
-          light
-          className="mb-7"
-        />
-        <p className="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase">
-          KHÔNG GIAN GIA PHẢ
-        </p>
-        <h1 className="my-[0.7rem] font-display text-[clamp(1.9rem,3vw,2.8rem)] leading-tight font-semibold">
-          Gia phả của bạn
-        </h1>
-        <span className="text-base text-content-secondary">
-          Chọn một gia phả để khám phá các thế hệ và mối quan hệ.
-        </span>
-      </header>
+      <PageBreadcrumbBar
+        items={[
+          { label: "Trang chủ", to: "/" },
+          { label: "Danh sách gia phả" },
+        ]}
+        light
+        headerClassName="mb-7"
+        contentClassName="flex items-center"
+      />
+      <PageHeading
+        className="mb-0"
+        eyebrow="KHÔNG GIAN GIA PHẢ"
+        eyebrowClassName="m-0 text-xs font-bold tracking-[0.13em] text-accent uppercase"
+        title="Gia phả của bạn"
+        titleClassName="my-[0.7rem] font-display text-[clamp(1.9rem,3vw,2.8rem)] leading-tight font-semibold"
+      />
       <section className="mt-9" aria-labelledby="owned-trees-title">
         <div className={sectionHeadingClass}>
           <h2 id="owned-trees-title">Gia phả của tôi</h2>

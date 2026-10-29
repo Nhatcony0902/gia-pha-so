@@ -26,7 +26,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useNotifications } from "../app/providers/NotificationProvider";
-import { Breadcrumbs } from "../components/Breadcrumbs";
+import { PageBreadcrumbBar, PageHeading } from "../components/PageHeader";
 import {
   addPersonImage,
   createPerson,
@@ -45,8 +45,10 @@ import {
   compactDangerButtonClass,
   compactPrimaryButtonClass,
   compactSecondaryButtonClass,
-  formFieldClass,
+  formInputClass,
   formLabelClass,
+  formSelectClass,
+  formTextareaClass,
   surfaceCardClass,
 } from "../lib/ui-classes";
 
@@ -501,7 +503,7 @@ export function PersonDetailPage() {
         <div
           className={`mx-auto w-full transition-[padding-right] duration-250 ${creationMode === "existing" && candidateSidebar ? "min-[801px]:pr-92" : ""}`}
         >
-          <Breadcrumbs
+          <PageBreadcrumbBar
             items={[
               { label: "Trang chủ", to: "/" },
               { label: "Danh sách gia phả", to: "/trees" },
@@ -509,7 +511,7 @@ export function PersonDetailPage() {
               { label: "Thành viên", to: `/trees/${treeId}/members` },
               { label: "Thêm thành viên" },
             ]}
-            className="mb-5"
+            headerClassName="z-3 -mx-4 -mt-6 mb-5 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 md:-mx-8"
           />
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <Link
@@ -584,7 +586,7 @@ export function PersonDetailPage() {
                     />
                     <input
                       type="search"
-                      className={`${formFieldClass} pl-10`}
+                      className={`${formInputClass} pl-10`}
                       placeholder="Tìm theo tên hoặc gia phả…"
                       value={candidateSearch}
                       onChange={(event) =>
@@ -630,7 +632,7 @@ export function PersonDetailPage() {
                             return (
                               <article
                                 key={`${group.tree.id}-${candidate.id}`}
-                                className={`flex items-stretch overflow-hidden rounded-xl border transition-colors ${selected ? "border-accent bg-[#fff8e9] shadow-sm" : "border-border-default bg-white hover:bg-surface-hover"}`}
+                                className={`flex items-stretch overflow-hidden rounded-xl border transition-colors ${selected ? "border-accent bg-[#fff8e9]" : "border-border-default bg-white hover:bg-surface-hover"}`}
                               >
                                 <label className="flex shrink-0 cursor-pointer items-center px-3 pl-4">
                                   <input
@@ -931,7 +933,7 @@ export function PersonDetailPage() {
   return (
     <main className="min-h-[calc(100vh-4.5rem)] bg-surface-page px-4 py-6 text-ink md:px-8">
       <div className="mx-auto w-full">
-        <Breadcrumbs
+        <PageBreadcrumbBar
           items={[
             { label: "Trang chủ", to: "/" },
             { label: "Danh sách gia phả", to: "/trees" },
@@ -942,17 +944,10 @@ export function PersonDetailPage() {
             { label: "Thành viên", to: `/trees/${treeId}/members` },
             { label: person.fullName },
           ]}
-          className="mb-5"
-        />
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to={`/trees/${treeId}/tree?person=${personId}`}
-            className="flex items-center gap-2 text-[#805824] no-underline"
-          >
-            <ArrowLeft size={18} /> Trở lại gia phả
-          </Link>
+          headerClassName="z-3 -mx-4 -mt-6 mb-5 border-b border-border-default bg-[rgba(249,251,250,0.96)] px-5 md:-mx-8"
+        >
           {canEdit && (
-            <div className="flex gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 min-[801px]:w-auto">
               {!editing && (
                 <button
                   type="button"
@@ -1012,7 +1007,8 @@ export function PersonDetailPage() {
               </button>
             </div>
           )}
-        </div>
+        </PageBreadcrumbBar>
+        <PageHeading title="Hồ sơ thành viên" className="mb-5" />
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.65fr)]">
           <aside className="grid gap-5">
             <section
@@ -1043,12 +1039,9 @@ export function PersonDetailPage() {
                 </label>
               </div>
               <div>
-                <p className="m-0 text-xs font-bold tracking-widest text-accent-deep">
-                  HỒ SƠ THÀNH VIÊN
-                </p>
-                <h1 className="mt-1 mb-1 font-display text-2xl">
+                <h2 className="mt-1 mb-1 font-display text-2xl">
                   {person.fullName}
-                </h1>
+                </h2>
               </div>
             </section>
             <section className={`${surfaceCardClass} p-5`}>
@@ -1260,8 +1253,8 @@ function FieldInput({
   disabled: boolean;
   onChange: (value: unknown) => void;
 }) {
-  const common = `${formFieldClass} disabled:border-transparent disabled:bg-[#f1f5f2] disabled:text-[#52645c]`;
-  const selectClass = `${common} appearance-none pr-10`;
+  const common = formInputClass;
+  const selectClass = `${formSelectClass} appearance-none pr-10`;
   const selectArrow = (
     <ChevronDown
       aria-hidden="true"
@@ -1272,7 +1265,7 @@ function FieldInput({
     return (
       <textarea
         rows={field.type === "json" ? 4 : 3}
-        className={common}
+        className={formTextareaClass}
         disabled={disabled}
         value={String(value ?? "")}
         onChange={(event) => onChange(event.target.value)}

@@ -22,6 +22,9 @@ model User {
   familyTrees     FamilyTree[]
   memberships     Membership[]
   invitations     Invitation[]
+  createdEvents   FamilyEvent[]        @relation("EventCreator")
+  eventGuests     EventGuest[]
+  notifications   Notification[]
 }
 
 enum Gender {
@@ -63,8 +66,99 @@ model FamilyTree {
   relationships Relationship[]
   memberships   Membership[]
   invitations   Invitation[]
+  events        FamilyEvent[]
 
   @@index([createdById, updatedAt])
+}
+
+enum EventCategory {
+  DEATH_ANNIVERSARY
+  REUNION
+  CEREMONY
+  WEDDING
+  BIRTHDAY
+  MEETING
+  OTHER
+}
+
+enum EventMediaType {
+  IMAGE
+  DOCUMENT
+}
+
+model FamilyEvent {
+  id              String        @id @default(cuid())
+  treeId          String
+  title           String
+  category        EventCategory
+  description     String?
+  location        String?
+  coverUrl        String?
+  coverPublicId   String?
+  startAt         DateTime
+  endAt           DateTime?
+  createdById     String
+  notifiedAt      DateTime?
+  endedNotifiedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tree            FamilyTree    @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  createdBy       User          @relation("EventCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  guests          EventGuest[]
+  media           EventMedia[]
+
+  @@index([treeId, startAt])
+  @@index([notifiedAt, startAt])
+  @@index([endedNotifiedAt, endAt])
+}
+
+model EventGuest {
+  id         String      @id @default(cuid())
+  eventId    String
+  email      String
+  userId     String?
+  invitedAt  DateTime    @default(now())
+  acceptedAt DateTime?
+  declinedAt DateTime?
+  event      FamilyEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, email])
+  @@index([userId])
+}
+
+model EventMedia {
+  id           String         @id @default(cuid())
+  eventId      String
+  url          String
+  publicId     String         @unique
+  type         EventMediaType
+  originalName String
+  mimeType     String?
+  format       String?
+  bytes        Int?
+  width        Int?
+  height       Int?
+  createdAt    DateTime       @default(now())
+  event        FamilyEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String    @default("SYSTEM")
+  sourceType String    @default("SYSTEM")
+  sourceName String    @default("Hệ thống")
+  title      String
+  message    String
+  actionUrl  String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
 }
 
 enum TreeRole {
@@ -158,19 +252,19 @@ model Person {
 }
 
 model PersonImage {
-  id          String   @id @default(cuid())
-  personId    String
-  url         String
-  publicId    String   @unique
-  caption     String?
-  takenAt     DateTime?
-  width       Int?
-  height      Int?
-  format      String?
-  bytes       Int?
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  personId  String
+  url       String
+  publicId  String    @unique
+  caption   String?
+  takenAt   DateTime?
+  width     Int?
+  height    Int?
+  format    String?
+  bytes     Int?
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  person    Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([personId, sortOrder])
 }

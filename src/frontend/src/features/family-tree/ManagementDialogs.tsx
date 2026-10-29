@@ -59,7 +59,7 @@ export function DialogShell({
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <section
-        className={`my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto ${wide ? "w-[min(68rem,100%)]" : "w-[min(42rem,100%)]"} rounded-2xl bg-surface-soft p-5 text-ink shadow-[0_24px_70px_rgba(0,0,0,0.42)] md:p-6`}
+        className={`my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto ${wide ? "w-[min(68rem,100%)]" : "w-[min(42rem,100%)]"} rounded-2xl border border-border-default bg-surface-soft p-5 text-ink md:p-6`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="management-dialog-title"

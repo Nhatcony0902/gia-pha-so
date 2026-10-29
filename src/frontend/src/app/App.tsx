@@ -20,6 +20,7 @@ import { PersonDetailPage } from "../pages/PersonDetailPage";
 import { TimelinePage } from "../pages/TimelinePage";
 import { HomePage } from "../pages/HomePage";
 import { InvitePage } from "../pages/InvitePage";
+import { EventDetailPage } from "../pages/EventDetailPage";
 
 function LegacyTreeRedirect() {
   const { treeId } = useParams();
@@ -109,6 +110,14 @@ export function App() {
                     element={
                       <ProtectedRoute>
                         <PersonDetailPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/events/:eventId"
+                    element={
+                      <ProtectedRoute>
+                        <EventDetailPage />
                       </ProtectedRoute>
                     }
                   />

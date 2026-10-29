@@ -4,7 +4,7 @@
 
 @theme {
   --font-sans: "DM Sans", sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-display: "DM Sans", sans-serif;
   --tracking-eyebrow: 0.12em;
 
   --color-page-start: #12211f;
@@ -86,7 +86,6 @@
   overflow: hidden;
   border: 1px solid #b6c8bf;
   border-radius: 0.5rem;
-  box-shadow: 0 8px 25px rgba(23, 48, 42, 0.12);
 }
 
 .react-flow__controls-button {

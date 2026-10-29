@@ -53,6 +53,20 @@ export class AuthService {
     };
   }
 
+  private async sendRegistrationSuccessEmail(user: User) {
+    try {
+      await this.mail.sendRegistrationSuccess({
+        email: user.email,
+        name: user.name,
+        url: `${process.env.WEB_ORIGIN ?? "http://localhost:5173"}/trees`,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not send registration success email to ${user.email}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   private async createChallenge(input: {
     email: string;
     purpose: VerificationPurpose;
@@ -220,8 +234,20 @@ export class AuthService {
         where: { email, purpose: VerificationPurpose.REGISTER, usedAt: null },
         data: { usedAt: new Date() },
       });
+      await tx.notification.create({
+        data: {
+          userId: created.id,
+          type: "ACCOUNT_WELCOME",
+          sourceType: "SYSTEM",
+          sourceName: "Hệ thống",
+          title: "Đăng ký thành công",
+          message: `Chào mừng ${created.name} đến với Gia Phả Số`,
+          actionUrl: "/trees",
+        },
+      });
       return created;
     });
+    await this.sendRegistrationSuccessEmail(user);
     return this.issueSession(user, client);
   }
 
@@ -278,16 +304,18 @@ export class AuthService {
         code: "GOOGLE_ACCOUNT_CONFLICT",
         message: "Email đã liên kết với tài khoản Google khác",
       });
-    user = user
-      ? await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleSubject: payload.sub,
-            avatarUrl: user.avatarUrl ?? payload.picture,
-            emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
-          },
-        })
-      : await this.prisma.user.create({
+    if (user) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleSubject: payload.sub,
+          avatarUrl: user.avatarUrl ?? payload.picture,
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+        },
+      });
+    } else {
+      user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
           data: {
             email,
             name: payload.name ?? email.split("@")[0]!,
@@ -296,6 +324,21 @@ export class AuthService {
             emailVerifiedAt: new Date(),
           },
         });
+        await tx.notification.create({
+          data: {
+            userId: created.id,
+            type: "ACCOUNT_WELCOME",
+            sourceType: "SYSTEM",
+            sourceName: "Hệ thống",
+            title: "Đăng ký thành công",
+            message: `Chào mừng ${created.name} đến với Gia Phả Số`,
+            actionUrl: "/trees",
+          },
+        });
+        return created;
+      });
+      await this.sendRegistrationSuccessEmail(user);
+    }
     await this.prisma.verificationChallenge.updateMany({
       where: { email, purpose: VerificationPurpose.REGISTER, usedAt: null },
       data: { usedAt: new Date() },

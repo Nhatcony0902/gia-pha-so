@@ -9,7 +9,7 @@ type SurfaceCardProps = HTMLAttributes<HTMLElement> & {
 const variantClass = {
   card: surfaceCardClass,
   table:
-    "min-h-0 flex-1 overflow-auto rounded-card border border-border-control bg-surface shadow-[0_10px_30px_rgba(27,54,47,0.08)]",
+    "min-h-0 flex-1 overflow-auto rounded-card border border-border-control bg-surface",
 };
 
 export function SurfaceCard({

@@ -266,6 +266,134 @@ export interface CloudinarySignature {
   folder: string;
 }
 
+export type EventCategory =
+  | "DEATH_ANNIVERSARY"
+  | "REUNION"
+  | "CEREMONY"
+  | "WEDDING"
+  | "BIRTHDAY"
+  | "MEETING"
+  | "OTHER";
+
+export type TimelineEntryKind = "EVENT" | "BIRTH" | "DEATH";
+
+export interface TimelineEntry {
+  id: string;
+  kind: TimelineEntryKind;
+  category: EventCategory | "BIRTH" | "DEATH";
+  title: string;
+  description: string | null;
+  location: string | null;
+  imageUrl: string | null;
+  startAt: string;
+  endAt: string | null;
+  eventId: string | null;
+  personId: string | null;
+}
+
+export interface TimelineResponse {
+  tree: FamilyTreeSummary;
+  entries: TimelineEntry[];
+  canManage: boolean;
+}
+
+export interface FamilyEventInput {
+  title: string;
+  category: EventCategory;
+  description?: string | null;
+  location?: string | null;
+  startAt: string;
+  endAt?: string | null;
+}
+
+export type FamilyEventUpdateInput = Partial<FamilyEventInput>;
+
+export interface EventGuest {
+  id: string;
+  email: string;
+  userId: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+  invitedAt: string;
+  status: "PENDING" | "ACCEPTED" | "DECLINED";
+  acceptedAt: string | null;
+  declinedAt: string | null;
+}
+
+export interface EventMedia {
+  id: string;
+  url: string;
+  publicId: string;
+  type: "IMAGE" | "DOCUMENT";
+  originalName: string;
+  mimeType: string | null;
+  format: string | null;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: string;
+}
+
+export interface FamilyEventDetail {
+  id: string;
+  treeId: string;
+  treeName: string;
+  title: string;
+  category: EventCategory;
+  description: string | null;
+  location: string | null;
+  coverUrl: string | null;
+  startAt: string;
+  endAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id: string; name: string; email: string };
+  guests: EventGuest[];
+  media: EventMedia[];
+  canManage: boolean;
+  canEdit: boolean;
+  canUploadMedia: boolean;
+  myInvitationStatus: "PENDING" | "ACCEPTED" | "DECLINED" | null;
+}
+
+export interface AddEventGuestsInput {
+  emails: string[];
+}
+
+export interface AddEventMediaInput {
+  url: string;
+  publicId: string;
+  type: "IMAGE" | "DOCUMENT";
+  originalName: string;
+  mimeType?: string | null;
+  format?: string | null;
+  bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface EventCoverInput {
+  url: string;
+  publicId: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  sourceType: string;
+  sourceName: string;
+  title: string;
+  message: string;
+  actionUrl: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
+
 export interface LinkedPerson {
   id: string;
   fullName: string;

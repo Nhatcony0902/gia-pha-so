@@ -21,6 +21,7 @@ import { useNotifications } from "../app/providers/NotificationProvider";
 import logo from "../assets/images/logo.svg";
 import { getTrees } from "../features/family-tree/api";
 import { primaryButtonClass } from "../lib/ui-classes";
+import { NotificationBell } from "./NotificationBell";
 
 const menuItemClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-semibold no-underline transition-colors ${isActive ? "border-accent text-white" : "border-transparent text-content-secondary hover:text-white"}`;
@@ -42,13 +43,15 @@ export function Navbar() {
   });
   const treePathSegment = location.pathname.split("/")[3] ?? "";
   const treeView =
-    treePathSegment === "persons"
-      ? "members"
-      : ["tree", "members", "relationships", "timeline"].includes(
-            treePathSegment,
-          )
-        ? treePathSegment
-        : "tree";
+    treePathSegment === "events"
+      ? "timeline"
+      : treePathSegment === "persons"
+        ? "members"
+        : ["tree", "members", "relationships", "timeline"].includes(
+              treePathSegment,
+            )
+          ? treePathSegment
+          : "tree";
   const availableTrees = [
     ...(trees.data?.createdByMe ?? []),
     ...(trees.data?.sharedWithMe ?? []),
@@ -133,7 +136,7 @@ export function Navbar() {
     <div ref={treeSelectorRef} className="relative min-w-0 shrink">
       <button
         type="button"
-        className="flex h-10 w-[clamp(10rem,20vw,16rem)] max-w-[calc(100vw-7rem)] cursor-pointer items-center gap-1.5 rounded-lg border border-white/50 bg-[rgba(18,38,33,0.58)] px-2.5 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] outline-none transition hover:border-white hover:bg-[rgba(18,38,33,0.82)] focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-10 w-[clamp(10rem,20vw,16rem)] max-w-[calc(100vw-7rem)] cursor-pointer items-center gap-1.5 rounded-lg border border-white/50 bg-[rgba(18,38,33,0.58)] px-2.5 text-left text-white outline-none transition-colors hover:border-white hover:bg-[rgba(18,38,33,0.82)] focus-visible:border-white disabled:cursor-not-allowed disabled:opacity-60"
         aria-label="Chuyển gia phả"
         aria-haspopup="menu"
         aria-controls="tree-selector-menu"
@@ -156,7 +159,7 @@ export function Navbar() {
           id="tree-selector-menu"
           role="menu"
           aria-label="Danh sách gia phả"
-          className="absolute top-[calc(100%+0.55rem)] left-0 z-50 w-full overflow-hidden rounded-xl border border-[#cad8d1] bg-[#f7faf8] p-2 text-ink shadow-[0_18px_50px_rgba(6,24,19,0.3)]"
+          className="absolute top-[calc(100%+0.55rem)] left-0 z-50 w-full overflow-hidden rounded-xl border border-[#cad8d1] bg-[#f7faf8] p-2 text-ink"
         >
           {trees.data?.createdByMe.length ? (
             <div className="mb-1 last:mb-0">
@@ -254,7 +257,9 @@ export function Navbar() {
         <GitFork size={16} /> Quan hệ
       </NavLink>
       <NavLink
-        className={menuItemClass}
+        className={({ isActive }) =>
+          menuItemClass({ isActive: isActive || treeView === "timeline" })
+        }
         to={`/trees/${treeId}/timeline`}
         onClick={() => setOpen(false)}
       >
@@ -295,11 +300,15 @@ export function Navbar() {
         <div className="hidden min-w-0 flex-1 justify-center min-[901px]:flex">
           {treeNavigation}
         </div>
-        <div className="ml-auto hidden min-w-0 min-[901px]:block">
+        <div className="ml-auto hidden min-w-0 items-center gap-3 min-[901px]:flex">
+          <NotificationBell />
           {accountActions}
         </div>
+        <div className="ml-auto min-[901px]:hidden">
+          <NotificationBell />
+        </div>
         <button
-          className="ml-auto rounded-lg border border-outline bg-transparent px-3 py-2 text-white min-[901px]:hidden"
+          className="rounded-lg border border-outline bg-transparent px-3 py-2 text-white min-[901px]:hidden"
           type="button"
           aria-expanded={open}
           aria-controls="nav-actions"
@@ -309,7 +318,7 @@ export function Navbar() {
         </button>
         <div
           id="nav-actions"
-          className={`${open ? "flex" : "hidden"} absolute top-16 right-4 left-4 flex-col items-stretch gap-4 rounded-xl border border-outline bg-[#29483e] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.3)] min-[901px]:hidden`}
+          className={`${open ? "flex" : "hidden"} absolute top-16 right-4 left-4 flex-col items-stretch gap-4 rounded-xl border border-outline bg-[#29483e] p-4 min-[901px]:hidden`}
         >
           {treeNavigation}
           {accountActions}

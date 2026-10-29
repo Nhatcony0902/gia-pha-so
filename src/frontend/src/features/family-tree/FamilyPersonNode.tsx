@@ -41,7 +41,7 @@ export function FamilyPersonNode({ data: person }: NodeProps<FamilyFlowNode>) {
     .join(" – ");
   return (
     <article
-      className={`family-node flex min-h-20 w-[200px] items-center gap-[0.6rem] rounded-[0.7rem] border-2 border-[#869e93] p-2.5 text-ink shadow-[0_8px_20px_rgba(30,58,51,0.14)] transition-[transform,background-color,box-shadow,border-color] duration-180 ${genderBorderClass[person.gender]} ${nodeBackgroundClass(person.isDeceased, person.selectedPerson)}`}
+      className={`family-node flex min-h-20 w-[200px] items-center gap-[0.6rem] rounded-[0.7rem] border-2 border-[#869e93] p-2.5 text-ink transition-[transform,background-color,border-color] duration-180 ${genderBorderClass[person.gender]} ${nodeBackgroundClass(person.isDeceased, person.selectedPerson)}`}
       aria-label={`${person.fullName}, ${genderLabel}${person.isDeceased ? ", đã mất" : ""}`}
     >
       <Handle id="child-target" type="target" position={Position.Top} />
