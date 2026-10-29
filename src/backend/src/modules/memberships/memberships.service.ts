@@ -181,15 +181,22 @@ export class MembershipsService {
           message: "Hồ sơ này đã gắn với một tài khoản khác",
         });
     }
-    if (
-      email &&
-      (await this.prisma.membership.findFirst({
-        where: { treeId, user: { email } },
-      }))
-    )
+    // Người đã vào gia phả (vd. qua link chung) vẫn mời lại được để gắn hồ sơ,
+    // khi chấp nhận thì giữ nguyên vai trò, chỉ gắn Person.
+    const member = email
+      ? await this.prisma.membership.findFirst({
+          where: { treeId, user: { email } },
+        })
+      : null;
+    if (member && !personId)
       throw new ConflictException({
         code: "ALREADY_MEMBER",
         message: "Người này đã có quyền truy cập gia phả",
+      });
+    if (member?.personId)
+      throw new ConflictException({
+        code: "MEMBER_ALREADY_LINKED",
+        message: "Tài khoản này đã gắn với một hồ sơ khác trong gia phả",
       });
 
     const token = generateInvitationToken();
