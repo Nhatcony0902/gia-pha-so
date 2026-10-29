@@ -16,6 +16,9 @@ target/
 .env.*
 !.env.example
 
+# Cache (vector embedding của chatbot prototype)
+.cache/
+
 # Logs
 *.log
 logs/

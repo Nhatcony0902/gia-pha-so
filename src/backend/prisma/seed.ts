@@ -11,6 +11,7 @@ import {
   canonicalSpousePair,
   validateParentRelationships,
 } from "../src/modules/trees/relationship-validation.js";
+import { seedLeDinhFamily } from "./seed-data/le-dinh-family.js";
 
 const prisma = new PrismaClient();
 const ADMIN_ID = "seed-user-admin";
@@ -442,12 +443,13 @@ async function main() {
       },
     });
   }
+  await seedLeDinhFamily(prisma, admin.id, passwordHash);
 }
 
 main()
   .then(() =>
     console.log(
-      "Seeded relationship master data and the British royal family demo.",
+      "Seeded relationship master data, the British royal family and the Le Dinh family demos.",
     ),
   )
   .finally(async () => prisma.$disconnect());
