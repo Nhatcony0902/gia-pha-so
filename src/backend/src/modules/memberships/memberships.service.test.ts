@@ -426,13 +426,50 @@ describe("MembershipsService", () => {
       assert.equal(db.invitations.length, 0);
     });
 
-    it("không mời được người đã ở trong gia phả", async () => {
+    it("không mời được người đã ở trong gia phả nếu không kèm hồ sơ", async () => {
       await assert.rejects(
         service.createInvitation(TREE, "admin", {
           email: "viewer@example.com",
         }),
         ConflictException,
       );
+    });
+
+    it("người đã vào bằng link chung được mời lại để gắn hồ sơ, giữ vai trò cũ", async () => {
+      await service.createInvitation(TREE, "admin", {
+        email: "viewer@example.com",
+        personId: "p-binh",
+      });
+      const result = await service.accept(
+        tokenFromUrl(mail.sent[0]!.url),
+        "viewer",
+      );
+      assert.deepEqual(result, {
+        treeId: TREE,
+        role: "VIEWER",
+        alreadyMember: true,
+      });
+      assert.equal(db.memberships[1]!.personId, "p-binh");
+      assert.equal(db.invitations[0]!.useCount, 1);
+    });
+
+    it("không gắn hồ sơ cho tài khoản đã gắn hồ sơ khác (409)", async () => {
+      db.memberships[1]!.personId = "p-an";
+      await assert.rejects(
+        service.createInvitation(TREE, "admin", {
+          email: "viewer@example.com",
+          personId: "p-binh",
+        }),
+        (error) => {
+          assert.ok(error instanceof ConflictException);
+          assert.equal(
+            (error.getResponse() as { code: string }).code,
+            "MEMBER_ALREADY_LINKED",
+          );
+          return true;
+        },
+      );
+      assert.equal(mail.sent.length, 0);
     });
 
     it("không mời gắn vào hồ sơ đã có tài khoản khác", async () => {
