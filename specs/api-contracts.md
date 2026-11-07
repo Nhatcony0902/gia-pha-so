@@ -99,4 +99,5 @@ Base URL: `/api`
 | PATCH | `/trees/{treeId}/events/{id}` | Cập nhật sự kiện dòng họ |
 | DELETE | `/trees/{treeId}/events/{id}` | Xóa sự kiện dòng họ |
 | POST | `/trees/{treeId}/persons/{personId}/biography/generate` | Tạo bản nháp tiểu sử |
-| POST | `/trees/{treeId}/chat` | Chatbot gia phả |
+| GET | `/trees/{treeId}/chat` | Thông tin màn hình chat: tên gia phả, `available` (máy chủ đã cấu hình LLM chưa), `me` (hồ sơ gắn với tài khoản, null nếu chưa gắn), câu hỏi gợi ý, hạn mức `{ questionMaxLength, dailyQuestions, remainingToday }`. Chỉ thành viên gia phả, người ngoài nhận `404` |
+| POST | `/trees/{treeId}/chat` | Hỏi chatbot `{ question: 1–500 ký tự, history?: [{ role: "user" \| "assistant", text }] }`. Trả **SSE** (`text/event-stream`), mỗi khung `data:` là JSON `ChatStreamEvent`: `tool` (đang gọi tool, kèm `label`), `delta` (đoạn chữ), `discard` (bỏ phần chữ đã stream của vòng này), `done` (`answer` bản cuối đã kiểm tra link, `persons` được nhắc, `usage`), `error` (`code`, `message`). Lỗi trước khi mở luồng trả JSON như mọi API: `400` câu hỏi không hợp lệ, `404 TREE_NOT_FOUND`, `429 AI_QUOTA_EXCEEDED` (hết hạn mức ngày) hoặc `RATE_LIMITED` (quá 10 câu/phút), `503 AI_NOT_CONFIGURED`. "Tôi" lấy từ Membership của tài khoản, client không truyền được |
