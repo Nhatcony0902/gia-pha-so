@@ -8,6 +8,7 @@ import { MailModule } from "./modules/mail/mail.module.js";
 import { TreesModule } from "./modules/trees/trees.module.js";
 import { MembershipsModule } from "./modules/memberships/memberships.module.js";
 import { EventsModule } from "./modules/events/events.module.js";
+import { AiModule } from "./modules/ai/ai.module.js";
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { EventsModule } from "./modules/events/events.module.js";
     TreesModule,
     MembershipsModule,
     EventsModule,
+    AiModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
