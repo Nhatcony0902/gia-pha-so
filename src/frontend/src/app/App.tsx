@@ -21,6 +21,7 @@ import { TimelinePage } from "../pages/TimelinePage";
 import { HomePage } from "../pages/HomePage";
 import { InvitePage } from "../pages/InvitePage";
 import { EventDetailPage } from "../pages/EventDetailPage";
+import { ChatPage } from "../pages/ChatPage";
 
 function LegacyTreeRedirect() {
   const { treeId } = useParams();
@@ -102,6 +103,14 @@ export function App() {
                     element={
                       <ProtectedRoute>
                         <TimelinePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/chat"
+                    element={
+                      <ProtectedRoute>
+                        <ChatPage />
                       </ProtectedRoute>
                     }
                   />

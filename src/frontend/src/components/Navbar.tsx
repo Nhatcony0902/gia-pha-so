@@ -7,6 +7,7 @@ import {
   List,
   Network,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -22,6 +23,14 @@ import logo from "../assets/images/logo.svg";
 import { getTrees } from "../features/family-tree/api";
 import { primaryButtonClass } from "../lib/ui-classes";
 import { NotificationBell } from "./NotificationBell";
+
+const treeNavItems = [
+  { view: "tree", label: "Cây gia phả", Icon: Network },
+  { view: "members", label: "Thành viên", Icon: List },
+  { view: "relationships", label: "Quan hệ", Icon: GitFork },
+  { view: "timeline", label: "Dòng thời gian", Icon: Clock3 },
+  { view: "chat", label: "Hỏi đáp AI", Icon: Sparkles },
+] as const;
 
 const menuItemClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-semibold no-underline transition-colors ${isActive ? "border-accent text-white" : "border-transparent text-content-secondary hover:text-white"}`;
@@ -47,7 +56,7 @@ export function Navbar() {
       ? "timeline"
       : treePathSegment === "persons"
         ? "members"
-        : ["tree", "members", "relationships", "timeline"].includes(
+        : ["tree", "members", "relationships", "timeline", "chat"].includes(
               treePathSegment,
             )
           ? treePathSegment
@@ -233,38 +242,23 @@ export function Navbar() {
 
   const treeNavigation = treeId ? (
     <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 min-[901px]:flex-nowrap">
-      <NavLink
-        className={menuItemClass}
-        to={`/trees/${treeId}/tree`}
-        onClick={() => setOpen(false)}
-      >
-        <Network size={16} /> Cây gia phả
-      </NavLink>
-      <NavLink
-        className={({ isActive }) =>
-          menuItemClass({ isActive: isActive || treeView === "members" })
-        }
-        to={`/trees/${treeId}/members`}
-        onClick={() => setOpen(false)}
-      >
-        <List size={16} /> Thành viên
-      </NavLink>
-      <NavLink
-        className={menuItemClass}
-        to={`/trees/${treeId}/relationships`}
-        onClick={() => setOpen(false)}
-      >
-        <GitFork size={16} /> Quan hệ
-      </NavLink>
-      <NavLink
-        className={({ isActive }) =>
-          menuItemClass({ isActive: isActive || treeView === "timeline" })
-        }
-        to={`/trees/${treeId}/timeline`}
-        onClick={() => setOpen(false)}
-      >
-        <Clock3 size={16} /> Dòng thời gian
-      </NavLink>
+      {treeNavItems.map(({ view, label, Icon }) => (
+        <NavLink
+          key={view}
+          className={({ isActive }) =>
+            menuItemClass({ isActive: isActive || treeView === view })
+          }
+          to={`/trees/${treeId}/${view}`}
+          title={label}
+          onClick={() => setOpen(false)}
+        >
+          <Icon size={16} className="shrink-0" />
+          {/* Màn hình vừa (901–1199px) không đủ chỗ cho 5 mục: chỉ hiện icon, chữ vẫn có cho trình đọc màn hình. */}
+          <span className="whitespace-nowrap min-[901px]:max-[1199px]:sr-only">
+            {label}
+          </span>
+        </NavLink>
+      ))}
     </div>
   ) : user ? (
     <NavLink
