@@ -1,22 +1,34 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { fileURLToPath } from "node:url";
+import type { ContentSearcher } from "../agent.js";
 import { ContentIndex, withFileCache } from "../content-search.js";
 import { FamilyGraph } from "../family-graph.js";
 import { createGemini } from "../gemini.js";
+import { PgVectorContentStore } from "../pgvector-store.js";
 import { loadTreeSnapshot, resolveAskContext } from "../tree-snapshot.js";
 
-/** Dựng mọi thứ một lượt hỏi cần, theo tài khoản đang hỏi. Dùng chung cho ai:chat và ai:eval. */
-export async function createSession(options: { noSearch?: boolean } = {}) {
+/**
+ * Dựng mọi thứ một lượt hỏi cần, theo tài khoản đang hỏi. Dùng chung cho ai:chat và ai:eval.
+ * Mặc định search_content chạy trên pgvector như server. `memory: true` giữ vector trong bộ nhớ
+ * (cache ra file), dùng khi DB chưa có migration person_embeddings.
+ */
+export async function createSession(
+  options: { noSearch?: boolean; memory?: boolean } = {},
+) {
   const prisma = new PrismaClient();
   const gemini = createGemini();
-  const embedder = await withFileCache(
-    gemini.embedder,
-    fileURLToPath(
-      new URL("../../../../.cache/ai-embeddings.json", import.meta.url),
-    ),
-    `${gemini.config.embeddingModel}@${gemini.config.embeddingDimensions}`,
-  );
+  const modelKey = `${gemini.config.embeddingModel}@${gemini.config.embeddingDimensions}`;
+  const fileCached = options.memory
+    ? await withFileCache(
+        gemini.embedder,
+        fileURLToPath(
+          new URL("../../../../.cache/ai-embeddings.json", import.meta.url),
+        ),
+        modelKey,
+      )
+    : null;
+  const store = new PgVectorContentStore(prisma, gemini.embedder, modelKey);
   const indexes = new Map<string, ContentIndex>();
 
   return {
@@ -28,14 +40,16 @@ export async function createSession(options: { noSearch?: boolean } = {}) {
         await loadTreeSnapshot(prisma, context.treeId),
         context,
       );
-      let contentIndex: ContentIndex | null = null;
-      if (!options.noSearch) {
-        contentIndex = indexes.get(context.treeId) ?? null;
-        if (!contentIndex) {
-          contentIndex = await ContentIndex.build(graph, embedder);
-          indexes.set(context.treeId, contentIndex);
+      let contentIndex: ContentSearcher | null = null;
+      if (options.noSearch) contentIndex = null;
+      else if (fileCached) {
+        let index = indexes.get(context.treeId);
+        if (!index) {
+          index = await ContentIndex.build(graph, fileCached);
+          indexes.set(context.treeId, index);
         }
-      }
+        contentIndex = index;
+      } else contentIndex = await store.forTree(graph);
       return { graph, contentIndex };
     },
     close: () => prisma.$disconnect(),

@@ -4,12 +4,15 @@ import type {
   FunctionCall,
   GenerateContentParameters,
   GenerateContentResponse,
+  Part,
 } from "@google/genai";
 import {
   MAX_TOOL_ROUNDS,
   NOT_ENOUGH_DATA,
   askFamilyAgent,
+  sanitizeAnswer,
   systemInstruction,
+  type AgentEvent,
 } from "./agent.js";
 import { ContentIndex, type Embedder } from "./content-search.js";
 import { FamilyGraph } from "./family-graph.js";
@@ -19,29 +22,48 @@ import { askAs, leDinhSnapshot, pid } from "./testing/le-dinh-snapshot.js";
 
 const graph = () => new FamilyGraph(leDinhSnapshot(), askAs("minh"));
 
-/** Model giả: trả lần lượt các lượt đã soạn, ghi lại request để kiểm tra. */
-function scriptedModel(turns: Array<FunctionCall[] | string>) {
+type Turn = FunctionCall[] | string | { text: string; calls: FunctionCall[] };
+
+/**
+ * Model giả dạng stream: trả lần lượt các lượt đã soạn, ghi lại request để kiểm tra.
+ * Chữ được cắt thành hai chunk, usage chỉ có ở chunk cuối như Gemini thật.
+ */
+function scriptedModel(turns: Turn[]) {
   const requests: GenerateContentParameters[] = [];
   let index = 0;
+  const chunk = (parts: Part[], last: boolean) =>
+    ({
+      candidates: [{ content: { role: "model", parts } }],
+      ...(last
+        ? { usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 10 } }
+        : {}),
+    }) as unknown as GenerateContentResponse;
   return {
     requests,
-    async generateContent(params: GenerateContentParameters) {
-      requests.push(structuredClone(params));
+    async generateContentStream(params: GenerateContentParameters) {
+      const { abortSignal: _signal, ...config } = params.config ?? {};
+      requests.push(structuredClone({ ...params, config }));
       const turn = turns[Math.min(index++, turns.length - 1)]!;
-      const calls = typeof turn === "string" ? [] : turn;
-      return {
-        functionCalls: calls.length ? calls : undefined,
-        text: typeof turn === "string" ? turn : undefined,
-        candidates: [
-          {
-            content: {
-              role: "model",
-              parts: calls.map((functionCall) => ({ functionCall })),
-            },
-          },
-        ],
-        usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 10 },
-      } as unknown as GenerateContentResponse;
+      const text =
+        typeof turn === "string" ? turn : Array.isArray(turn) ? "" : turn.text;
+      const calls =
+        typeof turn === "string" ? [] : Array.isArray(turn) ? turn : turn.calls;
+      const middle = Math.ceil(text.length / 2);
+      const chunks = [
+        ...(text
+          ? [
+              chunk([{ text: text.slice(0, middle) }], false),
+              chunk([{ text: text.slice(middle) }], false),
+            ]
+          : []),
+        chunk(
+          calls.map((functionCall) => ({ functionCall })),
+          true,
+        ),
+      ];
+      return (async function* () {
+        yield* chunks;
+      })();
     },
   };
 }
@@ -164,6 +186,113 @@ describe("askFamilyAgent", () => {
     assert.match(
       systemInstruction(new FamilyGraph(leDinhSnapshot(), askAs(null))),
       /chưa gắn với hồ sơ nào/,
+    );
+  });
+
+  it("stream trạng thái tool và từng đoạn chữ, bỏ phần chữ viết trước khi gọi tool", async () => {
+    const khang = graph().link(pid("khang"));
+    const model = scriptedModel([
+      {
+        text: "Để mình tra cứu.",
+        calls: [{ name: "find_person", args: { name: "Khang" } }],
+      },
+      `Cụ là [Lê Đình Khang](${khang}).`,
+    ]);
+    const events: AgentEvent[] = [];
+    const result = await askFamilyAgent({
+      model,
+      modelName: "fake",
+      graph: graph(),
+      question: "Cụ Khang là ai?",
+      onEvent: (event) => events.push(event),
+    });
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ["delta", "delta", "discard", "tool", "delta", "delta"],
+    );
+    assert.deepEqual(events[3], {
+      type: "tool",
+      name: "find_person",
+      label: 'Đang tìm "Khang" trong gia phả…',
+    });
+    const streamed = events
+      .slice(4)
+      .map((e) => (e.type === "delta" ? e.text : ""))
+      .join("");
+    assert.equal(streamed, result.answer);
+    assert.deepEqual(result.persons, [
+      { personId: pid("khang"), name: "Lê Đình Khang", link: khang },
+    ]);
+  });
+
+  it("đưa lịch sử hội thoại vào trước câu hỏi hiện tại", async () => {
+    const model = scriptedModel(["ok"]);
+    await askFamilyAgent({
+      model,
+      modelName: "fake",
+      graph: graph(),
+      question: "Còn bà nội?",
+      history: [
+        { role: "user", text: "Ông nội tôi là ai?" },
+        { role: "assistant", text: "Ông nội của bạn là Lê Đình Khang." },
+      ],
+    });
+    const contents = model.requests[0]!.contents as Array<{
+      role: string;
+      parts: Array<{ text: string }>;
+    }>;
+    assert.deepEqual(
+      contents.map((c) => [c.role, c.parts[0]!.text]),
+      [
+        ["user", "Ông nội tôi là ai?"],
+        ["model", "Ông nội của bạn là Lê Đình Khang."],
+        ["user", "Còn bà nội?"],
+      ],
+    );
+  });
+
+  it("vượt trần token đầu vào thì dừng gọi tool", async () => {
+    const model = scriptedModel([
+      [{ name: "get_stats", args: { metric: "overview" } }],
+    ]);
+    const result = await askFamilyAgent({
+      model,
+      modelName: "fake",
+      graph: graph(),
+      question: "?",
+      maxInputTokens: 150,
+    });
+    assert.equal(result.answer, NOT_ENOUGH_DATA);
+    assert.equal(model.requests.length, 2);
+  });
+
+  it("dừng ngay khi người dùng hủy", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      askFamilyAgent({
+        model: scriptedModel(["ok"]),
+        modelName: "fake",
+        graph: graph(),
+        question: "?",
+        signal: controller.signal,
+      }),
+    );
+  });
+});
+
+describe("sanitizeAnswer", () => {
+  it("giữ link hồ sơ trong dòng họ, bỏ link tới người lạ hoặc dòng họ khác", () => {
+    const g = graph();
+    const minh = g.link(pid("minh"));
+    const { text, persons } = sanitizeAnswer(
+      `[Lê Đình Minh](${minh}), [William](/trees/${g.snapshot.treeId}/persons/seed-person-william), [Bịa](/trees/khac/persons/${pid("minh")}), [web](https://example.com)`,
+      g,
+    );
+    assert.equal(text, `[Lê Đình Minh](${minh}), William, Bịa, web`);
+    assert.deepEqual(
+      persons.map((p) => p.name),
+      ["Lê Đình Minh"],
     );
   });
 });

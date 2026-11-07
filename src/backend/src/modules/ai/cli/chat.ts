@@ -3,7 +3,8 @@
  *   npm run ai:chat -w @family-tree/api -- "Ông nội tôi là ai?"
  *   npm run ai:chat -w @family-tree/api -- --as nam@example.com
  * Không truyền câu hỏi thì vào chế độ hỏi liên tục. --tree <id> khi tài khoản thuộc nhiều gia phả,
- * --no-search để tắt search_content (phương án dự phòng của ADR-0004).
+ * --no-search để tắt search_content (phương án dự phòng của ADR-0004), --memory để giữ vector
+ * trong bộ nhớ thay vì pgvector.
  */
 import { createInterface } from "node:readline/promises";
 import { askFamilyAgent } from "../agent.js";
@@ -11,7 +12,10 @@ import { createSession, parseArgs, withRetry } from "./setup.js";
 
 const { flags, rest } = parseArgs(process.argv.slice(2));
 const email = typeof flags.as === "string" ? flags.as : "minh@example.com";
-const session = await createSession({ noSearch: Boolean(flags["no-search"]) });
+const session = await createSession({
+  noSearch: Boolean(flags["no-search"]),
+  memory: Boolean(flags.memory),
+});
 
 try {
   const { graph, contentIndex } = await session.graphFor(

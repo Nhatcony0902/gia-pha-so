@@ -6,11 +6,15 @@ import type { SnapshotPerson } from "./tree-snapshot.js";
 
 /**
  * Tool `search_content`: tìm theo nghĩa trong tiểu sử, nghề nghiệp, nơi ở.
- * Prototype giữ vector trong bộ nhớ (cache ra file). S03 chuyển sang pgvector.
+ * Bản chạy thật dùng pgvector (pgvector-store.ts). Bản trong bộ nhớ ở đây dùng cho test
+ * và cho `ai:chat --memory` khi chưa chạy migration.
  */
 export type Embedder = {
   embed(texts: string[], kind: "document" | "query"): Promise<number[][]>;
 };
+
+export const SEARCH_NOTE =
+  "Kết quả xếp theo độ gần nghĩa, không phải kết quả nào cũng liên quan. Chỉ dùng kết quả có nội dung thật sự trả lời câu hỏi.";
 
 /** Văn bản đại diện một người. Null nếu không có gì ngoài tên để tìm. */
 export function personDocument(person: SnapshotPerson) {
@@ -84,10 +88,7 @@ export class ContentIndex {
         score: Math.round(score * 1000) / 1000,
         content: entry.text,
       }));
-    return {
-      results,
-      note: "Kết quả xếp theo độ gần nghĩa, không phải kết quả nào cũng liên quan. Chỉ dùng kết quả có nội dung thật sự trả lời câu hỏi.",
-    };
+    return { results, note: SEARCH_NOTE };
   }
 }
 
