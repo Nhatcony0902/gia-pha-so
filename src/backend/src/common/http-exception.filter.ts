@@ -24,7 +24,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException ? exception.getResponse() : null;
     const value =
       typeof body === "object" && body ? (body as Record<string, unknown>) : {};
-    const isRateLimited = status === HttpStatus.TOO_MANY_REQUESTS;
+    // 429 của ThrottlerGuard không có mã riêng. 429 có mã (ví dụ AI_QUOTA_EXCEEDED) giữ nguyên thông báo.
+    const isRateLimited =
+      status === HttpStatus.TOO_MANY_REQUESTS && typeof value.code !== "string";
     const rawMessage = isRateLimited
       ? "Bạn thao tác quá nhanh. Vui lòng chờ tối đa 60 giây rồi thử lại"
       : (value.message ??

@@ -467,3 +467,54 @@ export interface AcceptInvitationResponse {
   role: TreeRole;
   alreadyMember: boolean;
 }
+
+// ── Chatbot gia phả (LMS-016) ──────────────────────────────────────────────
+
+export interface ChatHistoryTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
+/** Body của `POST /trees/{treeId}/chat`. Phản hồi là luồng SSE gồm các `ChatStreamEvent`. */
+export interface ChatRequest {
+  question: string;
+  /** Vài lượt hỏi đáp gần nhất để hiểu câu hỏi nối tiếp ("còn bà nội?"). */
+  history?: ChatHistoryTurn[];
+}
+
+export interface ChatPersonRef {
+  personId: string;
+  name: string;
+  /** Đường dẫn trang hồ sơ, ví dụ `/trees/{treeId}/persons/{personId}`. */
+  link: string;
+}
+
+export type ChatStreamEvent =
+  /** Chatbot đang gọi một tool, `label` để hiện trạng thái ("Đang xác định quan hệ…"). */
+  | { type: "tool"; name: string; label: string }
+  /** Một đoạn chữ của câu trả lời (markdown, link hồ sơ dạng `[Tên](/trees/…)`). */
+  | { type: "delta"; text: string }
+  /** Bỏ phần chữ đã stream của vòng này: chatbot quyết định tra cứu thêm. */
+  | { type: "discard" }
+  /** Kết thúc. `answer` là bản cuối đã kiểm tra link, thay cho phần đã stream. */
+  | {
+      type: "done";
+      answer: string;
+      persons: ChatPersonRef[];
+      usage: { rounds: number; inputTokens: number; outputTokens: number };
+    }
+  | { type: "error"; code: string; message: string };
+
+export interface ChatContextResponse {
+  treeName: string;
+  /** Máy chủ đã cấu hình LLM chưa. */
+  available: boolean;
+  /** Hồ sơ gắn với tài khoản trong gia phả này ("tôi"), null nếu chưa gắn. */
+  me: { personId: string; name: string } | null;
+  suggestions: string[];
+  limits: {
+    questionMaxLength: number;
+    dailyQuestions: number;
+    remainingToday: number;
+  };
+}

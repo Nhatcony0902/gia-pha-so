@@ -10,10 +10,13 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev --skip-seed",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "ai:chat": "tsx src/modules/ai/cli/chat.ts",
+    "ai:eval": "tsx src/modules/ai/cli/eval.ts"
   },
   "dependencies": {
     "@family-tree/shared-types": "*",
+    "@google/genai": "^2.31.0",
     "@nestjs/common": "^11.0.11",
     "@nestjs/core": "^11.0.11",
     "@nestjs/jwt": "^12.0.2",

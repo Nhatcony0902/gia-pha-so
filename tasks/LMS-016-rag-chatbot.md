@@ -9,12 +9,12 @@
 Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên về gia phả và nhận câu trả lời dựa trên dữ liệu thật.
 
 ## Tiêu chí chấp nhận
-- [ ] Trả lời được: "Ông nội tôi là ai?", "Tôi có quan hệ gì với X?", "Ai sống thọ nhất?"
-- [ ] Câu hỏi quan hệ dùng kết quả Relationship Finder (LMS-007)
-- [ ] Không có dữ liệu thì nói không biết, không bịa; có link tới hồ sơ liên quan
-- [ ] Trả lời dạng stream
-- [ ] Chỉ truy cập dữ liệu dòng họ mà user có quyền xem
-- [ ] Chạy bộ câu hỏi đánh giá (≥ 20 câu) trước mỗi demo, ghi kết quả vào `docs/`
+- [ ] Trả lời được: "Ông nội tôi là ai?", "Tôi có quan hệ gì với X?", "Ai sống thọ nhất?" (đủ tool và dữ liệu, chờ chạy eval với Gemini thật để xác nhận)
+- [ ] Câu hỏi quan hệ dùng kết quả Relationship Finder (LMS-007) (đang dùng BFS tạm trong `tools.ts`, chờ LMS-007)
+- [ ] Không có dữ liệu thì nói không biết, không bịa; có link tới hồ sơ liên quan (link được kiểm tra và gỡ nếu bịa; phần "không bịa" chờ eval)
+- [x] Trả lời dạng stream (SSE, có trạng thái gọi tool, dừng giữa chừng)
+- [x] Chỉ truy cập dữ liệu dòng họ mà user có quyền xem (Membership, kể cả vector search)
+- [ ] Chạy bộ câu hỏi đánh giá (≥ 20 câu) trước mỗi demo, ghi kết quả vào `docs/` (bộ 30 câu đã có, chưa chạy với model thật)
 
 ## Phân việc
 ### AI Chatbot – Nhật
@@ -53,5 +53,14 @@ Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên v�
 
 ## Tiến độ
 - [x] ADR-0004 kiến trúc agentic RAG (PR #6, đang `Proposed`)
-- [ ] Chốt LLM + embedding, bộ câu hỏi đánh giá ≥ 20 câu (việc S01, đang trễ)
-- [ ] Prototype pipeline RAG trên dữ liệu seed (S02)
+- [x] Chốt LLM + embedding: Gemini (ADR-0005, đang `Proposed`)
+- [x] Bộ câu hỏi đánh giá 30 câu, 7 nhóm (`src/backend/src/modules/ai/eval/questions.ts`), dữ liệu đáp án được kiểm bằng test
+- [x] Seed dòng họ mẫu Lê Đình (54 người, 5 đời, tái hôn, con nuôi, tiểu sử) cho chatbot và demo
+- [x] Prototype agentic RAG chạy từ terminal: 5 tool, vòng lặp tool calling, `ai:chat`, `ai:eval` (xem `docs/ai/README.md`)
+- [x] S03: module Nest `AiModule`; migration bật pgvector + bảng `PersonEmbedding` (768 chiều)
+- [x] S04: re-embed khi dữ liệu đổi bằng so hash văn bản trước mỗi câu hỏi (thay tạm hook ChangeService chưa có); vector search lọc theo dòng họ
+- [x] S05: quyền theo Membership ở tầng service/tool; "tôi" lấy từ `Membership.personId`
+- [x] S06: `GET/POST /trees/:treeId/chat` (SSE), trang **Hỏi đáp AI** (stream, trạng thái tool, câu hỏi gợi ý, link + chip hồ sơ liên quan, dừng/hỏi lại, hội thoại nối tiếp)
+- [x] S07 (một phần): giới hạn độ dài câu hỏi, lịch sử, vòng tool, token mỗi câu, số câu/ngày/tài khoản, 10 câu/phút
+- [ ] Chạy `ai:eval` với Gemini thật, ghi kết quả đầu tiên vào `docs/ai/eval-results/`, tinh chỉnh prompt
+- [ ] Chuyển `find_relationship` sang service Relationship Finder khi LMS-007 xong
