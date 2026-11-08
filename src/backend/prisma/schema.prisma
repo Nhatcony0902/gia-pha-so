@@ -247,8 +247,23 @@ model Person {
   images             PersonImage[]
   memberships        Membership[]
   invitations        Invitation[]
+  embedding          PersonEmbedding?
 
   @@index([fullName])
+}
+
+/// Embedding văn bản mô tả một người (tiểu sử, nghề nghiệp, nơi ở) cho tool search_content
+/// của chatbot (LMS-016, ADR-0004). Đọc/ghi bằng raw SQL vì Prisma chưa hỗ trợ kiểu vector.
+/// Số chiều cố định 768 (ADR-0005): đổi số chiều phải có migration mới.
+model PersonEmbedding {
+  personId    String                      @id
+  /// "<model>@<số chiều>", đổi model thì embed lại
+  model       String
+  /// sha256 của model + văn bản đã embed, văn bản đổi thì embed lại
+  contentHash String
+  embedding   Unsupported("vector(768)")
+  updatedAt   DateTime                    @default(now())
+  person      Person                      @relation(fields: [personId], references: [id], onDelete: Cascade)
 }
 
 model PersonImage {

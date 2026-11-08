@@ -17,7 +17,10 @@ const only =
   typeof flags.only === "string" ? new Set(flags.only.split(",")) : null;
 const questions = evalQuestions.filter((q) => !only || only.has(q.id));
 const noSearch = Boolean(flags["no-search"]);
-const session = await createSession({ noSearch });
+const session = await createSession({
+  noSearch,
+  memory: Boolean(flags.memory),
+});
 
 type Row = {
   question: EvalQuestion;

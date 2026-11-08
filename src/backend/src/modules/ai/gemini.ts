@@ -14,12 +14,17 @@ export function geminiConfig() {
     embeddingModel:
       process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001",
     embeddingDimensions: Number(process.env.GEMINI_EMBEDDING_DIMENSIONS ?? 768),
+    /** Tùy chọn: gọi qua proxy hoặc server giả khi kiểm thử end-to-end. */
+    baseUrl: process.env.GEMINI_BASE_URL || undefined,
   };
 }
 
 export function createGemini() {
   const config = geminiConfig();
-  const client = new GoogleGenAI({ apiKey: config.apiKey });
+  const client = new GoogleGenAI({
+    apiKey: config.apiKey,
+    ...(config.baseUrl ? { httpOptions: { baseUrl: config.baseUrl } } : {}),
+  });
   const embedder: Embedder = {
     async embed(texts, kind) {
       const vectors: number[][] = [];

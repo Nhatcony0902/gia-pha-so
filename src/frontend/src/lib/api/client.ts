@@ -65,11 +65,15 @@ export async function refreshAccessToken(): Promise<AuthResponse> {
   return refreshPromise;
 }
 
-export async function apiRequest<T>(
+/**
+ * fetch kèm access token, tự làm mới token một lần khi gặp 401. Trả nguyên Response để
+ * đọc được cả luồng (SSE của chatbot). Dùng `apiRequest` cho API JSON thông thường.
+ */
+export async function authorizedFetch(
   path: string,
   init: RequestInit = {},
   canRetry = true,
-): Promise<T> {
+): Promise<Response> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
@@ -81,13 +85,32 @@ export async function apiRequest<T>(
   if (response.status === 401 && canRetry && !path.startsWith("/auth/")) {
     try {
       await refreshAccessToken();
-      return apiRequest<T>(path, init, false);
+      return authorizedFetch(path, init, false);
     } catch {
       setAccessToken(null);
       sessionExpiredHandler?.();
     }
   }
-  return parse<T>(response);
+  return response;
+}
+
+/** Đọc lỗi API (JSON `{ error }`) thành ApiError. */
+export async function errorFromResponse(response: Response) {
+  const body = (await response
+    .json()
+    .catch(() => null)) as ApiErrorResponse | null;
+  return new ApiError(
+    response.status,
+    body?.error?.code ?? `HTTP_${response.status}`,
+    body?.error?.message ?? "Không thể kết nối máy chủ",
+  );
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  return parse<T>(await authorizedFetch(path, init));
 }
 
 export function apiGet<T>(path: string): Promise<T> {
