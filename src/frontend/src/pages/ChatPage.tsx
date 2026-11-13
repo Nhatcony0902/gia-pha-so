@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ChatContextResponse } from "@family-tree/shared-types";
 import {
+  ImagePlus,
   Info,
   LoaderCircle,
   RotateCcw,
@@ -11,6 +12,7 @@ import {
   UserRound,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -18,6 +20,8 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ClipboardEvent,
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
@@ -26,6 +30,13 @@ import { Link, useParams } from "react-router-dom";
 import { PageBreadcrumbBar } from "../components/PageHeader";
 import { getChatContext } from "../features/chatbot/api";
 import { ChatMarkdown } from "../features/chatbot/ChatMarkdown";
+import {
+  DEFAULT_IMAGE_QUESTION,
+  ImagePrepareError,
+  imageFromClipboard,
+  prepareChatImage,
+  type PreparedImage,
+} from "../features/chatbot/image";
 import { useChat, type ChatMessage } from "../features/chatbot/useChat";
 import { useSpeech } from "../features/chatbot/useSpeech";
 import {
@@ -57,6 +68,10 @@ function ChatView({ treeId }: { treeId: string }) {
   const speech = useSpeech();
   const [voiceHint, setVoiceHint] = useState(false);
   const [draft, setDraft] = useState("");
+  const [attachment, setAttachment] = useState<PreparedImage | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [preparingImage, setPreparingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -117,12 +132,56 @@ function ChatView({ treeId }: { treeId: string }) {
     speech.stop();
     if (speech.autoRead) speech.prime();
   };
+  // Backend cũ chưa trả các trường ảnh thì coi như chưa bật gửi ảnh.
+  const dailyImages = info.limits.dailyImages ?? 0;
+  const remainingImages = info.limits.remainingImagesToday ?? 0;
+  const canAttach =
+    info.available && !outOfQuota && dailyImages > 0 && remainingImages > 0;
+  const attachTitle =
+    remainingImages > 0
+      ? "Gửi kèm ảnh (bia mộ, trang gia phả, ảnh cũ có chữ…)"
+      : `Bạn đã gửi đủ ${dailyImages} ảnh hôm nay`;
+  const attach = async (file: File) => {
+    if (!canAttach) return;
+    setImageError(null);
+    setPreparingImage(true);
+    try {
+      setAttachment(await prepareChatImage(file, info.limits.imageMaxBytes));
+    } catch (error) {
+      setImageError(
+        error instanceof ImagePrepareError
+          ? error.message
+          : "Không đọc được ảnh này, bạn chọn ảnh khác nhé.",
+      );
+    } finally {
+      setPreparingImage(false);
+      inputRef.current?.focus();
+    }
+  };
   const ask = (question: string) => {
-    if (!canAsk || !question.trim()) return;
+    // Chỉ gửi ảnh mà không gõ gì thì hỏi câu mặc định.
+    const text = question.trim() || (attachment ? DEFAULT_IMAGE_QUESTION : "");
+    if (!canAsk || !text || preparingImage) return;
     stickToBottom.current = true;
     setDraft("");
+    setAttachment(null);
+    setImageError(null);
     prepareSpeech();
-    void chat.send(question);
+    void chat.send(text, attachment);
+  };
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const file = imageFromClipboard(event.clipboardData);
+    if (!file || !canAttach) return;
+    event.preventDefault();
+    void attach(file);
+  };
+  const onDrop = (event: DragEvent<HTMLFormElement>) => {
+    const file = Array.from(event.dataTransfer.files).find((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (!file) return;
+    event.preventDefault();
+    void attach(file);
   };
   const toggleSpeech = (message: ChatMessage) => {
     if (speech.status === "no-voice") setVoiceHint(true);
@@ -212,7 +271,11 @@ function ChatView({ treeId }: { treeId: string }) {
           ) : (
             chat.messages.map((message) =>
               message.role === "user" ? (
-                <UserBubble key={message.id} text={message.text} />
+                <UserBubble
+                  key={message.id}
+                  text={message.text}
+                  image={message.image}
+                />
               ) : (
                 <AssistantBubble
                   key={message.id}
@@ -242,6 +305,11 @@ function ChatView({ treeId }: { treeId: string }) {
         <form
           className="mx-auto grid w-full max-w-3xl gap-1.5 px-4 py-3"
           onSubmit={onSubmit}
+          onDragOver={(event) => {
+            if (canAttach && event.dataTransfer.types.includes("Files"))
+              event.preventDefault();
+          }}
+          onDrop={onDrop}
         >
           {!info.available && (
             <Notice tone="warning">
@@ -273,7 +341,76 @@ function ChatView({ treeId }: { treeId: string }) {
               bạn ngày mai nhé.
             </Notice>
           )}
+          {imageError && (
+            <Notice tone="warning">
+              {imageError}{" "}
+              <button
+                type="button"
+                onClick={() => setImageError(null)}
+                className="cursor-pointer border-0 bg-transparent p-0 font-bold text-inherit underline"
+              >
+                Đóng
+              </button>
+            </Notice>
+          )}
+          {(attachment || preparingImage) && (
+            <div className="flex items-center gap-3 px-1 pt-1">
+              {attachment ? (
+                <div className="relative shrink-0">
+                  <img
+                    src={attachment.thumbnail}
+                    alt="Ảnh sẽ gửi kèm câu hỏi"
+                    className="size-16 rounded-lg border border-border-default object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAttachment(null)}
+                    className="absolute -top-2 -right-2 grid size-6 cursor-pointer place-items-center rounded-full border-2 border-surface-soft bg-ink-strong text-white hover:bg-[#2b3d38]"
+                    aria-label="Gỡ ảnh"
+                    title="Gỡ ảnh"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <span className="grid size-16 shrink-0 place-items-center rounded-lg border border-dashed border-border-control">
+                  <LoaderCircle size={18} className="animate-spin text-focus" />
+                </span>
+              )}
+              <span className="text-xs text-ink-muted">
+                {attachment
+                  ? `Ảnh gửi kèm câu hỏi · ${Math.max(1, Math.round(attachment.bytes / 1024))} KB · không lưu trên máy chủ`
+                  : "Đang thu nhỏ ảnh…"}
+              </span>
+            </div>
+          )}
           <div className="flex items-end gap-2 rounded-xl border border-border-control bg-surface p-1.5 focus-within:border-focus">
+            {dailyImages > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!canAttach || chat.streaming || preparingImage}
+                  className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-ink-muted hover:not-disabled:bg-surface-hover hover:not-disabled:text-ink-soft disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label="Gửi kèm ảnh"
+                  title={attachTitle}
+                >
+                  <ImagePlus size={19} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  tabIndex={-1}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) void attach(file);
+                  }}
+                />
+              </>
+            )}
             <label htmlFor="chat-question" className="sr-only">
               Câu hỏi cho trợ lý gia phả
             </label>
@@ -285,8 +422,13 @@ function ChatView({ treeId }: { treeId: string }) {
               maxLength={info.limits.questionMaxLength}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onKeyDown}
+              onPaste={onPaste}
               disabled={!info.available || outOfQuota}
-              placeholder="Đặt câu hỏi về gia phả…"
+              placeholder={
+                attachment
+                  ? "Hỏi về ảnh này, hoặc bấm gửi luôn…"
+                  : "Đặt câu hỏi về gia phả…"
+              }
               className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-ink outline-none placeholder:text-ink-subtle disabled:cursor-not-allowed"
             />
             {chat.streaming ? (
@@ -302,7 +444,9 @@ function ChatView({ treeId }: { treeId: string }) {
             ) : (
               <button
                 type="submit"
-                disabled={!canAsk || !draft.trim()}
+                disabled={
+                  !canAsk || preparingImage || (!draft.trim() && !attachment)
+                }
                 className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-accent bg-accent text-[#182b27] hover:not-disabled:bg-[#e6bd77] disabled:cursor-not-allowed disabled:opacity-45"
                 aria-label="Gửi câu hỏi"
                 title="Gửi (Enter)"
@@ -407,9 +551,16 @@ function EmptyState({
   );
 }
 
-function UserBubble({ text }: { text: string }) {
+function UserBubble({ text, image }: { text: string; image?: string }) {
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col items-end gap-1.5">
+      {image && (
+        <img
+          src={image}
+          alt="Ảnh đã gửi kèm câu hỏi"
+          className="max-h-48 max-w-[60%] rounded-2xl rounded-br-md border border-border-default object-cover"
+        />
+      )}
       <p className="m-0 max-w-[85%] rounded-2xl rounded-br-md bg-ink-strong px-4 py-2.5 whitespace-pre-wrap text-white">
         {text}
       </p>

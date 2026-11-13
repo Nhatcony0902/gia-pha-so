@@ -4,12 +4,33 @@
  *   npm run ai:eval -w @family-tree/api -- --only Q01,Q13 --no-search
  * Cần đã seed dòng họ Lê Đình (npm run db:seed). Chấm tự động chỉ để sàng lọc, vẫn phải đọc lại câu trả lời.
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { askFamilyAgent, type AgentResult } from "../agent.js";
 import { gradeAnswer } from "../eval/grade.js";
 import { evalQuestions, type EvalQuestion } from "../eval/questions.js";
-import { createSession, parseArgs, withRetry } from "./setup.js";
+import {
+  createSession,
+  isDailyQuotaError,
+  parseArgs,
+  withRetry,
+} from "./setup.js";
+
+const FIXTURES = new URL("../eval/fixtures/", import.meta.url);
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+async function loadFixture(name: string) {
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
+  const mimeType = MIME_BY_EXTENSION[extension];
+  if (!mimeType) throw new Error(`Không hỗ trợ ảnh .${extension}: ${name}`);
+  const data = (await readFile(new URL(name, FIXTURES))).toString("base64");
+  return { mimeType, data };
+}
 
 const DEFAULT_ASKER = "minh@example.com";
 const { flags } = parseArgs(process.argv.slice(2));
@@ -30,15 +51,27 @@ type Row = {
   grade: { pass: boolean; failures: string[] };
 };
 const rows: Row[] = [];
+/** Hết quota trong ngày thì dừng, không thử lại từng câu (mỗi câu mất gần 2 phút chờ). */
+let quotaExhausted = false;
 
 try {
   for (const question of questions) {
+    if (quotaExhausted) {
+      rows.push({
+        question,
+        seconds: 0,
+        error: "bỏ qua: hết quota Gemini trong ngày",
+        grade: { pass: false, failures: ["bỏ qua: hết quota trong ngày"] },
+      });
+      continue;
+    }
     const started = Date.now();
     process.stdout.write(`${question.id} ${question.question} … `);
     try {
       const { graph, contentIndex } = await session.graphFor(
         question.as ?? DEFAULT_ASKER,
       );
+      const image = question.image ? await loadFixture(question.image) : null;
       const result = await withRetry(() =>
         askFamilyAgent({
           model: session.gemini.model,
@@ -46,6 +79,7 @@ try {
           graph,
           contentIndex,
           question: question.question,
+          image,
         }),
       );
       const grade = gradeAnswer(
@@ -64,6 +98,7 @@ try {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (isDailyQuotaError(error)) quotaExhausted = true;
       rows.push({
         question,
         error: message,
@@ -97,7 +132,7 @@ const report = `# Kết quả đánh giá chatbot – ${stamp} UTC
 
 - Chat model: \`${chatModel}\` · Embedding: ${noSearch ? "tắt `search_content`" : `\`${embeddingModel}\` (${embeddingDimensions} chiều)`}
 - Dữ liệu: dòng họ mẫu Lê Đình (\`src/backend/prisma/seed-data/le-dinh-family.ts\`)
-- Chấm tự động: **${passed}/${rows.length} đạt**. Chấm tự động chỉ sàng lọc theo từ khóa, cần đọc lại từng câu trả lời.
+- Chấm tự động: **${passed}/${rows.length} đạt**.${quotaExhausted ? ` Hết quota Gemini trong ngày nên ${rows.filter((r) => r.error?.startsWith("bỏ qua")).length} câu bị bỏ qua.` : ""} Chấm tự động chỉ sàng lọc theo từ khóa, cần đọc lại từng câu trả lời.
 - Token: ${tokens.input} vào + ${tokens.output} ra (${rows.length ? Math.round((tokens.input + tokens.output) / rows.length) : 0} token/câu)
 
 | Nhóm | Đạt |
@@ -123,7 +158,7 @@ ${rows
   .map(
     (r) => `
 ### ${r.question.id} · ${r.question.group}${r.question.as ? ` · hỏi bằng ${r.question.as}` : ""}
-**Hỏi:** ${r.question.question}
+**Hỏi:** ${r.question.question}${r.question.image ? ` (kèm ảnh \`eval/fixtures/${r.question.image}\`)` : ""}
 
 **Đáp án đúng:** ${r.question.expected}
 
