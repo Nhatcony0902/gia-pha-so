@@ -475,11 +475,22 @@ export interface ChatHistoryTurn {
   text: string;
 }
 
+export type ChatImageMimeType = "image/jpeg" | "image/png" | "image/webp";
+
+/** Ảnh gửi kèm câu hỏi (LMS-019). Không lưu trên server, chỉ gửi cho model rồi bỏ. */
+export interface ChatImage {
+  mimeType: ChatImageMimeType;
+  /** Nội dung ảnh dạng base64 (không có tiền tố `data:`). */
+  data: string;
+}
+
 /** Body của `POST /trees/{treeId}/chat`. Phản hồi là luồng SSE gồm các `ChatStreamEvent`. */
 export interface ChatRequest {
   question: string;
   /** Vài lượt hỏi đáp gần nhất để hiểu câu hỏi nối tiếp ("còn bà nội?"). */
   history?: ChatHistoryTurn[];
+  /** Tối đa 1 ảnh mỗi câu hỏi. Lịch sử chỉ gửi chữ, không gửi lại ảnh. */
+  image?: ChatImage;
 }
 
 export interface ChatPersonRef {
@@ -516,5 +527,9 @@ export interface ChatContextResponse {
     questionMaxLength: number;
     dailyQuestions: number;
     remainingToday: number;
+    /** Dung lượng tối đa của ảnh gửi kèm (byte, sau khi giải mã base64). */
+    imageMaxBytes: number;
+    dailyImages: number;
+    remainingImagesToday: number;
   };
 }

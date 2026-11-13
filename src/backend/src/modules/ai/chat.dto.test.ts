@@ -2,6 +2,7 @@ import "reflect-metadata";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { BadRequestException, ValidationPipe } from "@nestjs/common";
+import { CHAT_IMAGE_MAX_BASE64_LENGTH } from "./chat-image.js";
 import { ChatRequestDto, QUESTION_MAX_LENGTH } from "./chat.dto.js";
 
 /** Cùng cấu hình pipe với ChatController. */
@@ -57,6 +58,44 @@ describe("ChatRequestDto", () => {
         })),
       }),
       /Lịch sử/,
+    );
+  });
+  it("nhận ảnh hợp lệ, bỏ trường lạ trong ảnh", async () => {
+    const body = await validate({
+      question: "Bia này của ai?",
+      image: { mimeType: "image/jpeg", data: "/9j/4AAQ", url: "http://x" },
+    });
+    assert.deepEqual(
+      { ...body.image },
+      { mimeType: "image/jpeg", data: "/9j/4AAQ" },
+    );
+  });
+
+  it("chặn ảnh sai định dạng, thiếu dữ liệu hoặc quá lớn", async () => {
+    assert.match(
+      await messageOf({
+        question: "?",
+        image: { mimeType: "image/gif", data: "R0lG" },
+      }),
+      /JPEG, PNG hoặc WebP/,
+    );
+    assert.match(
+      await messageOf({ question: "?", image: { mimeType: "image/png" } }),
+      /Ảnh gửi kèm không hợp lệ/,
+    );
+    assert.match(
+      await messageOf({ question: "?", image: "data:image/png;base64,AAAA" }),
+      /Ảnh gửi kèm không hợp lệ/,
+    );
+    assert.match(
+      await messageOf({
+        question: "?",
+        image: {
+          mimeType: "image/png",
+          data: "A".repeat(CHAT_IMAGE_MAX_BASE64_LENGTH + 5000),
+        },
+      }),
+      /quá lớn/,
     );
   });
 });
