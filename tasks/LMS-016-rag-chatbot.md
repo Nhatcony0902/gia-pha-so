@@ -64,3 +64,4 @@ Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên v�
 - [x] S07 (một phần): giới hạn độ dài câu hỏi, lịch sử, vòng tool, token mỗi câu, số câu/ngày/tài khoản, 10 câu/phút
 - [ ] Chạy `ai:eval` với Gemini thật, ghi kết quả đầu tiên vào `docs/ai/eval-results/`, tinh chỉnh prompt
 - [ ] Chuyển `find_relationship` sang service Relationship Finder khi LMS-007 xong
+- [ ] Mở rộng: đọc câu trả lời thành tiếng (LMS-020), gửi ảnh để hỏi (LMS-019), thiết kế ở ADR-0006
