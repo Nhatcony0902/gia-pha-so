@@ -9,6 +9,8 @@ import {
   Square,
   TriangleAlert,
   UserRound,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   useCallback,
@@ -25,6 +27,7 @@ import { PageBreadcrumbBar } from "../components/PageHeader";
 import { getChatContext } from "../features/chatbot/api";
 import { ChatMarkdown } from "../features/chatbot/ChatMarkdown";
 import { useChat, type ChatMessage } from "../features/chatbot/useChat";
+import { useSpeech } from "../features/chatbot/useSpeech";
 import {
   compactSecondaryButtonClass,
   secondaryButtonClass,
@@ -51,10 +54,27 @@ function ChatView({ treeId }: { treeId: string }) {
     [client, treeId],
   );
   const chat = useChat(treeId, refreshContext);
+  const speech = useSpeech();
+  const [voiceHint, setVoiceHint] = useState(false);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  /** Câu trả lời đang stream, để tự đọc khi nó xong (không đọc câu cũ tải lại từ sessionStorage). */
+  const autoReadId = useRef<string | null>(null);
+
+  const { autoRead, speak } = speech;
+  useEffect(() => {
+    const last = chat.messages.at(-1);
+    if (last?.role !== "assistant") return;
+    if (last.status === "streaming") {
+      autoReadId.current = last.id;
+      return;
+    }
+    if (autoReadId.current !== last.id) return;
+    autoReadId.current = null;
+    if (autoRead && last.status === "done") speak(last.id, last.text);
+  }, [chat.messages, autoRead, speak]);
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -93,11 +113,24 @@ function ChatView({ treeId }: { treeId: string }) {
   const info = context.data;
   const outOfQuota = info.limits.remainingToday <= 0;
   const canAsk = info.available && !outOfQuota && !chat.streaming;
+  const prepareSpeech = () => {
+    speech.stop();
+    if (speech.autoRead) speech.prime();
+  };
   const ask = (question: string) => {
     if (!canAsk || !question.trim()) return;
     stickToBottom.current = true;
     setDraft("");
+    prepareSpeech();
     void chat.send(question);
+  };
+  const toggleSpeech = (message: ChatMessage) => {
+    if (speech.status === "no-voice") setVoiceHint(true);
+    else speech.toggle(message.id, message.text);
+  };
+  const toggleAutoRead = () => {
+    if (speech.status === "no-voice") setVoiceHint(true);
+    else speech.setAutoRead(!speech.autoRead);
   };
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -128,11 +161,30 @@ function ChatView({ treeId }: { treeId: string }) {
           { label: "Hỏi đáp AI" },
         ]}
       >
+        {speech.status !== "unsupported" && (
+          <button
+            type="button"
+            className={`${compactSecondaryButtonClass} ${speech.autoRead ? "border-accent bg-[#f6ead3]" : ""}`}
+            onClick={toggleAutoRead}
+            aria-pressed={speech.autoRead}
+            title={
+              speech.autoRead
+                ? "Đang tự đọc câu trả lời. Bấm để tắt"
+                : "Tự đọc câu trả lời thành tiếng"
+            }
+          >
+            {speech.autoRead ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            <span className="hidden sm:inline">Tự đọc</span>
+          </button>
+        )}
         {chat.messages.length > 0 && (
           <button
             type="button"
             className={compactSecondaryButtonClass}
-            onClick={chat.reset}
+            onClick={() => {
+              speech.stop();
+              chat.reset();
+            }}
           >
             <RotateCcw size={15} />
             <span className="hidden sm:inline">Cuộc trò chuyện mới</span>
@@ -165,7 +217,20 @@ function ChatView({ treeId }: { treeId: string }) {
                 <AssistantBubble
                   key={message.id}
                   message={message}
-                  onRetry={canAsk ? () => chat.retry(message.id) : undefined}
+                  onRetry={
+                    canAsk
+                      ? () => {
+                          prepareSpeech();
+                          chat.retry(message.id);
+                        }
+                      : undefined
+                  }
+                  speaking={speech.speakingId === message.id}
+                  onToggleSpeech={
+                    speech.status === "unsupported"
+                      ? undefined
+                      : () => toggleSpeech(message)
+                  }
                 />
               ),
             )
@@ -185,6 +250,21 @@ function ChatView({ treeId }: { treeId: string }) {
                 GEMINI_API_KEY
               </code>
               cho backend.
+            </Notice>
+          )}
+          {voiceHint && (
+            <Notice tone="info">
+              Máy này chưa có giọng đọc tiếng Việt. Trên Windows: Cài đặt → Thời
+              gian và ngôn ngữ → Giọng nói → thêm giọng Tiếng Việt, hoặc mở
+              trang bằng Microsoft Edge. Trên điện thoại: cài giọng Tiếng Việt
+              trong phần Chuyển văn bản thành giọng nói.{" "}
+              <button
+                type="button"
+                onClick={() => setVoiceHint(false)}
+                className="cursor-pointer border-0 bg-transparent p-0 font-bold text-ink underline"
+              >
+                Đóng
+              </button>
             </Notice>
           )}
           {info.available && outOfQuota && (
@@ -340,9 +420,14 @@ function UserBubble({ text }: { text: string }) {
 function AssistantBubble({
   message,
   onRetry,
+  speaking,
+  onToggleSpeech,
 }: {
   message: ChatMessage;
   onRetry?: () => void;
+  speaking: boolean;
+  /** Không truyền thì trình duyệt không đọc được, ẩn nút. */
+  onToggleSpeech?: () => void;
 }) {
   const waiting = message.status === "streaming" && !message.text;
   return (
@@ -394,6 +479,24 @@ function AssistantBubble({
               ))}
             </div>
           )}
+        {message.status === "done" && message.text && onToggleSpeech && (
+          <button
+            type="button"
+            onClick={onToggleSpeech}
+            aria-pressed={speaking}
+            className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-transparent px-2 py-1 text-xs font-semibold text-ink-muted hover:border-border-default hover:bg-surface-hover hover:text-ink-soft"
+          >
+            {speaking ? (
+              <>
+                <Square size={11} fill="currentColor" /> Dừng đọc
+              </>
+            ) : (
+              <>
+                <Volume2 size={13} /> Đọc
+              </>
+            )}
+          </button>
+        )}
         {(message.status === "error" || message.status === "stopped") &&
           onRetry && (
             <button
