@@ -3,7 +3,15 @@ import type {
   CreatedTreeInvitation,
   InvitationStatus,
 } from "@family-tree/shared-types";
-import { Check, Copy, Link2, Mail, Trash2, UserMinus } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Link2,
+  Mail,
+  Send,
+  Trash2,
+  UserMinus,
+} from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { useNotifications } from "../../app/providers/NotificationProvider";
@@ -25,6 +33,7 @@ import {
   revokeTreeInvitation,
   roleLabel,
 } from "./api";
+import { browserZaloShareEnv, inviteMessage, shareToZalo } from "./zalo-share";
 
 const statusLabel: Record<InvitationStatus, string> = {
   ACTIVE: "Đang hoạt động",
@@ -152,6 +161,31 @@ export function ShareDialog({
       );
     }
   };
+  const sendZalo = async (invitation: CreatedTreeInvitation) => {
+    const text = inviteMessage({
+      treeName,
+      url: inviteUrl(invitation.token!),
+      expiresAt: invitation.expiresAt,
+      maxUses: invitation.maxUses,
+    });
+    try {
+      const result = await shareToZalo(
+        text,
+        browserZaloShareEnv(),
+        `Mời vào gia phả ${treeName}`,
+      );
+      if (result === "copied")
+        notice.toast(
+          "Đã chép lời mời. Dán (Ctrl+V) vào nhóm Zalo ở tab vừa mở",
+          "success",
+        );
+    } catch {
+      notice.alert(
+        "Không thể chép lời mời",
+        "Trình duyệt chặn quyền sao chép. Hãy bấm Sao chép link rồi gửi vào nhóm Zalo.",
+      );
+    }
+  };
 
   return (
     <DialogShell title={`Chia sẻ "${treeName}"`} onClose={onClose}>
@@ -256,10 +290,10 @@ export function ShareDialog({
           </form>
           {created?.token && (
             <div className="mt-3 grid gap-2 rounded-xl border border-accent bg-[#fff9ee] p-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   readOnly
-                  className={`${formFieldClass} font-mono text-xs`}
+                  className={`${formFieldClass} min-w-56 flex-1 font-mono text-xs`}
                   value={inviteUrl(created.token)}
                   onFocus={(event) => event.target.select()}
                   aria-label="Link mời"
@@ -271,6 +305,13 @@ export function ShareDialog({
                 >
                   {copied ? <Check size={16} /> : <Copy size={16} />}
                   {copied ? "Đã chép" : "Sao chép"}
+                </button>
+                <button
+                  type="button"
+                  className={compactSecondaryButtonClass}
+                  onClick={() => void sendZalo(created)}
+                >
+                  <Send size={16} /> Gửi qua Zalo
                 </button>
               </div>
               <p className="m-0 text-xs text-ink-subtle">
