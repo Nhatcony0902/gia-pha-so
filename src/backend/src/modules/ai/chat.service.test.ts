@@ -91,6 +91,11 @@ class TestChatService extends ChatService {
 }
 
 const savedLimit = process.env.AI_DAILY_QUESTION_LIMIT;
+const savedImageLimit = process.env.AI_DAILY_IMAGE_LIMIT;
+const jpeg = {
+  mimeType: "image/jpeg" as const,
+  data: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString("base64"),
+};
 
 describe("ChatService", () => {
   let model: ReturnType<typeof oneShotModel>;
@@ -106,6 +111,71 @@ describe("ChatService", () => {
   afterEach(() => {
     if (savedLimit === undefined) delete process.env.AI_DAILY_QUESTION_LIMIT;
     else process.env.AI_DAILY_QUESTION_LIMIT = savedLimit;
+    if (savedImageLimit === undefined) delete process.env.AI_DAILY_IMAGE_LIMIT;
+    else process.env.AI_DAILY_IMAGE_LIMIT = savedImageLimit;
+  });
+
+  it("gửi ảnh kèm câu hỏi cho model và trừ hạn mức ảnh", async () => {
+    process.env.AI_DAILY_IMAGE_LIMIT = "1";
+    const session = await service.prepare(TREE, "minh-user", {
+      question: "Bia này của ai?",
+      image: jpeg,
+    });
+    await session.run(() => {}, new AbortController().signal);
+    const last = (
+      model.requests[0]!.contents as Array<{
+        parts: Array<Record<string, unknown>>;
+      }>
+    ).at(-1)!;
+    assert.deepEqual(last.parts[0], { inlineData: jpeg });
+
+    const context = await service.context(TREE, "minh-user");
+    assert.equal(context.limits.dailyImages, 1);
+    assert.equal(context.limits.remainingImagesToday, 0);
+    assert.ok(context.limits.imageMaxBytes > 0);
+
+    const error = await service
+      .prepare(TREE, "minh-user", { question: "Ảnh nữa", image: jpeg })
+      .catch((e: unknown) => e);
+    assert.ok(error instanceof HttpException);
+    assert.equal(error.getStatus(), 429);
+    assert.equal(
+      (error.getResponse() as { code: string }).code,
+      "AI_IMAGE_QUOTA_EXCEEDED",
+    );
+    // hết lượt ảnh vẫn hỏi bằng chữ được, và lượt bị từ chối không bị trừ
+    await service.prepare(TREE, "minh-user", { question: "Chữ thôi" });
+    const after = await service.context(TREE, "minh-user");
+    assert.equal(after.limits.remainingToday, after.limits.dailyQuestions - 2);
+  });
+
+  it("AI_DAILY_IMAGE_LIMIT=0 thì tắt gửi ảnh", async () => {
+    process.env.AI_DAILY_IMAGE_LIMIT = "0";
+    const error = await service
+      .prepare(TREE, "minh-user", { question: "?", image: jpeg })
+      .catch((e: unknown) => e);
+    assert.ok(error instanceof HttpException);
+    assert.match(
+      (error.getResponse() as { message: string }).message,
+      /chưa bật/,
+    );
+  });
+
+  it("ảnh hỏng thì trả 400 INVALID_IMAGE và không mất lượt hỏi", async () => {
+    const error = await service
+      .prepare(TREE, "minh-user", {
+        question: "?",
+        image: { mimeType: "image/png", data: jpeg.data },
+      })
+      .catch((e: unknown) => e);
+    assert.ok(error instanceof HttpException);
+    assert.equal(error.getStatus(), 400);
+    assert.equal(
+      (error.getResponse() as { code: string }).code,
+      "INVALID_IMAGE",
+    );
+    const context = await service.context(TREE, "minh-user");
+    assert.equal(context.limits.remainingToday, context.limits.dailyQuestions);
   });
 
   it("người không thuộc gia phả nhận 404, kể cả khi hỏi", async () => {

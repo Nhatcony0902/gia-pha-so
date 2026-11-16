@@ -22,6 +22,7 @@ import {
   QUESTION_MAX_LENGTH,
   type ChatRequestDto,
 } from "./chat.dto.js";
+import { CHAT_IMAGE_MAX_BYTES, decodeChatImage } from "./chat-image.js";
 import { FamilyGraph } from "./family-graph.js";
 import { createGemini } from "./gemini.js";
 import {
@@ -38,6 +39,7 @@ export type ChatAi = {
 };
 
 const DEFAULT_DAILY_LIMIT = 50;
+const DEFAULT_DAILY_IMAGE_LIMIT = 10;
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 
 /** Chỉ giữ vài lượt gần nhất, cắt bớt chữ, và lịch sử phải bắt đầu bằng lượt của người dùng. */
@@ -93,7 +95,10 @@ export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private ai: ChatAi | null = null;
   /** Đếm số câu hỏi mỗi ngày theo user. Lưu trong bộ nhớ: đủ cho một instance (ADR-0001). */
-  private readonly usage = new Map<string, { day: string; count: number }>();
+  private readonly usage = new Map<
+    string,
+    { day: string; count: number; images: number }
+  >();
 
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
@@ -140,15 +145,27 @@ export class ChatService {
     return Number.isFinite(value) && value > 0 ? value : DEFAULT_DAILY_LIMIT;
   }
 
-  private usedToday(userId: string, now = new Date()) {
-    const entry = this.usage.get(userId);
-    return entry?.day === dayKey(now) ? entry.count : 0;
+  private dailyImageLimit() {
+    const raw = process.env.AI_DAILY_IMAGE_LIMIT;
+    const value = Number(raw);
+    // cho phép đặt 0 để tắt gửi ảnh
+    return raw !== undefined &&
+      raw !== "" &&
+      Number.isFinite(value) &&
+      value >= 0
+      ? value
+      : DEFAULT_DAILY_IMAGE_LIMIT;
   }
 
-  private consumeQuota(userId: string, now = new Date()) {
+  private usedToday(userId: string, now = new Date()) {
+    const entry = this.usage.get(userId);
+    return entry?.day === dayKey(now) ? entry : { count: 0, images: 0 };
+  }
+
+  private consumeQuota(userId: string, withImage: boolean, now = new Date()) {
     const used = this.usedToday(userId, now);
     const limit = this.dailyLimit();
-    if (used >= limit)
+    if (used.count >= limit)
       throw new HttpException(
         {
           code: "AI_QUOTA_EXCEEDED",
@@ -156,7 +173,23 @@ export class ChatService {
         },
         HttpStatus.TOO_MANY_REQUESTS,
       );
-    this.usage.set(userId, { day: dayKey(now), count: used + 1 });
+    const imageLimit = this.dailyImageLimit();
+    if (withImage && used.images >= imageLimit)
+      throw new HttpException(
+        {
+          code: "AI_IMAGE_QUOTA_EXCEEDED",
+          message:
+            imageLimit === 0
+              ? "Máy chủ chưa bật hỏi bằng ảnh."
+              : `Bạn đã gửi đủ ${imageLimit} ảnh hôm nay. Bạn vẫn hỏi bằng chữ được nhé.`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    this.usage.set(userId, {
+      day: dayKey(now),
+      count: used.count + 1,
+      images: used.images + (withImage ? 1 : 0),
+    });
   }
 
   /** Chỉ thành viên gia phả mới hỏi được. Người ngoài nhận 404 như TreesService để không lộ gia phả. */
@@ -191,6 +224,8 @@ export class ChatService {
         : null,
     ]);
     const limit = this.dailyLimit();
+    const imageLimit = this.dailyImageLimit();
+    const used = this.usedToday(userId);
     return {
       treeName: tree.name,
       available: this.isConfigured(),
@@ -199,7 +234,10 @@ export class ChatService {
       limits: {
         questionMaxLength: QUESTION_MAX_LENGTH,
         dailyQuestions: limit,
-        remainingToday: Math.max(0, limit - this.usedToday(userId)),
+        remainingToday: Math.max(0, limit - used.count),
+        imageMaxBytes: CHAT_IMAGE_MAX_BYTES,
+        dailyImages: imageLimit,
+        remainingImagesToday: Math.max(0, imageLimit - used.images),
       },
     };
   }
@@ -217,7 +255,9 @@ export class ChatService {
         { code: "VALIDATION_ERROR", message: "Bạn chưa nhập câu hỏi" },
         HttpStatus.BAD_REQUEST,
       );
-    this.consumeQuota(userId);
+    // Kiểm tra ảnh trước khi trừ hạn mức: ảnh hỏng không làm mất lượt hỏi.
+    const image = request.image ? decodeChatImage(request.image) : null;
+    this.consumeQuota(userId, Boolean(image));
     const graph = new FamilyGraph(
       await loadTreeSnapshot(this.prisma, treeId),
       context,
@@ -244,11 +284,12 @@ export class ChatService {
           contentIndex,
           question,
           history,
+          image,
           onEvent: emit,
           signal,
         });
         this.logger.log(
-          `chat tree=${treeId} rounds=${result.rounds} tools=${result.trace.map((t) => t.name).join(",") || "-"} tokens=${result.tokens.input}+${result.tokens.output} ${Date.now() - started}ms`,
+          `chat tree=${treeId} image=${image ? `${Math.round(image.bytes / 1024)}KB` : "-"} rounds=${result.rounds} tools=${result.trace.map((t) => t.name).join(",") || "-"} tokens=${result.tokens.input}+${result.tokens.output} ${Date.now() - started}ms`,
         );
         return result;
       },

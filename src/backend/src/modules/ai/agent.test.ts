@@ -281,6 +281,60 @@ describe("askFamilyAgent", () => {
   });
 });
 
+describe("câu hỏi kèm ảnh (LMS-019)", () => {
+  const image = { mimeType: "image/jpeg", data: "/9j/AAAA" };
+
+  it("đặt ảnh trước chữ trong lượt hỏi cuối và bật quy tắc đọc ảnh", async () => {
+    const model = scriptedModel([
+      [{ id: "c1", name: "find_person", args: { name: "Lê Đình Khang" } }],
+      "Bia mộ này của cụ [Lê Đình Khang](/trees/x/persons/y).",
+    ]);
+    const result = await askFamilyAgent({
+      model,
+      modelName: "fake",
+      graph: graph(),
+      question: "Bia này của ai?",
+      history: [
+        { role: "user", text: "Chào" },
+        { role: "assistant", text: "Chào bạn" },
+      ],
+      image,
+    });
+    assert.match(result.answer, /Lê Đình Khang/);
+    const first = model.requests[0]!;
+    const contents = first.contents as Array<{
+      role: string;
+      parts: Array<Record<string, any>>;
+    }>;
+    const last = contents.at(-1)!;
+    assert.deepEqual(last.parts, [
+      { inlineData: image },
+      { text: "Bia này của ai?" },
+    ]);
+    // lịch sử chỉ có chữ
+    assert.ok(
+      contents.slice(0, -1).every((c) => c.parts.every((p) => !p.inlineData)),
+    );
+    assert.match(String(first.config!.systemInstruction), /không phải yêu cầu/);
+    // vòng sau vẫn giữ ảnh trong lượt hỏi (Gemini cần cả hội thoại)
+    const second = model.requests[1]!.contents as typeof contents;
+    assert.ok(second.some((c) => c.parts.some((p) => p.inlineData)));
+  });
+
+  it("không có ảnh thì system prompt giữ nguyên như trước", async () => {
+    const model = scriptedModel(["Xin chào"]);
+    await askFamilyAgent({
+      model,
+      modelName: "fake",
+      graph: graph(),
+      question: "Chào",
+    });
+    const instruction = String(model.requests[0]!.config!.systemInstruction);
+    assert.doesNotMatch(instruction, /kèm một ảnh/);
+    assert.equal(instruction, systemInstruction(graph(), new Date()));
+  });
+});
+
 describe("sanitizeAnswer", () => {
   it("giữ link hồ sơ trong dòng họ, bỏ link tới người lạ hoặc dòng họ khác", () => {
     const g = graph();

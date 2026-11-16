@@ -70,6 +70,13 @@ export function parseArgs(argv: string[]) {
 }
 
 /** Free tier của Gemini hay trả 429/503: thử lại vài lần, chờ tăng dần. */
+/** Lỗi 429 vì hết số request trong ngày (free tier), thử lại trong vài phút cũng vô ích. */
+export function isDailyQuotaError(error: unknown) {
+  const status = (error as { status?: number }).status;
+  const message = error instanceof Error ? error.message : String(error);
+  return status === 429 && /PerDay|per day/i.test(message);
+}
+
 export async function withRetry<T>(
   run: () => Promise<T>,
   attempts = 4,
@@ -79,7 +86,11 @@ export async function withRetry<T>(
       return await run();
     } catch (error) {
       const status = (error as { status?: number }).status;
-      if (attempt >= attempts || (status !== 429 && status !== 503))
+      if (
+        attempt >= attempts ||
+        (status !== 429 && status !== 503) ||
+        isDailyQuotaError(error)
+      )
         throw error;
       const waitMs = 15_000 * attempt;
       console.warn(`  Gemini trả ${status}, thử lại sau ${waitMs / 1000}s…`);
