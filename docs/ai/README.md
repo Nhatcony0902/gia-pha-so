@@ -100,6 +100,7 @@ Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts
 ## Hỏi bằng ảnh (LMS-019, ADR-0006)
 
 - Nút 🖼 cạnh ô nhập, dán ảnh (Ctrl+V) hoặc kéo thả ảnh vào khung chat. Mỗi câu hỏi 1 ảnh. Chỉ gửi ảnh mà không gõ gì thì hỏi "Ảnh này liên quan tới ai trong gia phả?".
+- Nút 📷 để chụp ảnh. Máy tính: mở webcam trong hộp thoại (`CameraCapture.tsx`, `getUserMedia` chỉ xin video), có nút Chụp và Đổi camera nếu máy có nhiều camera; camera tắt ngay khi đóng hộp thoại. Điện thoại (màn hình cảm ứng): mở ứng dụng camera của máy qua `<input capture="environment">` vì ảnh nét hơn khung hình video. Trang không chạy HTTPS/localhost, bị từ chối quyền hoặc không có camera thì báo lỗi và cho chọn ảnh có sẵn. Camera đang bận thì tự thử lại một lần; camera bị ngắt giữa chừng (rút webcam) thì báo lỗi kèm nút Thử lại. Ảnh chụp đi qua đúng luồng nén bên dưới.
 - Trình duyệt thu nhỏ ảnh (cạnh dài ≤ 1280 px, JPEG, giảm dần chất lượng cho tới khi ≤ 1.5 MB) rồi gửi base64 trong field `image` của `POST /trees/:treeId/chat`. Route này có body parser riêng 3 MB, các route khác vẫn 100 KB.
 - Server (`chat-image.ts`) kiểm tra magic bytes, dung lượng và `mimeType` khớp nội dung. Ảnh hỏng thì trả `400 INVALID_IMAGE` và không trừ lượt hỏi. Hết lượt ảnh trong ngày thì trả `429 AI_IMAGE_QUOTA_EXCEEDED`, vẫn hỏi bằng chữ được.
 - Ảnh đi tới Gemini dưới dạng part `inlineData` đặt trước câu hỏi. **Không lưu ảnh** ở DB hay Cloudinary. Lịch sử gửi lên chỉ có chữ kèm ghi chú `[Kèm 1 ảnh]`. Trình duyệt chỉ giữ ảnh nhỏ 256 px trong `sessionStorage` để hiện lại hội thoại.

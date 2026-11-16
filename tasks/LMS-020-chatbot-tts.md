@@ -19,4 +19,5 @@ Là thành viên lớn tuổi trong dòng họ, tôi muốn nghe trợ lý đọ
 ## Ghi chú kỹ thuật
 - Dùng Web Speech API (`speechSynthesis`), không cần backend (ADR-0006).
 - Code: `src/frontend/src/features/chatbot/speech.ts` (làm sạch, cắt câu, chọn giọng, bộ đọc), `useSpeech.ts`, `ChatPage.tsx`.
+- Kiểm thử 2026-11-16 (Edge chạy ngầm bằng Playwright, có theo dõi lệnh gọi `speechSynthesis`): bấm Đọc → đọc từng câu với `lang = vi-VN`, đã bỏ markdown, "1905 – 1988" thành "1905 đến 1988", `12/03/1988` thành "ngày 12 tháng 3 năm 1988"; nút đổi sang Dừng đọc và dừng được; Tự đọc lưu `localStorage`, đọc khi câu trả lời xong, tải lại trang không đọc câu cũ; máy chỉ có giọng tiếng Anh thì hiện hướng dẫn và không đọc. Chưa nghe bằng tai trên Edge, Chrome Android, Safari iOS (Edge chạy ngầm trên máy phát triển không có giọng tiếng Việt).
 - Dự phòng (chưa làm): endpoint TTS bằng Gemini cho máy không có giọng tiếng Việt.
