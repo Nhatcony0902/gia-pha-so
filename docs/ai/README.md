@@ -91,7 +91,15 @@ Hạn mức ngày đếm trong bộ nhớ của tiến trình (đủ cho một i
 | `eval/questions.ts` | 30 câu hỏi đánh giá kèm đáp án |
 | `cli/chat.ts`, `cli/eval.ts` | Lệnh `ai:chat`, `ai:eval` |
 
-Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts` quản lý hội thoại, `ChatMarkdown.tsx` hiển thị câu trả lời) và `src/frontend/src/pages/ChatPage.tsx`. Hội thoại giữ trong `sessionStorage` theo gia phả.
+Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts` quản lý hội thoại, `ChatMarkdown.tsx` hiển thị câu trả lời, `speech.ts` + `useSpeech.ts` đọc thành tiếng) và `src/frontend/src/pages/ChatPage.tsx`. Hội thoại giữ trong `sessionStorage` theo gia phả.
+
+## Đọc câu trả lời thành tiếng (LMS-020, ADR-0006)
+
+- Dùng Web Speech API (`speechSynthesis`) của trình duyệt. Không gọi backend, không tốn request Gemini.
+- Mỗi câu trả lời có nút **Đọc / Dừng đọc**. Nút **Tự đọc** trên thanh tiêu đề bật đọc tự động khi câu trả lời xong (lưu ở `localStorage` key `chatbot:auto-read`). Không đọc lúc đang stream vì phần đó có thể bị `discard` và bản cuối còn được làm sạch link.
+- Chọn giọng `vi-*`, ưu tiên giọng "Natural"/"Online" (Edge: HoaiMy, NamMinh), rồi giọng Google. Danh sách giọng rỗng (Chrome Android hay vậy) thì vẫn đọc với `lang = "vi-VN"`. Có giọng nhưng không có giọng tiếng Việt thì không đọc (tránh đọc bằng giọng tiếng Anh) và hiện hướng dẫn cài giọng.
+- Trước khi đọc: bỏ markdown và đường link, "1905 – 1988" thành "1905 đến 1988", `05/03/1988` thành "ngày 5 tháng 3 năm 1988", mỗi mục danh sách là một câu. Câu dài cắt thành đoạn ≤ 180 ký tự và đọc lần lượt, vì Chrome hay tự ngắt khi đọc một đoạn dài.
+- Tự dừng khi hỏi câu mới, bấm Cuộc trò chuyện mới hoặc rời trang. Safari iOS chỉ cho đọc sau thao tác của người dùng, nên lúc bấm gửi có "mồi" một utterance rỗng để lần tự đọc sau đó không bị chặn.
 
 **Ghi chú về validate:** backend chạy bằng `tsx` (esbuild) nên không có decorator metadata. `ValidationPipe` toàn cục không biết kiểu của `@Body()` và bỏ qua kiểm tra. Endpoint chat truyền `expectedType` để chắc chắn được kiểm tra.
 

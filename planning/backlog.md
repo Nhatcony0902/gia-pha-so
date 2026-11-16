@@ -22,6 +22,8 @@
 | LMS-016 | AI Chatbot (RAG) | C1 | Medium | 4 | Nhật | S01–S07 |
 | LMS-017 | Kiểm thử tổng thể & deploy | – | High | – | Sơn + Quân + Nhật (Bình: điều phối UAT) | S07 |
 | LMS-018 | Tài liệu dự án & báo cáo đồ án | – | High | – | Bình | S01–S07 |
+| LMS-019 | Gửi ảnh để hỏi chatbot | C1 | Low | 3 | Nhật | S07 |
+| LMS-020 | Chatbot đọc câu trả lời thành tiếng | C1 | Low | 1 | Nhật | S07 |
 
 ## Mở rộng (chưa lên lịch)
 | Mã | User story | Ghi chú |
