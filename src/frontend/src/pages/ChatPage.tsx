@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ChatContextResponse } from "@family-tree/shared-types";
 import {
+  Camera,
   ImagePlus,
   Info,
   LoaderCircle,
@@ -29,6 +30,11 @@ import {
 import { Link, useParams } from "react-router-dom";
 import { PageBreadcrumbBar } from "../components/PageHeader";
 import { getChatContext } from "../features/chatbot/api";
+import {
+  cameraSupported,
+  prefersNativeCamera,
+} from "../features/chatbot/camera";
+import { CameraCapture } from "../features/chatbot/CameraCapture";
 import { ChatMarkdown } from "../features/chatbot/ChatMarkdown";
 import {
   DEFAULT_IMAGE_QUESTION,
@@ -46,6 +52,9 @@ import {
 
 const routeStateClass =
   "grid min-h-[calc(100dvh-4rem)] place-content-center justify-items-center gap-[0.8rem] bg-surface-page p-4 text-center text-ink [&>h1]:m-0 [&>p]:m-0";
+
+const attachButtonClass =
+  "inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-ink-muted hover:not-disabled:bg-surface-hover hover:not-disabled:text-ink-soft disabled:cursor-not-allowed disabled:opacity-45";
 
 export function ChatPage() {
   const { treeId = "" } = useParams();
@@ -71,7 +80,9 @@ function ChatView({ treeId }: { treeId: string }) {
   const [attachment, setAttachment] = useState<PreparedImage | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [preparingImage, setPreparingImage] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -141,7 +152,13 @@ function ChatView({ treeId }: { treeId: string }) {
     remainingImages > 0
       ? "Gửi kèm ảnh (bia mộ, trang gia phả, ảnh cũ có chữ…)"
       : `Bạn đã gửi đủ ${dailyImages} ảnh hôm nay`;
-  const attach = async (file: File) => {
+  const attachDisabled = !canAttach || chat.streaming || preparingImage;
+  const openCamera = () => {
+    // Điện thoại: ứng dụng camera của máy. Máy tính: webcam ngay trong trang.
+    if (cameraSupported() && !prefersNativeCamera()) setCameraOpen(true);
+    else cameraInputRef.current?.click();
+  };
+  const attach = async (file: Blob) => {
     if (!canAttach) return;
     setImageError(null);
     setPreparingImage(true);
@@ -390,13 +407,38 @@ function ChatView({ treeId }: { treeId: string }) {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={!canAttach || chat.streaming || preparingImage}
-                  className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-ink-muted hover:not-disabled:bg-surface-hover hover:not-disabled:text-ink-soft disabled:cursor-not-allowed disabled:opacity-45"
+                  disabled={attachDisabled}
+                  className={attachButtonClass}
                   aria-label="Gửi kèm ảnh"
                   title={attachTitle}
                 >
                   <ImagePlus size={19} />
                 </button>
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  disabled={attachDisabled}
+                  className={`${attachButtonClass} -ml-2`}
+                  aria-label="Chụp ảnh để hỏi"
+                  title={
+                    remainingImages > 0 ? "Chụp ảnh bằng camera" : attachTitle
+                  }
+                >
+                  <Camera size={19} />
+                </button>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  tabIndex={-1}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) void attach(file);
+                  }}
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -425,9 +467,7 @@ function ChatView({ treeId }: { treeId: string }) {
               onPaste={onPaste}
               disabled={!info.available || outOfQuota}
               placeholder={
-                attachment
-                  ? "Hỏi về ảnh này, hoặc bấm gửi luôn…"
-                  : "Đặt câu hỏi về gia phả…"
+                attachment ? "Hỏi về ảnh này…" : "Đặt câu hỏi về gia phả…"
               }
               className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-ink outline-none placeholder:text-ink-subtle disabled:cursor-not-allowed"
             />
@@ -468,6 +508,16 @@ function ChatView({ treeId }: { treeId: string }) {
           </p>
         </form>
       </footer>
+      {cameraOpen && (
+        <CameraCapture
+          onClose={() => setCameraOpen(false)}
+          onPickFile={() => fileInputRef.current?.click()}
+          onCapture={(photo) => {
+            setCameraOpen(false);
+            void attach(photo);
+          }}
+        />
+      )}
     </main>
   );
 }
