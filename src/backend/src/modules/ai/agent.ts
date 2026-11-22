@@ -9,6 +9,15 @@ import type {
 } from "@google/genai";
 import { FamilyGraph, ToolError } from "./family-graph.js";
 import {
+  WEB_RETRY,
+  isDailyQuotaError,
+  isTransientError,
+  retryDelay,
+  shortError,
+  sleep,
+  type RetryPolicy,
+} from "./retry.js";
+import {
   METRICS,
   RELATIONS,
   findPerson,
@@ -49,6 +58,10 @@ export type AgentResult = {
   trace: ToolTrace[];
   rounds: number;
   tokens: { input: number; output: number };
+  /** Model đã trả lời (khác `modelName` nếu phải chuyển sang model dự phòng). */
+  model: string;
+  /** Số lần gọi lại model vì lỗi tạm thời (quá tải, rớt mạng). */
+  retries: number;
   /** Những người được nhắc (có link) trong câu trả lời, đã kiểm tra thuộc dòng họ. */
   persons: Array<{ personId: string; name: string; link: string }>;
 };
@@ -243,9 +256,21 @@ export async function runFamilyAgent(input: {
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
   maxInputTokens?: number;
+  /** Model dùng khi model chính quá tải hoặc hết quota. Đã chuyển thì giữ đến hết câu hỏi. */
+  fallbackModelName?: string;
+  retry?: RetryPolicy;
+  /** Báo mỗi lần thử lại / chuyển model, để ghi log. */
+  onRetry?: (message: string) => void;
 }): Promise<AgentResult> {
   const { model, modelName, graph, contentIndex } = input;
   const emit = input.onEvent ?? (() => {});
+  const retry = input.retry ?? WEB_RETRY;
+  const fallbackModelName =
+    input.fallbackModelName && input.fallbackModelName !== modelName
+      ? input.fallbackModelName
+      : undefined;
+  let activeModel = modelName;
+  let retries = 0;
   const maxInputTokens = input.maxInputTokens ?? DEFAULT_MAX_INPUT_TOKENS;
   const tools = {
     find_person: (args: never) => findPerson(graph, args),
@@ -296,13 +321,15 @@ export async function runFamilyAgent(input: {
       trace,
       rounds,
       tokens,
+      model: activeModel,
+      retries,
     };
   };
 
-  for (let round = 0; ; round++) {
-    input.signal?.throwIfAborted();
+  /** Một lượt gọi model, stream chữ ra ngay. Chữ "thought" không stream. */
+  const streamTurn = async () => {
     const stream = await model.generateContentStream({
-      model: modelName,
+      model: activeModel,
       contents,
       config: {
         systemInstruction: instruction,
@@ -310,21 +337,65 @@ export async function runFamilyAgent(input: {
         ...(input.signal ? { abortSignal: input.signal } : {}),
       },
     });
-
-    // Gom các part của lượt này. Chữ (không phải "thought") được stream ra ngay.
     const parts: Part[] = [];
     let usage: GenerateContentResponseUsageMetadata | undefined;
     let text = "";
-    for await (const chunk of stream) {
-      if (chunk.usageMetadata) usage = chunk.usageMetadata;
-      for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
-        parts.push(part);
-        if (part.text && !part.thought) {
-          text += part.text;
-          emit({ type: "delta", text: part.text });
+    try {
+      for await (const chunk of stream) {
+        if (chunk.usageMetadata) usage = chunk.usageMetadata;
+        for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+          parts.push(part);
+          if (part.text && !part.thought) {
+            text += part.text;
+            emit({ type: "delta", text: part.text });
+          }
         }
       }
+    } catch (error) {
+      // Đứt giữa chừng: bỏ phần chữ đã stream, lượt thử lại sẽ viết lại từ đầu.
+      if (text) emit({ type: "discard" });
+      throw error;
     }
+    return { parts, usage, text };
+  };
+
+  /**
+   * Gọi lại khi gặp lỗi tạm thời (503 quá tải, 429, rớt mạng). Hết lượt thử, hoặc hết quota
+   * trong ngày, thì chuyển sang model dự phòng (nếu có) và thử lại từ đầu với model đó.
+   */
+  const streamTurnWithRetry = async () => {
+    for (let attempt = 1; ; attempt++) {
+      input.signal?.throwIfAborted();
+      try {
+        return await streamTurn();
+      } catch (error) {
+        if (input.signal?.aborted || !isTransientError(error)) throw error;
+        const exhausted =
+          attempt >= retry.attempts || isDailyQuotaError(error);
+        if (exhausted) {
+          if (!fallbackModelName || activeModel === fallbackModelName)
+            throw error;
+          input.onRetry?.(
+            `${activeModel} lỗi (${shortError(error)}), chuyển sang ${fallbackModelName}`,
+          );
+          activeModel = fallbackModelName;
+          attempt = 0;
+          retries++;
+          continue;
+        }
+        const waitMs = retryDelay(retry, attempt);
+        input.onRetry?.(
+          `${activeModel} lỗi (${shortError(error)}), thử lại sau ${waitMs / 1000}s (lần ${attempt + 1}/${retry.attempts})`,
+        );
+        retries++;
+        await sleep(waitMs, input.signal);
+      }
+    }
+  };
+
+  for (let round = 0; ; round++) {
+    input.signal?.throwIfAborted();
+    const { parts, usage, text } = await streamTurnWithRetry();
     tokens.input += usage?.promptTokenCount ?? 0;
     tokens.output +=
       (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);

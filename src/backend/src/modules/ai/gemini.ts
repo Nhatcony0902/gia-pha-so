@@ -11,6 +11,8 @@ export function geminiConfig() {
   return {
     apiKey,
     chatModel: process.env.GEMINI_CHAT_MODEL ?? "gemini-3.8-flash",
+    /** Model dự phòng khi model chính quá tải (503) hoặc hết quota. Để trống thì không đổi model. */
+    fallbackChatModel: process.env.GEMINI_CHAT_FALLBACK_MODEL || undefined,
     embeddingModel:
       process.env.GEMINI_EMBEDDING_MODEL ?? "gemini-embedding-001",
     embeddingDimensions: Number(process.env.GEMINI_EMBEDDING_DIMENSIONS ?? 768),
