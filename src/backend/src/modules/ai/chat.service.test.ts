@@ -345,6 +345,8 @@ const result = {
   trace: [],
   rounds: 1,
   tokens: { input: 10, output: 2 },
+  model: "fake",
+  retries: 0,
 };
 
 describe("streamAgentAnswer", () => {

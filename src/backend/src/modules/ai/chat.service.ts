@@ -34,6 +34,8 @@ import { loadTreeSnapshot, type AskContext } from "./tree-snapshot.js";
 export type ChatAi = {
   model: ChatModel;
   chatModel: string;
+  /** Model dùng khi model chính quá tải hoặc hết quota (GEMINI_CHAT_FALLBACK_MODEL). */
+  fallbackChatModel?: string;
   /** null: tắt search_content (phương án dự phòng của ADR-0004). */
   contentStore: Pick<PgVectorContentStore, "forTree"> | null;
 };
@@ -126,6 +128,7 @@ export class ChatService {
     return {
       model: gemini.model,
       chatModel: gemini.config.chatModel,
+      fallbackChatModel: gemini.config.fallbackChatModel,
       contentStore,
     };
   }
@@ -280,6 +283,8 @@ export class ChatService {
         const result = await runFamilyAgent({
           model: ai.model,
           modelName: ai.chatModel,
+          fallbackModelName: ai.fallbackChatModel,
+          onRetry: (message) => this.logger.warn(message),
           graph,
           contentIndex,
           question,
@@ -289,7 +294,7 @@ export class ChatService {
           signal,
         });
         this.logger.log(
-          `chat tree=${treeId} image=${image ? `${Math.round(image.bytes / 1024)}KB` : "-"} rounds=${result.rounds} tools=${result.trace.map((t) => t.name).join(",") || "-"} tokens=${result.tokens.input}+${result.tokens.output} ${Date.now() - started}ms`,
+          `chat tree=${treeId} image=${image ? `${Math.round(image.bytes / 1024)}KB` : "-"} rounds=${result.rounds} tools=${result.trace.map((t) => t.name).join(",") || "-"} tokens=${result.tokens.input}+${result.tokens.output}${result.retries ? ` retries=${result.retries}` : ""}${result.model !== ai.chatModel ? ` model=${result.model}` : ""} ${Date.now() - started}ms`,
         );
         return result;
       },

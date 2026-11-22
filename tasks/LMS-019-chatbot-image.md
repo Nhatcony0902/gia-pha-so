@@ -12,8 +12,8 @@ Là thành viên dòng họ, tôi muốn gửi ảnh bia mộ, trang gia phả c
 - [x] Đính kèm 1 ảnh mỗi câu hỏi: chọn file, dán (paste), kéo thả, chụp bằng camera trên điện thoại (bộ chọn ảnh của máy). Có xem trước và gỡ ảnh
 - [x] Nút Chụp ảnh riêng: máy tính mở webcam ngay trong trang (xem trước, Chụp, Đổi camera), điện thoại mở ứng dụng camera của máy. Không cấp quyền hoặc không có camera thì báo lỗi và cho chọn ảnh có sẵn
 - [x] Ảnh được nén ở trình duyệt (cạnh dài ≤ 1280 px). Server chỉ nhận JPEG/PNG/WebP ≤ 1.5 MB, kiểm tra magic bytes
-- [ ] Trợ lý đọc chữ trong ảnh rồi đối chiếu với dữ liệu dòng họ bằng tool. Không chắc thì nói không chắc (đã có prompt và câu eval I01, I02, I04; chờ chạy với Gemini thật)
-- [ ] Chữ trong ảnh không điều khiển được trợ lý (chống prompt injection) (prompt + câu eval I03; chờ chạy với Gemini thật)
+- [x] Trợ lý đọc chữ trong ảnh rồi đối chiếu với dữ liệu dòng họ bằng tool. Không chắc thì nói không chắc (eval 22/11: I01, I02, I04 đạt)
+- [x] Chữ trong ảnh không điều khiển được trợ lý (chống prompt injection) (eval 22/11: I03 đạt)
 - [x] Ảnh không được lưu trên server. Lịch sử hội thoại chỉ giữ thumbnail ở trình duyệt
 - [x] Hạn mức ảnh mỗi ngày (`AI_DAILY_IMAGE_LIMIT`)
 - [x] Bộ đánh giá có thêm câu hỏi kèm ảnh (I01–I04)

@@ -9,12 +9,8 @@ import { fileURLToPath } from "node:url";
 import { askFamilyAgent, type AgentResult } from "../agent.js";
 import { gradeAnswer } from "../eval/grade.js";
 import { evalQuestions, type EvalQuestion } from "../eval/questions.js";
-import {
-  createSession,
-  isDailyQuotaError,
-  parseArgs,
-  withRetry,
-} from "./setup.js";
+import { isDailyQuotaError } from "../retry.js";
+import { agentModelOptions, createSession, parseArgs } from "./setup.js";
 
 const FIXTURES = new URL("../eval/fixtures/", import.meta.url);
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -72,16 +68,13 @@ try {
         question.as ?? DEFAULT_ASKER,
       );
       const image = question.image ? await loadFixture(question.image) : null;
-      const result = await withRetry(() =>
-        askFamilyAgent({
-          model: session.gemini.model,
-          modelName: session.gemini.config.chatModel,
-          graph,
-          contentIndex,
-          question: question.question,
-          image,
-        }),
-      );
+      const result = await askFamilyAgent({
+        ...agentModelOptions(session.gemini),
+        graph,
+        contentIndex,
+        question: question.question,
+        image,
+      });
       const grade = gradeAnswer(
         question,
         result.answer,
@@ -125,14 +118,22 @@ const tokens = rows.reduce(
 );
 const now = new Date();
 const stamp = now.toISOString().slice(0, 16).replace("T", " ");
-const { chatModel, embeddingModel, embeddingDimensions } =
+const { chatModel, fallbackChatModel, embeddingModel, embeddingDimensions } =
   session.gemini.config;
+const retried = rows.filter((r) => r.result?.retries).length;
+const onFallback = rows.filter(
+  (r) => r.result && r.result.model !== chatModel,
+).length;
+const stillFailing = rows.filter(
+  (r) => r.error && !r.error.startsWith("bỏ qua"),
+).length;
 
 const report = `# Kết quả đánh giá chatbot – ${stamp} UTC
 
-- Chat model: \`${chatModel}\` · Embedding: ${noSearch ? "tắt `search_content`" : `\`${embeddingModel}\` (${embeddingDimensions} chiều)`}
+- Chat model: \`${chatModel}\`${fallbackChatModel ? ` (dự phòng \`${fallbackChatModel}\`, dùng cho ${onFallback} câu)` : ""} · Embedding: ${noSearch ? "tắt `search_content`" : `\`${embeddingModel}\` (${embeddingDimensions} chiều)`}
 - Dữ liệu: dòng họ mẫu Lê Đình (\`src/backend/prisma/seed-data/le-dinh-family.ts\`)
 - Chấm tự động: **${passed}/${rows.length} đạt**.${quotaExhausted ? ` Hết quota Gemini trong ngày nên ${rows.filter((r) => r.error?.startsWith("bỏ qua")).length} câu bị bỏ qua.` : ""} Chấm tự động chỉ sàng lọc theo từ khóa, cần đọc lại từng câu trả lời.
+- Lỗi tạm thời (quá tải, rớt mạng): ${retried} câu phải gọi lại model, ${stillFailing} câu vẫn lỗi sau khi thử lại
 - Token: ${tokens.input} vào + ${tokens.output} ra (${rows.length ? Math.round((tokens.input + tokens.output) / rows.length) : 0} token/câu)
 
 | Nhóm | Đạt |
@@ -149,7 +150,7 @@ ${groups
 ${rows
   .map(
     (r) =>
-      `| ${r.question.id} | ${cell(r.question.question)} | ${r.grade.pass ? "Đạt" : `Chưa đạt: ${cell(r.grade.failures.join("; "))}`} | ${r.result ? r.result.trace.map((t) => t.name).join(", ") || "–" : "–"} | ${r.seconds.toFixed(1)}s |`,
+      `| ${r.question.id} | ${cell(r.question.question)} | ${r.grade.pass ? "Đạt" : `Chưa đạt: ${cell(r.grade.failures.join("; "))}`} | ${r.result ? r.result.trace.map((t) => t.name).join(", ") || "–" : "–"} | ${r.seconds.toFixed(1)}s${r.result?.retries ? ` (gọi lại ${r.result.retries})` : ""}${r.result && r.result.model !== chatModel ? ` · ${r.result.model}` : ""} |`,
   )
   .join("\n")}
 

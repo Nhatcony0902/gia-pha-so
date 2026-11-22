@@ -9,12 +9,12 @@
 Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên về gia phả và nhận câu trả lời dựa trên dữ liệu thật.
 
 ## Tiêu chí chấp nhận
-- [ ] Trả lời được: "Ông nội tôi là ai?", "Tôi có quan hệ gì với X?", "Ai sống thọ nhất?" (đủ tool và dữ liệu, chờ chạy eval với Gemini thật để xác nhận)
+- [x] Trả lời được: "Ông nội tôi là ai?", "Tôi có quan hệ gì với X?", "Ai sống thọ nhất?" (eval 22/11: Q01, Q10, Q13 đạt)
 - [ ] Câu hỏi quan hệ dùng kết quả Relationship Finder (LMS-007) (đang dùng BFS tạm trong `tools.ts`, chờ LMS-007)
-- [ ] Không có dữ liệu thì nói không biết, không bịa; có link tới hồ sơ liên quan (link được kiểm tra và gỡ nếu bịa; phần "không bịa" chờ eval)
+- [x] Không có dữ liệu thì nói không biết, không bịa; có link tới hồ sơ liên quan (link được kiểm tra và gỡ nếu bịa; eval 22/11: nhóm "Không có dữ liệu" 3/3)
 - [x] Trả lời dạng stream (SSE, có trạng thái gọi tool, dừng giữa chừng)
 - [x] Chỉ truy cập dữ liệu dòng họ mà user có quyền xem (Membership, kể cả vector search)
-- [ ] Chạy bộ câu hỏi đánh giá (≥ 20 câu) trước mỗi demo, ghi kết quả vào `docs/` (bộ 30 câu đã có, chưa chạy với model thật)
+- [ ] Chạy bộ câu hỏi đánh giá (≥ 20 câu) trước mỗi demo, ghi kết quả vào `docs/` (bộ 34 câu; lần chạy đủ đầu tiên 22/11: 34/34, xem `docs/ai/eval-results/2026-11-22-gemini-3.5-flash.md`. Còn chạy lại trước mỗi demo)
 
 ## Phân việc
 ### AI Chatbot – Nhật
@@ -62,6 +62,7 @@ Là thành viên dòng họ, tôi muốn hỏi bằng ngôn ngữ tự nhiên v�
 - [x] S05: quyền theo Membership ở tầng service/tool; "tôi" lấy từ `Membership.personId`
 - [x] S06: `GET/POST /trees/:treeId/chat` (SSE), trang **Hỏi đáp AI** (stream, trạng thái tool, câu hỏi gợi ý, link + chip hồ sơ liên quan, dừng/hỏi lại, hội thoại nối tiếp)
 - [x] S07 (một phần): giới hạn độ dài câu hỏi, lịch sử, vòng tool, token mỗi câu, số câu/ngày/tài khoản, 10 câu/phút
-- [ ] Chạy `ai:eval` với Gemini thật, ghi kết quả đầu tiên vào `docs/ai/eval-results/`, tinh chỉnh prompt
+- [x] Chạy `ai:eval` với Gemini thật, ghi kết quả vào `docs/ai/eval-results/`. Các lần 08/11 và 13/11 chỉ đạt 5/30 vì Gemini trả 503 và rớt mạng. Sau khi thêm thử lại và model dự phòng (`retry.ts`, `GEMINI_CHAT_FALLBACK_MODEL`), lần 22/11 đạt 34/34, không câu nào lỗi
+- [ ] Tinh chỉnh prompt nếu lần chạy với model chính (không qua dự phòng) có câu chưa đạt. Lần 22/11 có 29/34 câu trả lời bằng `gemini-3.5-flash-lite` vì model chính quá tải
 - [ ] Chuyển `find_relationship` sang service Relationship Finder khi LMS-007 xong
 - [ ] Mở rộng: đọc câu trả lời thành tiếng (LMS-020), gửi ảnh để hỏi (LMS-019), thiết kế ở ADR-0006

@@ -10,7 +10,7 @@ import { readFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { askFamilyAgent } from "../agent.js";
 import { decodeChatImage } from "../chat-image.js";
-import { createSession, parseArgs, withRetry } from "./setup.js";
+import { agentModelOptions, createSession, parseArgs } from "./setup.js";
 
 const { flags, rest } = parseArgs(process.argv.slice(2));
 const email = typeof flags.as === "string" ? flags.as : "minh@example.com";
@@ -44,16 +44,13 @@ try {
 
   const ask = async (question: string) => {
     const started = Date.now();
-    const result = await withRetry(() =>
-      askFamilyAgent({
-        model: session.gemini.model,
-        modelName: session.gemini.config.chatModel,
-        graph,
-        contentIndex,
-        question,
-        image,
-      }),
-    );
+    const result = await askFamilyAgent({
+      ...agentModelOptions(session.gemini),
+      graph,
+      contentIndex,
+      question,
+      image,
+    });
     image = null; // ảnh chỉ đi kèm câu hỏi đầu tiên
     for (const call of result.trace)
       console.log(
@@ -61,7 +58,7 @@ try {
       );
     console.log(`\n${result.answer}\n`);
     console.log(
-      `  (${result.rounds} vòng tool · ${result.tokens.input}+${result.tokens.output} token · ${((Date.now() - started) / 1000).toFixed(1)}s)\n`,
+      `  (${result.rounds} vòng tool · ${result.tokens.input}+${result.tokens.output} token · ${((Date.now() - started) / 1000).toFixed(1)}s${result.retries ? ` · thử lại ${result.retries} lần` : ""}${result.model !== session.gemini.config.chatModel ? ` · trả lời bằng ${result.model}` : ""})\n`,
     );
   };
 
