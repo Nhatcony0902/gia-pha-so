@@ -8,6 +8,7 @@ Chatbot agentic RAG theo ADR-0004, dùng Gemini theo ADR-0005. Có API SSE, tran
 2. Thêm vào `src/backend/.env` (xem `.env.example`):
    ```
    GEMINI_API_KEY=...        # https://aistudio.google.com/apikey
+   GEMINI_CHAT_FALLBACK_MODEL=gemini-3.5-flash-lite   # tùy chọn, dùng khi model chính quá tải
    ```
    Để trống thì web vẫn chạy, trang Hỏi đáp AI báo "chưa bật".
 3. Migrate và seed (trong `src/`): `npm run db:setup`. Migration `person_embeddings` bật extension `vector` và tạo bảng `PersonEmbedding`. Seed có dòng họ mẫu **Họ Lê Đình – làng An Phú** (54 người, 5 đời) và hai tài khoản demo:
@@ -76,6 +77,25 @@ Web (ChatPage) ──POST /api/trees/:treeId/chat {question, history}──▶ C
 
 Hạn mức ngày đếm trong bộ nhớ của tiến trình (đủ cho một instance theo ADR-0001), khởi động lại server thì đếm lại. Mỗi câu hỏi ghi log số vòng, tool đã gọi, token và thời gian (không ghi nội dung câu hỏi).
 
+## Lỗi tạm thời của Gemini (`retry.ts`)
+
+Free tier của Gemini hay trả `503` ("model is currently experiencing high demand"), `429`, hoặc rớt kết nối (`fetch failed`). Trước khi có phần này, đa số câu trong `ai:eval` ngày 08/11 và 13/11 hỏng vì các lỗi đó chứ không phải do trả lời sai.
+
+- Mỗi lượt gọi model trong `runFamilyAgent` được thử lại khi gặp lỗi tạm thời: `429`, `500`, `502`, `503`, `504`, lỗi mạng (`fetch failed`, `ECONNRESET`, `ETIMEDOUT`…). Lỗi `400`/`401`/`403`/`404` và người dùng hủy thì không thử lại.
+- Thử lại cả khi stream đứt giữa chừng. Phần chữ đã stream bị bỏ bằng sự kiện `discard`, rồi lượt đó được gọi lại từ đầu.
+- Hết lượt thử với model chính, hoặc gặp `429` hết quota trong ngày, thì chuyển sang `GEMINI_CHAT_FALLBACK_MODEL` (nếu có đặt) và dùng model đó đến hết câu hỏi. Quota free tier tính riêng theo từng model nên nên chọn model khác, ví dụ bản `-lite`.
+
+| | Số lần gọi mỗi model | Chờ giữa các lần |
+| --- | --- | --- |
+| Web (`WEB_RETRY`) | 3 | 1 s, 2 s |
+| `ai:chat`, `ai:eval` (`CLI_RETRY`) | 4 | 10 s, 20 s, 40 s |
+
+Log server ghi `retries=` và `model=` khi có thử lại hoặc đổi model. Báo cáo `ai:eval` ghi số câu phải gọi lại và số câu dùng model dự phòng.
+
+Kết quả: lần chạy `ai:eval` ngày 22/11 (model chính đang quá tải) có 31/34 câu phải gọi lại, 29 câu trả lời bằng model dự phòng, không câu nào lỗi, 34/34 đạt.
+
+Lưu ý: khi đổi sang model dự phòng giữa một câu hỏi đã gọi tool, lịch sử gửi đi có thought signature của model chính. Lần chạy 22/11 không gặp lỗi vì việc này, nhưng nếu gặp `400` liên quan tới thought signature thì cần bỏ signature khi đổi model.
+
 ## Cấu trúc (`src/backend/src/modules/ai/`)
 
 | File | Vai trò |
@@ -92,6 +112,7 @@ Hạn mức ngày đếm trong bộ nhớ của tiến trình (đủ cho một i
 | `pgvector-store.ts` | `search_content` trên pgvector, đồng bộ embedding theo hash |
 | `content-search.ts` | Văn bản đại diện một người; bản chỉ mục trong bộ nhớ cho test và `--memory` |
 | `gemini.ts` | Client Gemini cho chat và embedding |
+| `retry.ts` | Phân loại lỗi tạm thời, chính sách thử lại cho web và CLI |
 | `eval/questions.ts` | 34 câu hỏi đánh giá kèm đáp án (4 câu kèm ảnh trong `eval/fixtures/`) |
 | `cli/chat.ts`, `cli/eval.ts` | Lệnh `ai:chat`, `ai:eval` |
 
@@ -119,7 +140,7 @@ Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts
 
 ## Kiểm thử
 
-- `npm test` (trong `src/backend/`): tool, vòng lặp agent với model giả dạng stream (thứ tự sự kiện, `discard`, hủy, trần token, lịch sử), làm sạch link, quyền và hạn mức của `ChatService`, định dạng SSE và ngắt kết nối, kế hoạch đồng bộ embedding, câu SQL tìm kiếm có lọc dòng họ, validate DTO.
+- `npm test` (trong `src/backend/`): tool, vòng lặp agent với model giả dạng stream (thứ tự sự kiện, `discard`, hủy, trần token, lịch sử), làm sạch link, quyền và hạn mức của `ChatService`, định dạng SSE và ngắt kết nối, kế hoạch đồng bộ embedding, câu SQL tìm kiếm có lọc dòng họ, validate DTO, thử lại và đổi model dự phòng khi Gemini lỗi tạm thời (`retry.test.ts`).
 - Kiểm thử thủ công end-to-end đã chạy với một server Gemini giả (đặt `GEMINI_BASE_URL`): stream qua proxy Vite không bị dồn buffer; `400`/`401`/`404`/`429` đúng; link bịa bị gỡ; trang chat trên desktop và mobile 390 px (không tràn ngang), dừng giữa chừng rồi hỏi lại, lỗi dịch vụ AI hiện thông báo kèm nút Hỏi lại.
 
 ## Bộ câu hỏi đánh giá
@@ -143,7 +164,7 @@ Chấm tự động chỉ dò từ khóa (khớp nguyên từ, phải đúng d�
 
 ## Còn thiếu
 
-- **Chưa chạy `ai:eval` với Gemini thật** (máy phát triển chưa có `GEMINI_API_KEY`). Cần chạy và ghi kết quả đầu tiên vào `docs/ai/eval-results/`, rồi tinh chỉnh prompt theo các câu chưa đạt.
+- **Chưa có lần chạy `ai:eval` đủ 34 câu trên model chính** `gemini-3.5-flash`: lần 22/11 phần lớn câu chạy trên model dự phòng vì model chính quá tải. Nên chạy lại vào giờ ít tải trước demo.
 - **Xưng hô do LLM suy ra** từ đường quan hệ, theo quy tắc ghi trong system prompt, nên không tất định. Khi có Relationship Finder (LMS-007), `find_relationship` sẽ trả thẳng cách gọi.
 - **Re-embed theo hash lúc hỏi** thay cho hook `ChangeService` (chưa có). Khi có hook thì chuyển sang embed ngay lúc ghi.
 - Hạn mức ngày lưu trong bộ nhớ, chưa bền qua khởi động lại và chưa dùng chung khi chạy nhiều instance.
