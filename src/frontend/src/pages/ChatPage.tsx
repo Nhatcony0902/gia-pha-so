@@ -5,6 +5,8 @@ import {
   ImagePlus,
   Info,
   LoaderCircle,
+  Mic,
+  Smartphone,
   RotateCcw,
   SendHorizontal,
   Sparkles,
@@ -44,6 +46,7 @@ import {
   type PreparedImage,
 } from "../features/chatbot/image";
 import { useChat, type ChatMessage } from "../features/chatbot/useChat";
+import { useDictation } from "../features/chatbot/useDictation";
 import { useSpeech } from "../features/chatbot/useSpeech";
 import {
   compactSecondaryButtonClass,
@@ -75,6 +78,7 @@ function ChatView({ treeId }: { treeId: string }) {
   );
   const chat = useChat(treeId, refreshContext);
   const speech = useSpeech();
+  const dictation = useDictation();
   const [voiceHint, setVoiceHint] = useState(false);
   const [draft, setDraft] = useState("");
   const [attachment, setAttachment] = useState<PreparedImage | null>(null);
@@ -90,6 +94,7 @@ function ChatView({ treeId }: { treeId: string }) {
   const autoReadId = useRef<string | null>(null);
 
   const { autoRead, speak } = speech;
+  const dictating = dictation.listening;
   useEffect(() => {
     const last = chat.messages.at(-1);
     if (last?.role !== "assistant") return;
@@ -99,8 +104,10 @@ function ChatView({ treeId }: { treeId: string }) {
     }
     if (autoReadId.current !== last.id) return;
     autoReadId.current = null;
-    if (autoRead && last.status === "done") speak(last.id, last.text);
-  }, [chat.messages, autoRead, speak]);
+    // Đang nói vào micro thì không tự đọc, kẻo micro thu luôn giọng đọc.
+    if (autoRead && last.status === "done" && !dictating)
+      speak(last.id, last.text);
+  }, [chat.messages, autoRead, speak, dictating]);
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -179,6 +186,8 @@ function ChatView({ treeId }: { treeId: string }) {
     // Chỉ gửi ảnh mà không gõ gì thì hỏi câu mặc định.
     const text = question.trim() || (attachment ? DEFAULT_IMAGE_QUESTION : "");
     if (!canAsk || !text || preparingImage) return;
+    // Gửi rồi thì tắt micro, bỏ phần nhận dạng về muộn.
+    dictation.cancel();
     stickToBottom.current = true;
     setDraft("");
     setAttachment(null);
@@ -199,6 +208,20 @@ function ChatView({ treeId }: { treeId: string }) {
     if (!file) return;
     event.preventDefault();
     void attach(file);
+  };
+  const canDictate = info.available && !outOfQuota;
+  const toggleDictation = () => {
+    if (dictation.listening) {
+      dictation.stop();
+      return;
+    }
+    // Tắt giọng đọc trước, kẻo micro thu luôn câu trả lời đang đọc.
+    speech.stop();
+    dictation.start(draft, setDraft, {
+      maxLength: info.limits.questionMaxLength,
+      // Nghe được chữ thì đưa con trỏ về ô để sửa tên người nếu nghe sai.
+      onHeard: () => inputRef.current?.focus(),
+    });
   };
   const toggleSpeech = (message: ChatMessage) => {
     if (speech.status === "no-voice") setVoiceHint(true);
@@ -358,6 +381,25 @@ function ChatView({ treeId }: { treeId: string }) {
               bạn ngày mai nhé.
             </Notice>
           )}
+          {dictation.listening && <ListeningReminder />}
+          {dictation.unsure && !dictation.listening && (
+            <Notice tone="info">
+              Mình nghe chưa rõ lắm, bạn đọc lại chữ trong ô (nhất là tên người)
+              trước khi gửi nhé.
+            </Notice>
+          )}
+          {dictation.error && (
+            <Notice tone="warning">
+              {dictation.error}{" "}
+              <button
+                type="button"
+                onClick={dictation.clearError}
+                className="cursor-pointer border-0 bg-transparent p-0 font-bold text-inherit underline"
+              >
+                Đóng
+              </button>
+            </Notice>
+          )}
           {imageError && (
             <Notice tone="warning">
               {imageError}{" "}
@@ -462,15 +504,52 @@ function ChatView({ treeId }: { treeId: string }) {
               rows={1}
               value={draft}
               maxLength={info.limits.questionMaxLength}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                // Tự gõ thì thôi nghe (giữ chữ đã gõ) và bỏ lời nhắc của lượt nghe trước.
+                if (dictation.listening || dictation.unsure) dictation.cancel();
+                setDraft(event.target.value);
+              }}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
               disabled={!info.available || outOfQuota}
               placeholder={
-                attachment ? "Hỏi về ảnh này…" : "Đặt câu hỏi về gia phả…"
+                dictation.listening
+                  ? "Đang nghe… bạn nói câu hỏi nhé"
+                  : attachment
+                    ? "Hỏi về ảnh này…"
+                    : "Đặt câu hỏi về gia phả…"
               }
               className="max-h-40 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-ink outline-none placeholder:text-ink-subtle disabled:cursor-not-allowed"
             />
+            {dictation.supported && (
+              <button
+                type="button"
+                onClick={toggleDictation}
+                disabled={!canDictate && !dictation.listening}
+                aria-pressed={dictation.listening}
+                className={
+                  dictation.listening
+                    ? "relative inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#d98b7d] bg-[#fdeeea] text-[#b0412f] hover:bg-[#fbe2dc]"
+                    : attachButtonClass
+                }
+                aria-label={
+                  dictation.listening ? "Dừng nghe" : "Hỏi bằng giọng nói"
+                }
+                title={
+                  dictation.listening
+                    ? "Đang nghe. Bấm để dừng"
+                    : "Hỏi bằng giọng nói (tiếng Việt)"
+                }
+              >
+                {dictation.listening && (
+                  <span
+                    className="absolute inset-0 animate-ping rounded-lg border-2 border-[#d98b7d] opacity-60"
+                    aria-hidden
+                  />
+                )}
+                <Mic size={19} />
+              </button>
+            )}
             {chat.streaming ? (
               <button
                 type="button"
@@ -519,6 +598,32 @@ function ChatView({ treeId }: { treeId: string }) {
         />
       )}
     </main>
+  );
+}
+
+/** Lời nhắc trong lúc nghe, theo P-147: điều giúp nhiều nhất ở chỗ ồn là để máy sát miệng. */
+function ListeningReminder() {
+  return (
+    <div
+      className="grid gap-1 rounded-lg border border-[#e7c0b6] bg-[#fdf3f0] px-3 py-2 text-sm text-[#6b3a2f]"
+      aria-live="polite"
+    >
+      <p className="m-0 flex items-start gap-2 font-semibold">
+        <Smartphone size={16} className="mt-0.5 shrink-0" />
+        Đưa máy sát miệng, cách khoảng một nắm tay. Nói chậm và rõ.
+      </p>
+      <p className="m-0 flex items-center gap-2 pl-6">
+        <span
+          className="size-2 shrink-0 animate-pulse rounded-full bg-[#c0533f]"
+          aria-hidden
+        />
+        Đang nghe. Nói xong mình tự dừng, bạn đọc lại chữ rồi bấm Gửi.
+      </p>
+      <p className="m-0 pl-6 text-xs text-[#8a5a4f]">
+        Giọng nói được trình duyệt gửi tới dịch vụ nhận dạng giọng nói để chuyển
+        thành chữ.
+      </p>
+    </div>
   );
 }
 
