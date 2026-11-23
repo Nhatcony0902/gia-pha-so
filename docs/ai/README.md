@@ -116,7 +116,7 @@ Lưu ý: khi đổi sang model dự phòng giữa một câu hỏi đã gọi to
 | `eval/questions.ts` | 34 câu hỏi đánh giá kèm đáp án (4 câu kèm ảnh trong `eval/fixtures/`) |
 | `cli/chat.ts`, `cli/eval.ts` | Lệnh `ai:chat`, `ai:eval` |
 
-Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts` quản lý hội thoại, `ChatMarkdown.tsx` hiển thị câu trả lời, `speech.ts` + `useSpeech.ts` đọc thành tiếng, `image.ts` nén ảnh gửi kèm) và `src/frontend/src/pages/ChatPage.tsx`. Hội thoại giữ trong `sessionStorage` theo gia phả.
+Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts` quản lý hội thoại, `ChatMarkdown.tsx` hiển thị câu trả lời, `speech.ts` + `useSpeech.ts` đọc thành tiếng, `image.ts` nén ảnh gửi kèm, `dictation.ts` + `useDictation.ts` hỏi bằng giọng nói) và `src/frontend/src/pages/ChatPage.tsx`. Hội thoại giữ trong `sessionStorage` theo gia phả.
 
 ## Hỏi bằng ảnh (LMS-019, ADR-0006)
 
@@ -135,6 +135,18 @@ Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts
 - Chọn giọng `vi-*`, ưu tiên giọng "Natural"/"Online" (Edge: HoaiMy, NamMinh), rồi giọng Google. Danh sách giọng rỗng (Chrome Android hay vậy) thì vẫn đọc với `lang = "vi-VN"`. Có giọng nhưng không có giọng tiếng Việt thì không đọc (tránh đọc bằng giọng tiếng Anh) và hiện hướng dẫn cài giọng.
 - Trước khi đọc: bỏ markdown và đường link, "1905 – 1988" thành "1905 đến 1988", `05/03/1988` thành "ngày 5 tháng 3 năm 1988", mỗi mục danh sách là một câu. Câu dài cắt thành đoạn ≤ 180 ký tự và đọc lần lượt, vì Chrome hay tự ngắt khi đọc một đoạn dài.
 - Tự dừng khi hỏi câu mới, bấm Cuộc trò chuyện mới hoặc rời trang. Safari iOS chỉ cho đọc sau thao tác của người dùng, nên lúc bấm gửi có "mồi" một utterance rỗng để lần tự đọc sau đó không bị chặn.
+
+## Hỏi bằng giọng nói (LMS-021, ADR-0007)
+
+- Nút 🎤 cạnh nút Gửi. Dùng `SpeechRecognition` (hoặc `webkitSpeechRecognition`) của trình duyệt với `lang = "vi-VN"`. Không gọi backend, không tốn request Gemini.
+- Cách nghe lấy từ P-147 (GlucoCare): nghe liên tục (`continuous`), chỉ tự dừng sau **2,5 s** không có chữ mới (người lớn tuổi hay ngừng giữa câu), tối đa **30 s**. Bấm nút lần nữa thì dừng và vẫn giữ phần vừa nói.
+- Chữ hiện dần trong ô câu hỏi khi đang nói (`interimResults`), nối sau chữ đã gõ sẵn. Chrome Android hay lặp câu trước ở đầu đoạn sau, `transcriptOf` chỉ giữ bản dài hơn.
+- Trong lúc nghe hiện lời nhắc (đưa máy sát miệng, nói chậm và rõ, nói xong tự dừng) và câu quyền riêng tư. Đoạn đã chốt có độ tin cậy dưới 0,6 thì nhắc đọc lại chữ, nhất là tên người.
+- **Không tự gửi**: người dùng xem, sửa tên người rồi bấm Gửi. Gửi câu hỏi hoặc tự gõ trong lúc đang nghe thì micro tắt và kết quả về muộn bị bỏ.
+- Bật micro thì dừng giọng đọc, và không tự đọc câu trả lời khi đang nghe, để micro không thu giọng đọc.
+- Firefox không có API thì ẩn nút. Lỗi (`not-allowed`, `audio-capture`, `no-speech`, `network`, không hỗ trợ tiếng Việt) hiện lời nhắn tiếng Việt cạnh ô nhập (`dictationErrorMessage`).
+- Âm thanh được trình duyệt gửi tới máy chủ nhận dạng của hãng (Chrome: Google, Edge: Microsoft, Safari: Apple hoặc nhận dạng trên máy). Cần HTTPS hoặc localhost.
+- Code: `features/chatbot/dictation.ts`, `useDictation.ts`, `pages/ChatPage.tsx`. Test: `dictation.test.ts` (`npm test` trong `src/frontend/`).
 
 **Ghi chú về validate:** backend chạy bằng `tsx` (esbuild) nên không có decorator metadata. `ValidationPipe` toàn cục không biết kiểu của `@Body()` và bỏ qua kiểm tra. Endpoint chat truyền `expectedType` để chắc chắn được kiểm tra.
 
