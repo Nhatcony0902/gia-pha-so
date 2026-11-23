@@ -33,5 +33,6 @@ Chốt các câu hỏi mở trong `specs/user-roles.md`.
 - [x] FE: hộp thoại "Chia sẻ", trang `/invite/:token`, ẩn nút sửa/xóa với Viewer
 - [x] Mời qua email, gắn tài khoản với Person khi chấp nhận (nút "Mời người này" ở trang hồ sơ) (PR #7)
 - [x] Gắn hồ sơ cho người đã vào bằng link chung: Admin mời lại qua email kèm Person, giữ nguyên vai trò (PR #9)
+- [x] Nút "Gửi qua Zalo" cạnh link mời: điện thoại mở bảng chia sẻ của máy để chọn Zalo; máy tính chép sẵn tin nhắn mời (tên gia phả, link, ngày hết hạn) rồi mở Zalo Web để dán. Không dùng plugin chia sẻ của Zalo vì cần mã Official Account
 - [ ] Mời Editor qua email, đổi vai trò, giao nhánh cho Editor (cần LMS-011 để Editor đề xuất qua duyệt)
 - [ ] Người dùng tự nhận hồ sơ của mình khi không được mời kèm Person
