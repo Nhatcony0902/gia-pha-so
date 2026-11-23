@@ -7,6 +7,7 @@ import type {
 import { askFamilyAgent, type AgentEvent } from "./agent.js";
 import { FamilyGraph } from "./family-graph.js";
 import {
+  GeminiTimeoutError,
   isDailyQuotaError,
   isTransientError,
   retryDelay,
@@ -34,21 +35,37 @@ const chunk = (text: string) =>
     usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 10 },
   }) as unknown as GenerateContentResponse;
 
-/** Một lượt gọi model: ném lỗi ngay, stream một đoạn rồi đứt, hoặc trả lời. */
-type Step = Error | { partial: string; error: Error } | string;
+/** Một lượt gọi model: ném lỗi ngay, stream một đoạn rồi đứt, treo không trả gì, hoặc trả lời. */
+type Step =
+  | Error
+  | { partial: string; error: Error }
+  | { hang: "connect" | "first-chunk" | { after: string } }
+  | string;
+
+const never = () => new Promise<never>(() => {});
 
 function flakyModel(steps: Step[]) {
   const models: string[] = [];
+  const signals: AbortSignal[] = [];
   let index = 0;
   return {
     models,
+    signals,
     async generateContentStream(params: GenerateContentParameters) {
       models.push(params.model);
+      if (params.config?.abortSignal) signals.push(params.config.abortSignal);
       const step = steps[Math.min(index++, steps.length - 1)]!;
       if (step instanceof Error) throw step;
+      if (typeof step === "object" && "hang" in step && step.hang === "connect")
+        return never();
       return (async function* () {
         if (typeof step === "string") {
           yield chunk(step);
+          return;
+        }
+        if ("hang" in step) {
+          if (typeof step.hang === "object") yield chunk(step.hang.after);
+          await never();
           return;
         }
         yield chunk(step.partial);
@@ -84,6 +101,10 @@ describe("phân loại lỗi Gemini", () => {
         }),
       ),
     );
+  });
+
+  it("Gemini treo quá hạn cũng là lỗi tạm thời", () => {
+    assert.equal(isTransientError(new GeminiTimeoutError(30_000)), true);
   });
 
   it("400, 401, 403, 404, lỗi code và người dùng hủy thì không thử lại", () => {
@@ -232,5 +253,59 @@ describe("chatbot thử lại khi Gemini lỗi tạm thời", () => {
     });
     await assert.rejects(pending, { name: "AbortError" });
     assert.equal(model.models.length, 1);
+  });
+
+  it("Gemini treo không trả gì thì hết hạn, hủy request rồi thử lại", async () => {
+    const model = flakyModel([
+      { hang: "connect" },
+      { hang: "first-chunk" },
+      "Lê Đình Khang",
+    ]);
+    const messages: string[] = [];
+    const result = await ask(model, {
+      retry: { attempts: 3, baseDelayMs: 1, timeoutMs: 20 },
+      onRetry: (message) => messages.push(message),
+    });
+    assert.equal(result.answer, "Lê Đình Khang");
+    assert.equal(result.retries, 2);
+    assert.match(messages[0]!, /không phản hồi sau/);
+    // Hai lần gọi bị treo đã bị hủy để không giữ kết nối tới Gemini.
+    assert.deepEqual(
+      model.signals.map((s) => s.aborted),
+      [true, true, false],
+    );
+  });
+
+  it("treo giữa chừng thì bỏ phần chữ đã stream, hết lượt thì chuyển model dự phòng", async () => {
+    const model = flakyModel([
+      { hang: { after: "Ông nội của" } },
+      { hang: "first-chunk" },
+      "Lê Đình Khang",
+    ]);
+    const events: AgentEvent[] = [];
+    const result = await ask(model, {
+      retry: { attempts: 2, baseDelayMs: 1, timeoutMs: 20 },
+      fallbackModelName: "backup",
+      onEvent: (e) => events.push(e),
+    });
+    assert.equal(result.answer, "Lê Đình Khang");
+    assert.deepEqual(model.models, ["main", "main", "backup"]);
+    assert.deepEqual(
+      events.map((e) => e.type),
+      ["delta", "discard", "delta"],
+    );
+  });
+
+  it("người dùng hủy khi Gemini đang treo thì dừng ngay, không chờ hết hạn", async () => {
+    const controller = new AbortController();
+    const model = flakyModel([{ hang: "first-chunk" }]);
+    const pending = ask(model, {
+      retry: { attempts: 3, baseDelayMs: 1, timeoutMs: 60_000 },
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 10);
+    await assert.rejects(pending, { name: "AbortError" });
+    assert.equal(model.models.length, 1);
+    assert.equal(model.signals[0]!.aborted, true);
   });
 });

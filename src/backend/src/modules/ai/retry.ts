@@ -8,12 +8,76 @@ export type RetryPolicy = {
   attempts: number;
   /** Thời gian chờ trước lần thử lại thứ nhất; các lần sau gấp đôi. */
   baseDelayMs: number;
+  /**
+   * Chờ tối đa bấy nhiêu ms cho mỗi chunk (kể cả chunk đầu). Gemini đôi khi giữ kết nối mà không
+   * trả gì (hay gặp ngay sau 503); quá hạn thì coi như lỗi tạm thời để thử lại / đổi model.
+   * Bỏ trống thì không giới hạn.
+   */
+  timeoutMs?: number;
 };
 
 /** Web: người dùng đang chờ, chỉ chờ ngắn (1s, 2s) rồi chuyển model dự phòng. */
-export const WEB_RETRY: RetryPolicy = { attempts: 3, baseDelayMs: 1_000 };
+export const WEB_RETRY: RetryPolicy = {
+  attempts: 3,
+  baseDelayMs: 1_000,
+  timeoutMs: 30_000,
+};
 /** CLI (ai:chat, ai:eval): không ai chờ, chờ lâu hơn để qua đợt quá tải (10s, 20s, 40s). */
-export const CLI_RETRY: RetryPolicy = { attempts: 4, baseDelayMs: 10_000 };
+export const CLI_RETRY: RetryPolicy = {
+  attempts: 4,
+  baseDelayMs: 10_000,
+  timeoutMs: 90_000,
+};
+
+/** Gemini không trả dữ liệu trong thời hạn `timeoutMs`. */
+export class GeminiTimeoutError extends Error {
+  override name = "GeminiTimeoutError";
+  constructor(ms: number) {
+    super(`Gemini không phản hồi sau ${ms / 1000}s`);
+  }
+}
+
+/**
+ * Chờ `promise` tối đa `ms`. Quá hạn thì gọi `onTimeout` (để hủy request) và ném
+ * GeminiTimeoutError; người dùng hủy (`signal`) thì ném lý do hủy ngay.
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number | undefined,
+  signal?: AbortSignal,
+  onTimeout?: () => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(signal!.reason);
+    };
+    const timer =
+      ms === undefined
+        ? undefined
+        : setTimeout(() => {
+            cleanup();
+            onTimeout?.();
+            reject(new GeminiTimeoutError(ms));
+          }, ms);
+    if (signal?.aborted) return onAbort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const NETWORK_ERROR =
@@ -46,6 +110,7 @@ export function isDailyQuotaError(error: unknown) {
 /** Lỗi tạm thời: quá tải, lỗi server, rớt mạng. Lỗi 400/401/403/404 là lỗi thật, không thử lại. */
 export function isTransientError(error: unknown) {
   if (isAbortError(error)) return false;
+  if (error instanceof GeminiTimeoutError) return true;
   const status = statusOf(error);
   if (status !== undefined) return RETRYABLE_STATUS.has(status);
   return NETWORK_ERROR.test(errorText(error));
@@ -74,6 +139,7 @@ export function sleep(ms: number, signal?: AbortSignal) {
 export function shortError(error: unknown) {
   const status = statusOf(error);
   if (status !== undefined) return `HTTP ${status}`;
+  if (error instanceof GeminiTimeoutError) return error.message;
   return errorText(error).trim().slice(0, 80);
 }
 
