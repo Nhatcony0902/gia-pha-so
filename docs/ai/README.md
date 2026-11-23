@@ -83,12 +83,13 @@ Free tier của Gemini hay trả `503` ("model is currently experiencing high de
 
 - Mỗi lượt gọi model trong `runFamilyAgent` được thử lại khi gặp lỗi tạm thời: `429`, `500`, `502`, `503`, `504`, lỗi mạng (`fetch failed`, `ECONNRESET`, `ETIMEDOUT`…). Lỗi `400`/`401`/`403`/`404` và người dùng hủy thì không thử lại.
 - Thử lại cả khi stream đứt giữa chừng. Phần chữ đã stream bị bỏ bằng sự kiện `discard`, rồi lượt đó được gọi lại từ đầu.
+- Gemini có lúc giữ kết nối mà không trả gì, hay gặp ngay sau một lần `503`. Ngày 23/11 có một lần thử lại treo hơn 100 s và giao diện kẹt ở "Đang suy nghĩ…". Vì vậy mỗi bước (chờ kết nối, chờ từng chunk) có hạn `timeoutMs`. Quá hạn thì lần gọi đó bị hủy (đóng kết nối) và tính là lỗi tạm thời, nên được thử lại hoặc chuyển sang model dự phòng như trên.
 - Hết lượt thử với model chính, hoặc gặp `429` hết quota trong ngày, thì chuyển sang `GEMINI_CHAT_FALLBACK_MODEL` (nếu có đặt) và dùng model đó đến hết câu hỏi. Quota free tier tính riêng theo từng model nên nên chọn model khác, ví dụ bản `-lite`.
 
-| | Số lần gọi mỗi model | Chờ giữa các lần |
-| --- | --- | --- |
-| Web (`WEB_RETRY`) | 3 | 1 s, 2 s |
-| `ai:chat`, `ai:eval` (`CLI_RETRY`) | 4 | 10 s, 20 s, 40 s |
+| | Số lần gọi mỗi model | Chờ giữa các lần | Hạn chờ mỗi chunk |
+| --- | --- | --- | --- |
+| Web (`WEB_RETRY`) | 3 | 1 s, 2 s | 30 s |
+| `ai:chat`, `ai:eval` (`CLI_RETRY`) | 4 | 10 s, 20 s, 40 s | 90 s |
 
 Log server ghi `retries=` và `model=` khi có thử lại hoặc đổi model. Báo cáo `ai:eval` ghi số câu phải gọi lại và số câu dùng model dự phòng.
 
@@ -140,7 +141,7 @@ Frontend: `src/frontend/src/features/chatbot/` (`api.ts` đọc SSE, `useChat.ts
 
 ## Kiểm thử
 
-- `npm test` (trong `src/backend/`): tool, vòng lặp agent với model giả dạng stream (thứ tự sự kiện, `discard`, hủy, trần token, lịch sử), làm sạch link, quyền và hạn mức của `ChatService`, định dạng SSE và ngắt kết nối, kế hoạch đồng bộ embedding, câu SQL tìm kiếm có lọc dòng họ, validate DTO, thử lại và đổi model dự phòng khi Gemini lỗi tạm thời (`retry.test.ts`).
+- `npm test` (trong `src/backend/`): tool, vòng lặp agent với model giả dạng stream (thứ tự sự kiện, `discard`, hủy, trần token, lịch sử), làm sạch link, quyền và hạn mức của `ChatService`, định dạng SSE và ngắt kết nối, kế hoạch đồng bộ embedding, câu SQL tìm kiếm có lọc dòng họ, validate DTO, thử lại và đổi model dự phòng khi Gemini lỗi tạm thời hoặc treo quá hạn (`retry.test.ts`).
 - Kiểm thử thủ công end-to-end đã chạy với một server Gemini giả (đặt `GEMINI_BASE_URL`): stream qua proxy Vite không bị dồn buffer; `400`/`401`/`404`/`429` đúng; link bịa bị gỡ; trang chat trên desktop và mobile 390 px (không tràn ngang), dừng giữa chừng rồi hỏi lại, lỗi dịch vụ AI hiện thông báo kèm nút Hỏi lại.
 
 ## Bộ câu hỏi đánh giá

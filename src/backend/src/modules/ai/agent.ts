@@ -15,6 +15,7 @@ import {
   retryDelay,
   shortError,
   sleep,
+  withTimeout,
   type RetryPolicy,
 } from "./retry.js";
 import {
@@ -328,20 +329,36 @@ export async function runFamilyAgent(input: {
 
   /** Một lượt gọi model, stream chữ ra ngay. Chữ "thought" không stream. */
   const streamTurn = async () => {
-    const stream = await model.generateContentStream({
-      model: activeModel,
-      contents,
-      config: {
-        systemInstruction: instruction,
-        tools: [{ functionDeclarations }],
-        ...(input.signal ? { abortSignal: input.signal } : {}),
-      },
-    });
+    // Mỗi lần gọi có controller riêng: quá hạn thì chỉ hủy lần gọi này, người dùng hủy thì hủy theo.
+    const attempt = new AbortController();
+    const onUserAbort = () => attempt.abort(input.signal!.reason);
+    input.signal?.addEventListener("abort", onUserAbort, { once: true });
+    /** Chờ một bước của Gemini, không quá `retry.timeoutMs` (Gemini có lúc treo không trả gì). */
+    const step = <T>(promise: Promise<T>) =>
+      withTimeout(promise, retry.timeoutMs, input.signal, () =>
+        attempt.abort(),
+      );
     const parts: Part[] = [];
     let usage: GenerateContentResponseUsageMetadata | undefined;
     let text = "";
+    let iterator: AsyncIterator<GenerateContentResponse> | undefined;
     try {
-      for await (const chunk of stream) {
+      const stream = await step(
+        model.generateContentStream({
+          model: activeModel,
+          contents,
+          config: {
+            systemInstruction: instruction,
+            tools: [{ functionDeclarations }],
+            abortSignal: attempt.signal,
+          },
+        }),
+      );
+      iterator = stream[Symbol.asyncIterator]();
+      for (;;) {
+        const next = await step(iterator.next());
+        if (next.done) break;
+        const chunk = next.value;
         if (chunk.usageMetadata) usage = chunk.usageMetadata;
         for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
           parts.push(part);
@@ -352,9 +369,13 @@ export async function runFamilyAgent(input: {
         }
       }
     } catch (error) {
+      // Lần gọi bị bỏ dở (quá hạn, đứt mạng): đóng stream, không chờ vì nó có thể đang treo.
+      void iterator?.return?.()?.catch(() => {});
       // Đứt giữa chừng: bỏ phần chữ đã stream, lượt thử lại sẽ viết lại từ đầu.
       if (text) emit({ type: "discard" });
       throw error;
+    } finally {
+      input.signal?.removeEventListener("abort", onUserAbort);
     }
     return { parts, usage, text };
   };
@@ -370,8 +391,7 @@ export async function runFamilyAgent(input: {
         return await streamTurn();
       } catch (error) {
         if (input.signal?.aborted || !isTransientError(error)) throw error;
-        const exhausted =
-          attempt >= retry.attempts || isDailyQuotaError(error);
+        const exhausted = attempt >= retry.attempts || isDailyQuotaError(error);
         if (exhausted) {
           if (!fallbackModelName || activeModel === fallbackModelName)
             throw error;
