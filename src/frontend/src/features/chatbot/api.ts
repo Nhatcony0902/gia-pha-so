@@ -1,17 +1,30 @@
 import type {
+  AiSettings,
   ChatContextResponse,
   ChatRequest,
   ChatStreamEvent,
+  UpdateAiSettingsRequest,
 } from "@family-tree/shared-types";
 import {
   ApiError,
   apiGet,
+  apiRequest,
   authorizedFetch,
   errorFromResponse,
 } from "../../lib/api/client";
 
 export const getChatContext = (treeId: string) =>
   apiGet<ChatContextResponse>(`/trees/${treeId}/chat`);
+
+/** Admin bật/tắt trợ lý AI cho gia phả (LMS-023). */
+export const updateAiSettings = (
+  treeId: string,
+  body: UpdateAiSettingsRequest,
+) =>
+  apiRequest<AiSettings>(`/trees/${treeId}/chat/settings`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
 
 /**
  * Tách luồng SSE thành từng sự kiện. Chỉ đọc dòng `data:` (JSON), bỏ qua comment `: ping`.

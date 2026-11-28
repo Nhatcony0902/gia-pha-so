@@ -29,6 +29,10 @@ import {
 } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PageBreadcrumbBar } from "../components/PageHeader";
+import {
+  AiConsentPanel,
+  AiPrivacyNote,
+} from "../features/chatbot/AiConsentPanel";
 import { getChatContext } from "../features/chatbot/api";
 import {
   cameraSupported,
@@ -138,7 +142,9 @@ function ChatView({ treeId }: { treeId: string }) {
 
   const info = context.data;
   const outOfQuota = info.limits.remainingToday <= 0;
-  const canAsk = info.available && !outOfQuota && !chat.streaming;
+  // Admin chưa đồng ý gửi dữ liệu sang AI (LMS-023) thì khóa ô hỏi.
+  const aiOn = info.ai.enabled;
+  const canAsk = info.available && aiOn && !outOfQuota && !chat.streaming;
   const prepareSpeech = () => {
     speech.stop();
     if (speech.autoRead) speech.prime();
@@ -147,7 +153,11 @@ function ChatView({ treeId }: { treeId: string }) {
   const dailyImages = info.limits.dailyImages ?? 0;
   const remainingImages = info.limits.remainingImagesToday ?? 0;
   const canAttach =
-    info.available && !outOfQuota && dailyImages > 0 && remainingImages > 0;
+    info.available &&
+    aiOn &&
+    !outOfQuota &&
+    dailyImages > 0 &&
+    remainingImages > 0;
   const attachTitle =
     remainingImages > 0
       ? "Gửi kèm ảnh (bia mộ, trang gia phả, ảnh cũ có chữ…)"
@@ -278,7 +288,13 @@ function ChatView({ treeId }: { treeId: string }) {
         }}
       >
         <div className="mx-auto grid w-full max-w-3xl gap-5 px-4 py-6">
-          {chat.messages.length === 0 ? (
+          {info.available && !aiOn ? (
+            <AiConsentPanel
+              treeId={treeId}
+              settings={info.ai}
+              onChanged={refreshContext}
+            />
+          ) : chat.messages.length === 0 ? (
             <EmptyState
               info={info}
               treeId={treeId}
@@ -465,7 +481,7 @@ function ChatView({ treeId }: { treeId: string }) {
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
-              disabled={!info.available || outOfQuota}
+              disabled={!info.available || !aiOn || outOfQuota}
               placeholder={
                 attachment ? "Hỏi về ảnh này…" : "Đặt câu hỏi về gia phả…"
               }
@@ -506,6 +522,15 @@ function ChatView({ treeId }: { treeId: string }) {
                 : `Còn ${info.limits.remainingToday}/${info.limits.dailyQuestions} câu hôm nay`}
             </span>
           </p>
+          {info.available && aiOn && (
+            <div className="px-1 text-xs text-ink-muted">
+              <AiPrivacyNote
+                treeId={treeId}
+                settings={info.ai}
+                onChanged={refreshContext}
+              />
+            </div>
+          )}
         </form>
       </footer>
       {cameraOpen && (

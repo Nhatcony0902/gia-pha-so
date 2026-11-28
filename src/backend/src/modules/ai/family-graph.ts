@@ -220,6 +220,7 @@ export class FamilyGraph {
       age: this.age(person),
       generation: this.generation(person.id),
       link: this.link(person.id),
+      ...(person.detailsHidden ? { detailsHidden: true } : {}),
     };
   }
 }

@@ -516,10 +516,32 @@ export type ChatStreamEvent =
     }
   | { type: "error"; code: string; message: string };
 
+/**
+ * Đồng ý dùng AI của một gia phả (LMS-023, ADR-0008). Chỉ Admin đổi được.
+ * Chưa bật thì chatbot và các tính năng AI khác trả `403 AI_CONSENT_REQUIRED`.
+ */
+export interface AiSettings {
+  enabled: boolean;
+  /** Lúc Admin bật (ISO), null nếu đang tắt. */
+  enabledAt: string | null;
+  /** false (mặc định): ẩn nghề nghiệp, nơi ở, tiểu sử, ngày sinh cụ thể của người còn sống với AI. */
+  shareLivingDetails: boolean;
+  /** Người đang xem là Admin, được bật/tắt. */
+  canManage: boolean;
+}
+
+/** Body của `PUT /trees/{treeId}/chat/settings`. Tắt AI thì xóa luôn embedding của gia phả. */
+export interface UpdateAiSettingsRequest {
+  enabled: boolean;
+  shareLivingDetails?: boolean;
+}
+
 export interface ChatContextResponse {
   treeName: string;
   /** Máy chủ đã cấu hình LLM chưa. */
   available: boolean;
+  /** Admin của gia phả đã đồng ý dùng AI chưa. */
+  ai: AiSettings;
   /** Hồ sơ gắn với tài khoản trong gia phả này ("tôi"), null nếu chưa gắn. */
   me: { personId: string; name: string } | null;
   suggestions: string[];

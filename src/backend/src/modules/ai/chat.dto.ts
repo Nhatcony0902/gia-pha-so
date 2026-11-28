@@ -2,6 +2,7 @@ import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsObject,
   IsOptional,
@@ -66,4 +67,12 @@ export class ChatRequestDto {
   @ValidateNested()
   @Type(() => ChatImageDto)
   image?: ChatImageDto;
+}
+
+const settingsMessage = { message: "Cài đặt AI không hợp lệ" };
+
+/** Body của `PUT /trees/:treeId/chat/settings` (LMS-023). */
+export class UpdateAiSettingsDto {
+  @IsBoolean(settingsMessage) enabled!: boolean;
+  @IsOptional() @IsBoolean(settingsMessage) shareLivingDetails?: boolean;
 }

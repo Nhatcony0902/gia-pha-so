@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
+  ForbiddenException,
   HttpException,
   NotFoundException,
   ServiceUnavailableException,
@@ -27,13 +28,40 @@ import { leDinhSnapshot, pid } from "./testing/le-dinh-snapshot.js";
 const snapshot = leDinhSnapshot();
 const TREE = snapshot.treeId;
 
+type FakeTree = {
+  aiEnabledAt: Date | null;
+  aiEnabledById: string | null;
+  aiShareLivingDetails: boolean;
+};
+
 /** Prisma giả: chỉ các truy vấn ChatService và loadTreeSnapshot dùng. */
-function fakePrisma() {
+function fakePrisma(
+  tree: FakeTree = {
+    aiEnabledAt: new Date("2026-11-01T00:00:00Z"),
+    aiEnabledById: "admin-user",
+    aiShareLivingDetails: true,
+  },
+  rawCalls: string[] = [],
+) {
   const memberships = [
-    { treeId: TREE, userId: "minh-user", personId: pid("minh") },
-    { treeId: TREE, userId: "unlinked-user", personId: null },
+    {
+      treeId: TREE,
+      userId: "minh-user",
+      personId: pid("minh"),
+      role: "VIEWER",
+    },
+    { treeId: TREE, userId: "unlinked-user", personId: null, role: "VIEWER" },
+    { treeId: TREE, userId: "admin-user", personId: null, role: "ADMIN" },
   ];
+  const settings = () => ({
+    aiEnabledAt: tree.aiEnabledAt,
+    aiShareLivingDetails: tree.aiShareLivingDetails,
+  });
   return {
+    $executeRaw: async (strings: TemplateStringsArray) => {
+      rawCalls.push(strings.join("?"));
+      return 0;
+    },
     membership: {
       findUnique: async ({
         where: { treeId_userId: key },
@@ -45,7 +73,15 @@ function fakePrisma() {
         ) ?? null,
     },
     familyTree: {
-      findUniqueOrThrow: async () => ({ name: snapshot.treeName }),
+      findUniqueOrThrow: async () => ({
+        name: snapshot.treeName,
+        ...settings(),
+      }),
+      update: async ({ data }: { data: Partial<FakeTree> }) => {
+        for (const [key, value] of Object.entries(data))
+          if (value !== undefined) Object.assign(tree, { [key]: value });
+        return settings();
+      },
     },
     person: {
       findUnique: async ({ where: { id } }: { where: { id: string } }) => {
@@ -79,8 +115,11 @@ function oneShotModel(answer: string) {
 
 class TestChatService extends ChatService {
   configured = true;
-  constructor(readonly fakeAi: ChatAi) {
-    super(fakePrisma());
+  constructor(
+    readonly fakeAi: ChatAi,
+    prisma: PrismaService = fakePrisma(),
+  ) {
+    super(prisma);
   }
   protected override isConfigured() {
     return this.configured;
@@ -414,5 +453,112 @@ describe("streamAgentAnswer", () => {
       parseFrames(res.chunks).map((e) => e.type),
       ["delta"],
     );
+  });
+});
+
+describe("ChatService – đồng ý và riêng tư (LMS-023)", () => {
+  const disabledTree = (): FakeTree => ({
+    aiEnabledAt: null,
+    aiEnabledById: null,
+    aiShareLivingDetails: false,
+  });
+
+  it("gia phả chưa bật AI: không gọi model, trả 403 AI_CONSENT_REQUIRED", async () => {
+    const model = oneShotModel("không được gọi");
+    const service = new TestChatService(
+      { model, chatModel: "fake", contentStore: null },
+      fakePrisma(disabledTree()),
+    );
+    const error = await service
+      .prepare(TREE, "minh-user", { question: "Ông nội tôi là ai?" })
+      .catch((e: unknown) => e);
+    assert.ok(error instanceof ForbiddenException);
+    assert.equal(
+      (error.getResponse() as { code: string }).code,
+      "AI_CONSENT_REQUIRED",
+    );
+    assert.equal(model.requests.length, 0);
+    // lượt bị từ chối không trừ hạn mức
+    const context = await service.context(TREE, "minh-user");
+    assert.equal(context.limits.remainingToday, context.limits.dailyQuestions);
+    assert.deepEqual(context.ai, {
+      enabled: false,
+      enabledAt: null,
+      shareLivingDetails: false,
+      canManage: false,
+    });
+  });
+
+  it("chỉ Admin bật/tắt được; bật ghi người bật, tắt xóa embedding của gia phả", async () => {
+    const tree = disabledTree();
+    const rawCalls: string[] = [];
+    const service = new TestChatService(
+      { model: oneShotModel("ok"), chatModel: "fake", contentStore: null },
+      fakePrisma(tree, rawCalls),
+    );
+    const error = await service
+      .updateSettings(TREE, "minh-user", { enabled: true })
+      .catch((e: unknown) => e);
+    assert.ok(error instanceof ForbiddenException);
+    assert.equal(
+      (error.getResponse() as { code: string }).code,
+      "AI_SETTINGS_FORBIDDEN",
+    );
+    assert.equal(tree.aiEnabledAt, null);
+    await assert.rejects(
+      service.updateSettings(TREE, "stranger", { enabled: true }),
+      NotFoundException,
+    );
+
+    const on = await service.updateSettings(TREE, "admin-user", {
+      enabled: true,
+    });
+    assert.equal(on.enabled, true);
+    assert.equal(on.canManage, true);
+    assert.equal(on.shareLivingDetails, false);
+    assert.equal(tree.aiEnabledById, "admin-user");
+    const enabledAt = tree.aiEnabledAt as Date | null;
+    assert.ok(enabledAt instanceof Date);
+
+    // đổi tùy chọn khi đang bật không đổi thời điểm đồng ý
+    const shared = await service.updateSettings(TREE, "admin-user", {
+      enabled: true,
+      shareLivingDetails: true,
+    });
+    assert.equal(shared.shareLivingDetails, true);
+    assert.equal(tree.aiEnabledAt, enabledAt);
+    assert.equal(rawCalls.length, 0);
+
+    const off = await service.updateSettings(TREE, "admin-user", {
+      enabled: false,
+    });
+    assert.equal(off.enabled, false);
+    assert.equal(tree.aiEnabledAt, null);
+    assert.equal(tree.aiEnabledById, null);
+    assert.equal(rawCalls.length, 1);
+    assert.match(rawCalls[0]!, /DELETE FROM "PersonEmbedding"/);
+  });
+
+  it("không chia sẻ chi tiết người còn sống thì thêm luật riêng tư vào system prompt", async () => {
+    const tree = { ...disabledTree(), aiEnabledAt: new Date() };
+    const model = oneShotModel("ok");
+    const service = new TestChatService(
+      { model, chatModel: "fake", contentStore: null },
+      fakePrisma(tree),
+    );
+    await (
+      await service.prepare(TREE, "minh-user", {
+        question: "Bác Phúc làm nghề gì?",
+      })
+    ).run(() => {}, new AbortController().signal);
+    const hidden = JSON.stringify(model.requests[0]!.config?.systemInstruction);
+    assert.match(hidden, /detailsHidden/);
+
+    tree.aiShareLivingDetails = true;
+    await (
+      await service.prepare(TREE, "minh-user", { question: "Còn ai nữa?" })
+    ).run(() => {}, new AbortController().signal);
+    const shared = JSON.stringify(model.requests[1]!.config?.systemInstruction);
+    assert.doesNotMatch(shared, /detailsHidden/);
   });
 });

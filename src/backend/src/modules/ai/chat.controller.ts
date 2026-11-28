@@ -5,6 +5,7 @@ import {
   Inject,
   Param,
   Post,
+  Put,
   Req,
   Res,
   UseGuards,
@@ -13,7 +14,7 @@ import {
 import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard.js";
-import { ChatRequestDto } from "./chat.dto.js";
+import { ChatRequestDto, UpdateAiSettingsDto } from "./chat.dto.js";
 import { ChatService, describeChatError } from "./chat.service.js";
 import { streamAgentAnswer } from "./sse.js";
 
@@ -31,6 +32,23 @@ export class ChatController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.chat.context(treeId, request.user.userId);
+  }
+
+  /** Admin bật/tắt trợ lý AI cho gia phả và chọn có chia sẻ chi tiết người còn sống không (LMS-023). */
+  @Put("settings")
+  updateSettings(
+    @Param("treeId") treeId: string,
+    @Body(
+      new ValidationPipe({
+        expectedType: UpdateAiSettingsDto,
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    body: UpdateAiSettingsDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.chat.updateSettings(treeId, request.user.userId, body);
   }
 
   /** Hỏi chatbot. Trả về luồng SSE (`ChatStreamEvent`), lỗi trước khi mở luồng thì trả JSON như mọi API. */

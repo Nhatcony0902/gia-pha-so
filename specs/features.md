@@ -29,6 +29,7 @@
 - **B2 – Thống kê:** tổng số người, tỉ lệ nam/nữ, tuổi trung bình, tuổi thọ trung bình, gia đình đông con nhất, nhánh lớn nhất. Biểu đồ pie/bar/line.
 - **C1 – Chatbot RAG:** hỏi bằng ngôn ngữ tự nhiên. Câu hỏi về quan hệ dùng kết quả B1; các câu hỏi khác dùng truy vấn có cấu trúc kết hợp vector search. Chỉ trả lời dựa trên dữ liệu.
 - **C2 – AI tiểu sử:** sinh bản nháp tiểu sử từ các trường hồ sơ. Người dùng sửa rồi mới lưu.
+- **Quy tắc chung cho mọi tính năng AI (LMS-023, ADR-0008):** chỉ chạy khi Admin của gia phả đã bật AI (đồng ý gửi dữ liệu sang Gemini); mặc định ẩn chi tiết người còn sống với AI; nội dung AI tạo phải gắn nhãn và có người duyệt; mỗi tính năng AI có số liệu đánh giá trong báo cáo. Các tính năng AI tiếp theo theo nhận xét tiến độ: LMS-024 (gợi ý câu hỏi phỏng vấn), LMS-025 (chép lời kể, đo WER), LMS-026 (người trùng, dữ liệu bất thường), LMS-027 (phục chế ảnh), LMS-028 (sách ký ức).
 - **D1 – Phân quyền:** Admin/Editor/Viewer theo từng dòng họ; Editor chỉ sửa được nhánh được giao. Xem `user-roles.md`.
 - **D2 – Duyệt thay đổi:** thay đổi của Editor vào trạng thái `PENDING`. Admin xem diff rồi duyệt hoặc từ chối. Có audit log và thông báo.
 - **D3 – Bình luận:** bình luận trên hồ sơ, realtime qua WebSocket là tùy chọn.
