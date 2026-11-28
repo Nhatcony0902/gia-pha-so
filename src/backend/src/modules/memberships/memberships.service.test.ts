@@ -190,6 +190,17 @@ function fakePrisma() {
     async delete({ where }: { where: TreeUserKey }) {
       memberships.splice(memberships.indexOf(byTreeUser(where)!), 1);
     },
+    async count({ where }: { where: { treeId: string; role: TreeRole } }) {
+      return memberships.filter(
+        (m) => m.treeId === where.treeId && m.role === where.role,
+      ).length;
+    },
+  };
+  const familyTree = {
+    async findUniqueOrThrow({ where }: { where: { id: string } }) {
+      if (where.id !== TREE) throw new Error("not found");
+      return { createdById: "admin" };
+    },
   };
   const familyTreePerson = {
     async findUnique({ where }: { where: TreePersonKey }) {
@@ -204,6 +215,7 @@ function fakePrisma() {
   const tx = { membership, invitation, familyTreePerson, user };
   const prisma = {
     ...tx,
+    familyTree,
     $transaction: <T>(run: (client: unknown) => Promise<T>) => run(tx),
   };
   return { prisma, memberships, invitations };
@@ -524,6 +536,81 @@ describe("MembershipsService", () => {
         service.removeMember(TREE, "admin", "admin"),
         BadRequestException,
       );
+    });
+  });
+
+  describe("đổi vai trò (LMS-010)", () => {
+    const addMember = (userId: string, role: TreeRole) =>
+      db.memberships.push({ treeId: TREE, userId, role, personId: null });
+    const roleOf = (userId: string) =>
+      db.memberships.find((m) => m.userId === userId)?.role;
+
+    it("Admin nâng Viewer thành trưởng họ rồi hạ lại", async () => {
+      assert.deepEqual(
+        await service.updateMemberRole(TREE, "viewer", "ADMIN", "admin"),
+        { userId: "viewer", role: "ADMIN" },
+      );
+      assert.equal(roleOf("viewer"), "ADMIN");
+      await service.updateMemberRole(TREE, "viewer", "VIEWER", "admin");
+      assert.equal(roleOf("viewer"), "VIEWER");
+    });
+
+    it("trưởng họ được nâng quyền có thể tự rút về Viewer", async () => {
+      addMember("binh", "ADMIN");
+      await service.updateMemberRole(TREE, "binh", "VIEWER", "binh");
+      assert.equal(roleOf("binh"), "VIEWER");
+    });
+
+    it("Viewer không đổi được vai trò (403), người ngoài nhận 404", async () => {
+      await assert.rejects(
+        service.updateMemberRole(TREE, "viewer", "ADMIN", "viewer"),
+        ForbiddenException,
+      );
+      await assert.rejects(
+        service.updateMemberRole(TREE, "viewer", "ADMIN", "other"),
+        NotFoundException,
+      );
+      assert.equal(roleOf("viewer"), "VIEWER");
+    });
+
+    it("chưa mở vai trò Editor (chờ LMS-011)", async () => {
+      await assert.rejects(
+        service.updateMemberRole(TREE, "viewer", "EDITOR", "admin"),
+        (error: unknown) =>
+          error instanceof BadRequestException &&
+          (error.getResponse() as { code: string }).code ===
+            "ROLE_NOT_AVAILABLE",
+      );
+    });
+
+    it("không hạ quyền người tạo gia phả, kể cả khi có trưởng họ khác", async () => {
+      addMember("binh", "ADMIN");
+      await assert.rejects(
+        service.updateMemberRole(TREE, "admin", "VIEWER", "binh"),
+        (error: unknown) =>
+          error instanceof BadRequestException &&
+          (error.getResponse() as { code: string }).code ===
+            "CANNOT_DEMOTE_CREATOR",
+      );
+      assert.equal(roleOf("admin"), "ADMIN");
+    });
+
+    it("không đổi được người không thuộc gia phả (404)", async () => {
+      await assert.rejects(
+        service.updateMemberRole(TREE, "binh", "ADMIN", "admin"),
+        NotFoundException,
+      );
+    });
+
+    it("hạ trưởng họ (không phải người tạo) xong thì xóa được", async () => {
+      addMember("binh", "ADMIN");
+      await assert.rejects(
+        service.removeMember(TREE, "binh", "admin"),
+        BadRequestException,
+      );
+      await service.updateMemberRole(TREE, "binh", "VIEWER", "admin");
+      await service.removeMember(TREE, "binh", "admin");
+      assert.equal(roleOf("binh"), undefined);
     });
   });
 });

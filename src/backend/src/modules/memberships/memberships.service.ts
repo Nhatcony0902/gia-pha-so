@@ -16,6 +16,8 @@ import type {
   TreeInvitation,
   TreeInvitationListResponse,
   TreeMemberListResponse,
+  TreeRole,
+  UpdatedMemberRole,
 } from "@family-tree/shared-types";
 import { PrismaService } from "../database/prisma.service.js";
 import { MailService } from "../mail/mail.service.js";
@@ -108,14 +110,20 @@ export class MembershipsService {
     userId: string,
   ): Promise<TreeMemberListResponse> {
     await this.assertAdmin(treeId, userId);
-    const memberships = await this.prisma.membership.findMany({
-      where: { treeId },
-      include: {
-        user: true,
-        person: { select: { id: true, fullName: true } },
-      },
-      orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
-    });
+    const [memberships, tree] = await Promise.all([
+      this.prisma.membership.findMany({
+        where: { treeId },
+        include: {
+          user: true,
+          person: { select: { id: true, fullName: true } },
+        },
+        orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
+      }),
+      this.prisma.familyTree.findUniqueOrThrow({
+        where: { id: treeId },
+        select: { createdById: true },
+      }),
+    ]);
     return {
       members: memberships.map(({ user, role, joinedAt, person }) => ({
         userId: user.id,
@@ -125,8 +133,62 @@ export class MembershipsService {
         role,
         joinedAt: joinedAt.toISOString(),
         person,
+        isCreator: user.id === tree.createdById,
       })),
     };
+  }
+
+  /**
+   * Admin đổi vai trò của một thành viên (LMS-010). Hiện chỉ giữa ADMIN và VIEWER:
+   * Editor cần luồng duyệt (LMS-011) nên chưa mở. Người tạo gia phả luôn là Admin,
+   * và gia phả luôn còn ít nhất một Admin.
+   */
+  async updateMemberRole(
+    treeId: string,
+    targetUserId: string,
+    role: TreeRole,
+    userId: string,
+  ): Promise<UpdatedMemberRole> {
+    await this.assertAdmin(treeId, userId);
+    if (role !== "ADMIN" && role !== "VIEWER")
+      throw new BadRequestException({
+        code: "ROLE_NOT_AVAILABLE",
+        message:
+          "Vai trò Biên tập viên sẽ mở khi có quy trình duyệt thay đổi. Hiện chỉ chọn được Trưởng họ hoặc Thành viên (chỉ xem)",
+      });
+    const target = await this.prisma.membership.findUnique({
+      where: { treeId_userId: { treeId, userId: targetUserId } },
+    });
+    if (!target)
+      throw new NotFoundException({
+        code: "MEMBER_NOT_FOUND",
+        message: "Người này không có quyền truy cập gia phả",
+      });
+    if (target.role === role) return { userId: targetUserId, role };
+    if (target.role === "ADMIN") {
+      const tree = await this.prisma.familyTree.findUniqueOrThrow({
+        where: { id: treeId },
+        select: { createdById: true },
+      });
+      if (tree.createdById === targetUserId)
+        throw new BadRequestException({
+          code: "CANNOT_DEMOTE_CREATOR",
+          message: "Người tạo gia phả luôn là trưởng họ, không hạ quyền được",
+        });
+      const admins = await this.prisma.membership.count({
+        where: { treeId, role: "ADMIN" },
+      });
+      if (admins <= 1)
+        throw new BadRequestException({
+          code: "LAST_ADMIN",
+          message: "Gia phả phải còn ít nhất một trưởng họ",
+        });
+    }
+    await this.prisma.membership.update({
+      where: { treeId_userId: { treeId, userId: targetUserId } },
+      data: { role },
+    });
+    return { userId: targetUserId, role };
   }
 
   /** Admin xóa người khác, hoặc thành viên tự rời gia phả. Không xóa được Admin. */

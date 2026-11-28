@@ -67,8 +67,8 @@ Base URL: `/api`
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/trees/{treeId}/members` | Danh sách cộng tác viên (chỉ Admin) |
-| PATCH | `/trees/{treeId}/members/{userId}` | Cập nhật quyền cộng tác viên |
+| GET | `/trees/{treeId}/members` | Danh sách cộng tác viên (chỉ Admin). Mỗi người có `isCreator` (người tạo gia phả) |
+| PATCH | `/trees/{treeId}/members/{userId}` | Admin đổi vai trò `{ role }`, trả `{ userId, role }`. Hiện chỉ `ADMIN` ↔ `VIEWER`; `EDITOR` trả `400 ROLE_NOT_AVAILABLE` cho tới khi có LMS-011. `400 CANNOT_DEMOTE_CREATOR` (người tạo luôn là Admin), `400 LAST_ADMIN`, `403 TREE_ADMIN_REQUIRED`, `404 MEMBER_NOT_FOUND`. Admin tự rút về Viewer được nếu còn Admin khác (LMS-010) |
 | DELETE | `/trees/{treeId}/members/{userId}` | Xóa cộng tác viên. Admin xóa người khác, hoặc tự rời gia phả. Không xóa được Admin |
 | GET | `/trees/{treeId}/invitations` | Danh sách link mời kèm trạng thái (chỉ Admin) |
 | POST | `/trees/{treeId}/invitations` | Tạo lời mời `{ expiresInDays?: 1–30 (mặc định 7), maxUses?, email?, personId? }`. Không có `email`: link chung, trả `token` **một lần duy nhất**. Có `email`: gửi email, dùng một lần, trả `token: null`, thu hồi lời mời cũ cùng email. `personId` chỉ dùng kèm `email`. Email đã là thành viên: `409 ALREADY_MEMBER`, trừ khi kèm `personId` và tài khoản chưa gắn hồ sơ (để gắn hồ sơ cho người đã vào bằng link chung); đã gắn hồ sơ khác thì `409 MEMBER_ALREADY_LINKED` |

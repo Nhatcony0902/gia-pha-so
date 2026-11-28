@@ -7,6 +7,7 @@ import {
   List,
   Network,
   Plus,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -31,6 +32,12 @@ const treeNavItems = [
   { view: "timeline", label: "Dòng thời gian", Icon: Clock3 },
   { view: "chat", label: "Hỏi đáp AI", Icon: Sparkles },
 ] as const;
+/** Chỉ trưởng họ thấy (LMS-010). */
+const adminNavItem = {
+  view: "admin",
+  label: "Quản trị",
+  Icon: ShieldCheck,
+} as const;
 
 const menuItemClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-semibold no-underline transition-colors ${isActive ? "border-accent text-white" : "border-transparent text-content-secondary hover:text-white"}`;
@@ -56,9 +63,14 @@ export function Navbar() {
       ? "timeline"
       : treePathSegment === "persons"
         ? "members"
-        : ["tree", "members", "relationships", "timeline", "chat"].includes(
-              treePathSegment,
-            )
+        : [
+              "tree",
+              "members",
+              "relationships",
+              "timeline",
+              "chat",
+              "admin",
+            ].includes(treePathSegment)
           ? treePathSegment
           : "tree";
   const availableTrees = [
@@ -66,6 +78,13 @@ export function Navbar() {
     ...(trees.data?.sharedWithMe ?? []),
   ];
   const selectedTree = availableTrees.find((tree) => tree.id === treeId);
+  // Đang ở trang Quản trị mà chuyển sang gia phả mình không phải trưởng họ thì về cây gia phả.
+  const viewFor = (role: string) =>
+    treeView === "admin" && role !== "ADMIN" ? "tree" : treeView;
+  const navItems =
+    selectedTree?.myRole === "ADMIN"
+      ? [...treeNavItems, adminNavItem]
+      : treeNavItems;
 
   useEffect(() => {
     if (!treeMenuOpen) return;
@@ -183,7 +202,7 @@ export function Navbar() {
                   aria-checked={tree.id === treeId}
                   className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-0 px-2.5 py-2 text-left text-xs transition-colors ${tree.id === treeId ? "bg-[#dfeae4] font-bold text-[#183d32]" : "bg-transparent text-[#415c52] hover:bg-[#eaf1ed] hover:text-[#183d32]"}`}
                   onClick={() => {
-                    navigate(`/trees/${tree.id}/${treeView}`);
+                    navigate(`/trees/${tree.id}/${viewFor(tree.myRole)}`);
                     setTreeMenuOpen(false);
                     setOpen(false);
                   }}
@@ -209,7 +228,7 @@ export function Navbar() {
                   aria-checked={tree.id === treeId}
                   className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border-0 px-2.5 py-2 text-left text-xs transition-colors ${tree.id === treeId ? "bg-[#dfeae4] font-bold text-[#183d32]" : "bg-transparent text-[#415c52] hover:bg-[#eaf1ed] hover:text-[#183d32]"}`}
                   onClick={() => {
-                    navigate(`/trees/${tree.id}/${treeView}`);
+                    navigate(`/trees/${tree.id}/${viewFor(tree.myRole)}`);
                     setTreeMenuOpen(false);
                     setOpen(false);
                   }}
@@ -242,7 +261,7 @@ export function Navbar() {
 
   const treeNavigation = treeId ? (
     <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 min-[901px]:flex-nowrap">
-      {treeNavItems.map(({ view, label, Icon }) => (
+      {navItems.map(({ view, label, Icon }) => (
         <NavLink
           key={view}
           className={({ isActive }) =>

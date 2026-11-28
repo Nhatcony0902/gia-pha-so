@@ -5,15 +5,17 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
+  ValidationPipe,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard.js";
 import { MembershipsService } from "./memberships.service.js";
-import { CreateInvitationDto } from "./memberships.dto.js";
+import { CreateInvitationDto, UpdateMemberRoleDto } from "./memberships.dto.js";
 
 type AuthenticatedRequest = Request & { user: { userId: string } };
 
@@ -31,6 +33,30 @@ export class TreeMembershipsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.memberships.members(treeId, request.user.userId);
+  }
+
+  /** Admin đổi vai trò thành viên (LMS-010). */
+  @Patch("members/:userId")
+  updateMemberRole(
+    @Param("treeId") treeId: string,
+    @Param("userId") targetUserId: string,
+    // Chỉ rõ kiểu DTO: chạy bằng tsx không có decorator metadata (xem chat.controller.ts).
+    @Body(
+      new ValidationPipe({
+        expectedType: UpdateMemberRoleDto,
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    body: UpdateMemberRoleDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.memberships.updateMemberRole(
+      treeId,
+      targetUserId,
+      body.role,
+      request.user.userId,
+    );
   }
 
   @Delete("members/:userId")
