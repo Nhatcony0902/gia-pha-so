@@ -53,20 +53,26 @@ enum MarriageStatus {
 }
 
 model FamilyTree {
-  id            String             @id @default(cuid())
-  name          String
-  description   String?
-  coverUrl      String?
-  originPlace   String?
-  createdById   String
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  createdBy     User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  persons       FamilyTreePerson[]
-  relationships Relationship[]
-  memberships   Membership[]
-  invitations   Invitation[]
-  events        FamilyEvent[]
+  id                   String             @id @default(cuid())
+  name                 String
+  description          String?
+  coverUrl             String?
+  originPlace          String?
+  /// Admin đã đồng ý gửi dữ liệu gia phả sang dịch vụ AI (Gemini) lúc nào. Null: AI tắt (LMS-023, ADR-0008)
+  aiEnabledAt          DateTime?
+  /// Admin đã bật AI. Không đặt khóa ngoại để xóa tài khoản không ảnh hưởng gia phả
+  aiEnabledById        String?
+  /// false: ẩn nghề nghiệp, nơi ở, tiểu sử, ngày sinh cụ thể của người còn sống trước khi gửi sang AI
+  aiShareLivingDetails Boolean            @default(false)
+  createdById          String
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  createdBy            User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  persons              FamilyTreePerson[]
+  relationships        Relationship[]
+  memberships          Membership[]
+  invitations          Invitation[]
+  events               FamilyEvent[]
 
   @@index([createdById, updatedAt])
 }
@@ -256,14 +262,14 @@ model Person {
 /// của chatbot (LMS-016, ADR-0004). Đọc/ghi bằng raw SQL vì Prisma chưa hỗ trợ kiểu vector.
 /// Số chiều cố định 768 (ADR-0005): đổi số chiều phải có migration mới.
 model PersonEmbedding {
-  personId    String                      @id
+  personId    String                     @id
   /// "<model>@<số chiều>", đổi model thì embed lại
   model       String
   /// sha256 của model + văn bản đã embed, văn bản đổi thì embed lại
   contentHash String
   embedding   Unsupported("vector(768)")
-  updatedAt   DateTime                    @default(now())
-  person      Person                      @relation(fields: [personId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime                   @default(now())
+  person      Person                     @relation(fields: [personId], references: [id], onDelete: Cascade)
 }
 
 model PersonImage {

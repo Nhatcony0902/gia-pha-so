@@ -646,8 +646,10 @@ export async function seedLeDinhFamily(
   const treeId = LE_DINH_TREE_ID;
   await prisma.familyTree.upsert({
     where: { id: treeId },
-    update: { createdById: adminId },
+    // Dữ liệu hư cấu: bật sẵn AI và cho AI thấy đủ chi tiết để chạy ai:eval (LMS-023).
+    update: { createdById: adminId, ...aiDemoSettings(adminId) },
     create: {
+      ...aiDemoSettings(adminId),
       id: treeId,
       name: "Họ Lê Đình – làng An Phú",
       description:
@@ -731,4 +733,12 @@ export async function seedLeDinhFamily(
       create: { treeId, userId: user.id, role: "VIEWER", personId },
     });
   }
+}
+
+function aiDemoSettings(adminId: string) {
+  return {
+    aiEnabledAt: new Date(),
+    aiEnabledById: adminId,
+    aiShareLivingDetails: true,
+  };
 }

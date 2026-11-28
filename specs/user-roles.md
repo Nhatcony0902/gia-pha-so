@@ -5,7 +5,7 @@ Quyền chia làm 2 cấp: **tài khoản hệ thống** và **vai trò trong t�
 | Vai trò | Phạm vi | Quyền chính |
 |---|---|---|
 | User | Hệ thống | Đăng ký, đăng nhập; tạo dòng họ mới (tự động thành Admin của dòng họ đó); nhận lời mời vào dòng họ khác |
-| Admin | Một dòng họ | Toàn quyền: sửa trực tiếp dữ liệu, mời thành viên và đổi quyền, giao nhánh cho Editor, duyệt/từ chối thay đổi, quản lý sự kiện |
+| Admin | Một dòng họ | Toàn quyền: sửa trực tiếp dữ liệu, mời thành viên và đổi quyền, giao nhánh cho Editor, duyệt/từ chối thay đổi, quản lý sự kiện, bật/tắt trợ lý AI và chọn có chia sẻ chi tiết người còn sống với AI (LMS-023) |
 | Editor | Một dòng họ | Đề xuất thêm/sửa người và quan hệ **trong nhánh được giao**, sửa hồ sơ của chính mình. Mọi thay đổi vào hàng chờ duyệt. Được bình luận, đăng ký ức |
 | Viewer | Một dòng họ | Xem cây, hồ sơ, timeline, thống kê; tìm quan hệ; hỏi chatbot; bình luận |
 

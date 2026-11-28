@@ -335,8 +335,17 @@ async function main() {
   });
   await prisma.familyTree.upsert({
     where: { id: TREE_ID },
-    update: { createdById: admin.id },
+    // Người của công chúng: bật sẵn AI, chia sẻ đủ chi tiết (LMS-023).
+    update: {
+      createdById: admin.id,
+      aiEnabledAt: new Date(),
+      aiEnabledById: admin.id,
+      aiShareLivingDetails: true,
+    },
     create: {
+      aiEnabledAt: new Date(),
+      aiEnabledById: admin.id,
+      aiShareLivingDetails: true,
       id: TREE_ID,
       name: "Hoàng gia Anh – Elizabeth II và Philip",
       description:

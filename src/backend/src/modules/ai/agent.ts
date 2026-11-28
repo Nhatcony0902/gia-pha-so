@@ -7,6 +7,7 @@ import type {
   GenerateContentResponseUsageMetadata,
   Part,
 } from "@google/genai";
+import { PRIVACY_RULES } from "./ai-privacy.js";
 import { FamilyGraph, ToolError } from "./family-graph.js";
 import {
   WEB_RETRY,
@@ -215,6 +216,11 @@ Cách gọi họ hàng (miền Bắc), dùng khi trả lời câu hỏi quan h�
 - Con của bác là anh/chị họ (kể cả khi ít tuổi hơn mình); con của chú, cô, cậu, dì là em họ. Thứ bậc theo vai của cha mẹ, không theo tuổi người con.
 - Con của con trai là cháu nội, con của con gái là cháu ngoại.
 - Con nuôi là con trong nhà, nhưng khi được hỏi "con ruột không" thì trả lời đúng là con nuôi.${
+    graph.persons.some((person) => person.detailsHidden)
+      ? `
+${PRIVACY_RULES}`
+      : ""
+  }${
     options.withImage
       ? `
 ${IMAGE_RULES}`
@@ -370,8 +376,7 @@ export async function runFamilyAgent(input: {
         return await streamTurn();
       } catch (error) {
         if (input.signal?.aborted || !isTransientError(error)) throw error;
-        const exhausted =
-          attempt >= retry.attempts || isDailyQuotaError(error);
+        const exhausted = attempt >= retry.attempts || isDailyQuotaError(error);
         if (exhausted) {
           if (!fallbackModelName || activeModel === fallbackModelName)
             throw error;

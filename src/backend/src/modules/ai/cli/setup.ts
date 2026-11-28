@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { fileURLToPath } from "node:url";
 import type { ContentSearcher } from "../agent.js";
+import { isAiEnabled, snapshotForAi } from "../ai-privacy.js";
 import { ContentIndex, withFileCache } from "../content-search.js";
 import { FamilyGraph } from "../family-graph.js";
 import { createGemini } from "../gemini.js";
@@ -37,8 +38,21 @@ export async function createSession(
     gemini,
     async graphFor(email: string, treeId?: string) {
       const context = await resolveAskContext(prisma, email, treeId);
+      // Cùng luật riêng tư với server (LMS-023): gia phả chưa bật AI thì không gửi dữ liệu đi.
+      const settings = await prisma.familyTree.findUniqueOrThrow({
+        where: { id: context.treeId },
+        select: { aiEnabledAt: true, aiShareLivingDetails: true },
+      });
+      if (!isAiEnabled(settings))
+        throw new Error(
+          `Gia phả ${context.treeId} chưa bật trợ lý AI. Admin bật trên trang Hỏi đáp AI, hoặc chạy lại npm run db:seed với dữ liệu mẫu.`,
+        );
       const graph = new FamilyGraph(
-        await loadTreeSnapshot(prisma, context.treeId),
+        snapshotForAi(
+          await loadTreeSnapshot(prisma, context.treeId),
+          settings,
+          context.mePersonId,
+        ),
         context,
       );
       let contentIndex: ContentSearcher | null = null;
@@ -77,7 +91,8 @@ export function agentModelOptions(gemini: ReturnType<typeof createGemini>) {
     modelName: gemini.config.chatModel,
     fallbackModelName: gemini.config.fallbackChatModel,
     retry: CLI_RETRY,
-    onRetry: (message: string) => console.warn(`
+    onRetry: (message: string) =>
+      console.warn(`
   ↻ ${message}`),
   };
 }

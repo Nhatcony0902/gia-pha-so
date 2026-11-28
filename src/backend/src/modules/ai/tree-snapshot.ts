@@ -20,6 +20,8 @@ export type SnapshotPerson = {
   currentResidence: string | null;
   burialPlace: string | null;
   biography: string | null;
+  /** Người còn sống bị ẩn chi tiết trước khi gửi sang AI (ai-privacy.ts). */
+  detailsHidden?: boolean;
 };
 
 export type SnapshotRelationship = {

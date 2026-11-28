@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -7,7 +8,10 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import type { ChatContextResponse } from "@family-tree/shared-types";
+import type {
+  AiSettings,
+  ChatContextResponse,
+} from "@family-tree/shared-types";
 import { PrismaService } from "../database/prisma.service.js";
 import {
   runFamilyAgent,
@@ -21,7 +25,13 @@ import {
   HISTORY_TEXT_MAX_LENGTH,
   QUESTION_MAX_LENGTH,
   type ChatRequestDto,
+  type UpdateAiSettingsDto,
 } from "./chat.dto.js";
+import {
+  isAiEnabled,
+  snapshotForAi,
+  type AiTreeSettings,
+} from "./ai-privacy.js";
 import { CHAT_IMAGE_MAX_BYTES, decodeChatImage } from "./chat-image.js";
 import { FamilyGraph } from "./family-graph.js";
 import { createGemini } from "./gemini.js";
@@ -196,32 +206,91 @@ export class ChatService {
   }
 
   /** Chỉ thành viên gia phả mới hỏi được. Người ngoài nhận 404 như TreesService để không lộ gia phả. */
-  private async askContext(
-    treeId: string,
-    userId: string,
-  ): Promise<AskContext> {
+  private async membership(treeId: string, userId: string) {
     const membership = await this.prisma.membership.findUnique({
       where: { treeId_userId: { treeId, userId } },
-      select: { personId: true },
+      select: { personId: true, role: true },
     });
     if (!membership)
       throw new NotFoundException({
         code: "TREE_NOT_FOUND",
         message: "Không tìm thấy gia phả",
       });
+    return membership;
+  }
+
+  private async askContext(
+    treeId: string,
+    userId: string,
+  ): Promise<AskContext> {
+    const membership = await this.membership(treeId, userId);
     return { treeId, userId, mePersonId: membership.personId };
   }
 
+  private treeSettings(treeId: string) {
+    return this.prisma.familyTree.findUniqueOrThrow({
+      where: { id: treeId },
+      select: { name: true, aiEnabledAt: true, aiShareLivingDetails: true },
+    });
+  }
+
+  private static settingsView(tree: AiTreeSettings, role: string): AiSettings {
+    return {
+      enabled: isAiEnabled(tree),
+      enabledAt: tree.aiEnabledAt?.toISOString() ?? null,
+      shareLivingDetails: tree.aiShareLivingDetails,
+      canManage: role === "ADMIN",
+    };
+  }
+
+  /**
+   * Admin bật/tắt AI cho gia phả (LMS-023). Bật là đồng ý gửi dữ liệu gia phả sang Gemini.
+   * Tắt thì xóa embedding của mọi người trong gia phả (đã tạo từ dữ liệu gửi đi).
+   */
+  async updateSettings(
+    treeId: string,
+    userId: string,
+    body: UpdateAiSettingsDto,
+  ): Promise<AiSettings> {
+    const membership = await this.membership(treeId, userId);
+    if (membership.role !== "ADMIN")
+      throw new ForbiddenException({
+        code: "AI_SETTINGS_FORBIDDEN",
+        message: "Chỉ Admin của gia phả mới bật hoặc tắt được trợ lý AI",
+      });
+    const current = await this.treeSettings(treeId);
+    const share =
+      body.shareLivingDetails === undefined
+        ? {}
+        : { aiShareLivingDetails: body.shareLivingDetails };
+    // Đang bật mà chỉ đổi tùy chọn thì giữ nguyên thời điểm và người đã đồng ý.
+    const consent = !body.enabled
+      ? { aiEnabledAt: null, aiEnabledById: null }
+      : current.aiEnabledAt
+        ? {}
+        : { aiEnabledAt: new Date(), aiEnabledById: userId };
+    const tree = await this.prisma.familyTree.update({
+      where: { id: treeId },
+      data: { ...consent, ...share },
+      select: { aiEnabledAt: true, aiShareLivingDetails: true },
+    });
+    if (!body.enabled)
+      await this.prisma.$executeRaw`
+        DELETE FROM "PersonEmbedding"
+        WHERE "personId" IN (SELECT "personId" FROM "FamilyTreePerson" WHERE "treeId" = ${treeId})`;
+    this.logger.log(
+      `ai settings tree=${treeId} by=${userId} enabled=${body.enabled} shareLiving=${tree.aiShareLivingDetails}`,
+    );
+    return ChatService.settingsView(tree, membership.role);
+  }
+
   async context(treeId: string, userId: string): Promise<ChatContextResponse> {
-    const context = await this.askContext(treeId, userId);
+    const membership = await this.membership(treeId, userId);
     const [tree, me] = await Promise.all([
-      this.prisma.familyTree.findUniqueOrThrow({
-        where: { id: treeId },
-        select: { name: true },
-      }),
-      context.mePersonId
+      this.treeSettings(treeId),
+      membership.personId
         ? this.prisma.person.findUnique({
-            where: { id: context.mePersonId },
+            where: { id: membership.personId },
             select: { id: true, fullName: true },
           })
         : null,
@@ -232,6 +301,7 @@ export class ChatService {
     return {
       treeName: tree.name,
       available: this.isConfigured(),
+      ai: ChatService.settingsView(tree, membership.role),
       me: me ? { personId: me.id, name: me.fullName } : null,
       suggestions: suggestionsFor(Boolean(me)),
       limits: {
@@ -252,6 +322,13 @@ export class ChatService {
   async prepare(treeId: string, userId: string, request: ChatRequestDto) {
     const ai = this.getAi();
     const context = await this.askContext(treeId, userId);
+    const settings = await this.treeSettings(treeId);
+    if (!isAiEnabled(settings))
+      throw new ForbiddenException({
+        code: "AI_CONSENT_REQUIRED",
+        message:
+          "Admin của gia phả chưa bật trợ lý AI, nên dữ liệu chưa được gửi sang dịch vụ AI.",
+      });
     const question = request.question.trim();
     if (!question)
       throw new HttpException(
@@ -261,8 +338,13 @@ export class ChatService {
     // Kiểm tra ảnh trước khi trừ hạn mức: ảnh hỏng không làm mất lượt hỏi.
     const image = request.image ? decodeChatImage(request.image) : null;
     this.consumeQuota(userId, Boolean(image));
+    // Ẩn chi tiết người còn sống trước khi dữ liệu tới bất kỳ tool hay embedding nào (ADR-0008).
     const graph = new FamilyGraph(
-      await loadTreeSnapshot(this.prisma, treeId),
+      snapshotForAi(
+        await loadTreeSnapshot(this.prisma, treeId),
+        settings,
+        context.mePersonId,
+      ),
       context,
     );
     const history = trimHistory(request.history);

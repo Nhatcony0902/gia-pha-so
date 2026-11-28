@@ -55,6 +55,15 @@ Web (ChatPage) ──POST /api/trees/:treeId/chat {question, history}──▶ C
 - `search_content` trên pgvector luôn join `FamilyTreePerson` theo `treeId` đang hỏi, rồi lọc lại theo snapshot.
 - Câu trả lời cuối được kiểm tra: link `[Tên](/trees/…/persons/…)` tới người không thuộc dòng họ (id bịa, dòng họ khác, link ngoài) bị gỡ, chỉ giữ chữ. Những người còn link được trả trong `persons` để UI hiện "Hồ sơ liên quan".
 
+## Đồng ý và riêng tư (LMS-023, ADR-0008)
+
+- Gia phả **mặc định tắt AI**. Admin bật trên trang Hỏi đáp AI sau khi đọc dữ liệu nào được gửi sang Gemini (`PUT /api/trees/:treeId/chat/settings`). Chưa bật thì `POST /chat` trả `403 AI_CONSENT_REQUIRED` trước khi tải dữ liệu, không trừ hạn mức. Seed bật sẵn cho hai gia phả mẫu.
+- Mặc định **ẩn chi tiết người còn sống** (`aiShareLivingDetails = false`): `snapshotForAi()` trong `ai-privacy.ts` bỏ nghề nghiệp, nơi ở, tiểu sử và rút ngày sinh về năm, **trước khi** dựng `FamilyGraph`. Mọi tool, kết quả `search_content` và văn bản đem embed chỉ thấy bản đã ẩn. Hồ sơ của chính người hỏi và người đã mất giữ nguyên.
+- Người bị ẩn có `detailsHidden: true` trong kết quả tool. Khi có người bị ẩn, system prompt thêm `PRIVACY_RULES` để model nói "được ẩn theo cài đặt riêng tư" thay vì "gia phả chưa có".
+- Không bao giờ gửi điện thoại, email, địa chỉ, nhóm máu, mã định danh, ghi chú: `tree-snapshot.ts` không đọc các trường này.
+- Admin tắt AI thì xóa `PersonEmbedding` của mọi người trong gia phả.
+- `ai:chat`, `ai:eval` dùng cùng luật: gia phả chưa bật thì báo lỗi, chưa chia sẻ thì ẩn như server.
+
 ## Vector search (pgvector)
 
 - Bảng `PersonEmbedding(personId, model, contentHash, embedding vector(768))`, một dòng cho mỗi người có tiểu sử/nghề nghiệp/nơi ở. Đọc ghi bằng raw SQL vì Prisma chưa hỗ trợ kiểu `vector`.
@@ -100,8 +109,9 @@ Lưu ý: khi đổi sang model dự phòng giữa một câu hỏi đã gọi to
 
 | File | Vai trò |
 | --- | --- |
-| `ai.module.ts`, `chat.controller.ts` | Module Nest, `GET`/`POST /trees/:treeId/chat` |
-| `chat.service.ts` | Quyền, hạn mức, dựng dữ liệu, gọi agent |
+| `ai.module.ts`, `chat.controller.ts` | Module Nest, `GET`/`POST /trees/:treeId/chat`, `PUT /trees/:treeId/chat/settings` |
+| `chat.service.ts` | Quyền, đồng ý AI, hạn mức, dựng dữ liệu, gọi agent |
+| `ai-privacy.ts` | Cổng đồng ý và ẩn chi tiết người còn sống trước khi gửi sang AI (LMS-023) |
 | `chat-image.ts` | Kiểm tra ảnh gửi kèm: magic bytes, dung lượng, khớp `mimeType` |
 | `chat.dto.ts` | Kiểm tra body (dùng `ValidationPipe({ expectedType })`, xem ghi chú bên dưới) |
 | `sse.ts` | Ghi luồng SSE, heartbeat 15 s, hủy khi client ngắt |
