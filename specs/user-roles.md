@@ -15,6 +15,12 @@ Quyền chia làm 2 cấp: **tài khoản hệ thống** và **vai trò trong t�
 - Người đã ở trong gia phả bấm lại link thì giữ nguyên vai trò cũ (không bị hạ quyền).
 - **Mời qua email** (đã có): mời đích danh, dùng một lần, chỉ tài khoản đúng email (đã xác minh) mới chấp nhận được. Có thể gắn với một Person: khi chấp nhận, tài khoản được liên kết với đúng người đó trong cây (mỗi Person chỉ gắn một tài khoản trong một gia phả). Mời lại cùng email thì link cũ bị thu hồi. Người đã vào bằng link chung (chưa gắn hồ sơ) vẫn mời qua email kèm Person được: khi chấp nhận thì giữ nguyên vai trò, chỉ gắn hồ sơ.
   - Hiện mới cấp quyền **Viewer**. Mời Editor qua email sẽ mở khi có luồng duyệt (LMS-011).
+## Trang Quản trị (`/trees/:treeId/admin`)
+- Chỉ Admin thấy mục **Quản trị** trên thanh điều hướng. Người khác vào thẳng đường dẫn thì thấy "Chỉ trưởng họ mới mở được trang này".
+- Gồm: số liệu nhanh, người có quyền truy cập (đổi vai trò Admin ↔ Viewer, xóa), lời mời (xem, thu hồi, mời mới bằng hộp thoại "Chia sẻ"), trợ lý AI và riêng tư (LMS-023).
+- Người tạo gia phả luôn là Admin, không bị hạ quyền hay xóa. Gia phả luôn còn ít nhất một Admin. Muốn xóa một Admin thì hạ về Viewer trước.
+- Vai trò Editor chưa chọn được: mở cùng quy trình duyệt (LMS-011). Hàng chờ duyệt (LMS-011) và thống kê (LMS-008) sẽ thêm vào trang này khi có.
+
 - Người ngoài gia phả gọi API của gia phả nhận `404` (không lộ gia phả tồn tại). Thành viên không đủ quyền ghi nhận `403`.
 
 ## Câu hỏi mở (chốt ở Sprint 05)

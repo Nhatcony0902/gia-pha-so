@@ -10,6 +10,7 @@ import {
   compactSecondaryButtonClass,
   primaryButtonClass,
 } from "../../lib/ui-classes";
+import { useNotifications } from "../../app/providers/NotificationProvider";
 import { updateAiSettings } from "./api";
 
 /**
@@ -17,7 +18,7 @@ import { updateAiSettings } from "./api";
  * Admin thấy nút bật kèm giải thích dữ liệu nào được gửi; thành viên khác chỉ thấy lời nhắn.
  */
 
-function useAiSettings(treeId: string, onChanged: () => void) {
+export function useAiSettings(treeId: string, onChanged: () => void) {
   return useMutation({
     mutationFn: (body: UpdateAiSettingsRequest) =>
       updateAiSettings(treeId, body),
@@ -25,10 +26,10 @@ function useAiSettings(treeId: string, onChanged: () => void) {
   });
 }
 
-const errorText = (error: unknown) =>
+export const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Không lưu được cài đặt AI";
 
-function LivingDetailsOption({
+export function LivingDetailsOption({
   checked,
   onChange,
   disabled,
@@ -65,24 +66,34 @@ export function AiConsentPanel({
   treeId,
   settings,
   onChanged,
+  embedded = false,
 }: {
   treeId: string;
   settings: AiSettings;
   onChanged: () => void;
+  /** Đặt trong trang Quản trị: tiêu đề cấp thấp hơn, không có viền thẻ riêng. */
+  embedded?: boolean;
 }) {
   const [shareLiving, setShareLiving] = useState(settings.shareLivingDetails);
+  const Heading = embedded ? "h3" : "h1";
   const save = useAiSettings(treeId, onChanged);
 
   return (
-    <section className="mx-auto grid w-full max-w-xl gap-4 rounded-2xl border border-border-default bg-surface p-5 text-left sm:p-6">
+    <section
+      className={
+        embedded
+          ? "grid gap-4 text-left"
+          : "mx-auto grid w-full max-w-xl gap-4 rounded-2xl border border-border-default bg-surface p-5 text-left sm:p-6"
+      }
+    >
       <div className="flex items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[#f6ead3] text-accent-deep">
           <ShieldCheck size={22} />
         </span>
         <div className="grid gap-1">
-          <h1 className="m-0 font-display text-xl font-semibold text-ink">
+          <Heading className="m-0 font-display text-xl font-semibold text-ink">
             Trợ lý AI chưa được bật
-          </h1>
+          </Heading>
           <p className="m-0 text-sm text-ink-muted">
             Trợ lý AI chạy trên dịch vụ Gemini của Google, nên phải gửi dữ liệu
             gia phả ra ngoài. Trưởng họ (Admin) cần đồng ý trước.
@@ -164,6 +175,7 @@ export function AiPrivacyNote({
   onChanged: () => void;
 }) {
   const save = useAiSettings(treeId, onChanged);
+  const notice = useNotifications();
   const summary = settings.shareLivingDetails
     ? "AI xem được chi tiết người còn sống"
     : "Chi tiết người còn sống được ẩn với AI";
@@ -199,10 +211,11 @@ export function AiPrivacyNote({
             type="button"
             className={compactDangerButtonClass}
             disabled={save.isPending}
-            onClick={() => {
+            onClick={async () => {
               if (
-                window.confirm(
-                  "Tắt trợ lý AI cho cả gia phả? Mọi người sẽ không hỏi được nữa cho tới khi bật lại.",
+                await notice.confirm(
+                  "Tắt trợ lý AI?",
+                  "Mọi người, kể cả bạn, sẽ không hỏi được nữa cho tới khi bật lại. Dữ liệu tìm kiếm đã tạo cho AI bị xóa.",
                 )
               )
                 save.mutate({ enabled: false });

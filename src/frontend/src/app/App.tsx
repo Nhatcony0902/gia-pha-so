@@ -22,6 +22,7 @@ import { HomePage } from "../pages/HomePage";
 import { InvitePage } from "../pages/InvitePage";
 import { EventDetailPage } from "../pages/EventDetailPage";
 import { ChatPage } from "../pages/ChatPage";
+import { AdminPage } from "../pages/AdminPage";
 
 function LegacyTreeRedirect() {
   const { treeId } = useParams();
@@ -111,6 +112,14 @@ export function App() {
                     element={
                       <ProtectedRoute>
                         <ChatPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/trees/:treeId/admin"
+                    element={
+                      <ProtectedRoute>
+                        <AdminPage />
                       </ProtectedRoute>
                     }
                   />

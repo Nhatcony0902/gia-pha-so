@@ -407,10 +407,25 @@ export interface TreeMember {
   role: TreeRole;
   joinedAt: string;
   person: LinkedPerson | null;
+  /** Người tạo gia phả: luôn là Admin, không bị hạ quyền hay xóa. */
+  isCreator: boolean;
 }
 
 export interface TreeMemberListResponse {
   members: TreeMember[];
+}
+
+/**
+ * Body của `PATCH /trees/{treeId}/members/{userId}` (LMS-010). Hiện chỉ đổi giữa ADMIN và VIEWER;
+ * EDITOR mở khi có luồng duyệt (LMS-011).
+ */
+export interface UpdateMemberRoleRequest {
+  role: TreeRole;
+}
+
+export interface UpdatedMemberRole {
+  userId: string;
+  role: TreeRole;
 }
 
 export type InvitationStatus = "ACTIVE" | "EXPIRED" | "REVOKED" | "EXHAUSTED";

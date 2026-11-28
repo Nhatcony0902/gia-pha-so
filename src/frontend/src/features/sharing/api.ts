@@ -6,8 +6,15 @@ import type {
   TreeInvitationListResponse,
   TreeMemberListResponse,
   TreeRole,
+  UpdatedMemberRole,
 } from "@family-tree/shared-types";
-import { apiDelete, apiGet, apiPost, publicApi } from "../../lib/api/client";
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  publicApi,
+} from "../../lib/api/client";
 
 export const roleLabel: Record<TreeRole, string> = {
   ADMIN: "Trưởng họ",
@@ -20,6 +27,12 @@ export const inviteUrl = (token: string) =>
 
 export const getTreeMembers = (treeId: string) =>
   apiGet<TreeMemberListResponse>(`/trees/${treeId}/members`);
+export const updateTreeMemberRole = (
+  treeId: string,
+  userId: string,
+  role: TreeRole,
+) =>
+  apiPatch<UpdatedMemberRole>(`/trees/${treeId}/members/${userId}`, { role });
 export const removeTreeMember = (treeId: string, userId: string) =>
   apiDelete<{ success: true }>(`/trees/${treeId}/members/${userId}`);
 export const getTreeInvitations = (treeId: string) =>
