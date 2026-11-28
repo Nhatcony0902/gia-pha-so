@@ -96,7 +96,7 @@ export function AiConsentPanel({
             <p className="m-0 font-bold text-ink">
               Khi bật, mỗi câu hỏi có thể gửi sang Gemini:
             </p>
-            <ul className="m-0 grid gap-1 pl-5">
+            <ul className="m-0 grid list-disc gap-1 pl-5">
               <li>Tên, giới tính, đời, quan hệ cha mẹ – con – vợ chồng.</li>
               <li>
                 Năm sinh, năm mất, quê quán; tiểu sử và nơi an táng của người đã

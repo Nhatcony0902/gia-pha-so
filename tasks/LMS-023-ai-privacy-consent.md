@@ -20,11 +20,12 @@ Là trưởng họ (Admin), tôi muốn biết dữ liệu nào của dòng họ
 - [x] Trang Hỏi đáp AI: Admin thấy giải thích dữ liệu nào được gửi, tùy chọn chia sẻ chi tiết người còn sống, nút "Đồng ý và bật". Thành viên khác thấy lời nhắn nhờ trưởng họ bật
 - [x] Khi đang bật: dòng trạng thái riêng tư dưới ô hỏi; Admin mở ra để đổi tùy chọn hoặc tắt
 - [x] `ai:chat`, `ai:eval` dùng cùng luật. Seed bật sẵn AI cho hai gia phả mẫu (hư cấu / người của công chúng)
-- [ ] Chạy migration trên DB thật và kiểm thử thủ công trên web (Admin bật, Viewer bị chặn, tắt rồi bật lại)
+- [x] Chạy migration trên DB thật và kiểm thử trên web (Admin bật, Viewer bị chặn, tắt rồi bật lại)
 - [ ] Chạy lại `npm run ai:eval` sau khi seed để chắc 34/34 không đổi
 
 ## Ghi chú kỹ thuật
 - Code: `src/backend/src/modules/ai/ai-privacy.ts` (`snapshotForAi`, `PRIVACY_RULES`), `chat.service.ts` (`updateSettings`, kiểm tra đồng ý trong `prepare`), `chat.controller.ts`, `cli/setup.ts`. Frontend: `features/chatbot/AiConsentPanel.tsx`, `pages/ChatPage.tsx`.
 - Test: `ai-privacy.test.ts`, `chat.service.test.ts` (suite "đồng ý và riêng tư").
 - Migration: `20261128090000_ai_privacy_consent`. Gia phả có sẵn sẽ tắt AI cho tới khi Admin bật.
+- Kiểm thử 2026-11-28 (DB Docker, Gemini thật, Chromium chạy ngầm bằng Playwright): migration làm cả 3 gia phả có sẵn tắt AI, seed bật lại 2 gia phả mẫu. API: Viewer `PUT settings` → 403 `AI_SETTINGS_FORBIDDEN`; body sai → 400; gia phả không phải thành viên → 404; Admin tắt → Viewer và cả Admin hỏi đều nhận 403 `AI_CONSENT_REQUIRED`, không mất lượt; embedding của gia phả 35 → 0, bật lại ở chế độ ẩn thì chỉ embed lại 11 người (đã mất + người hỏi). Hỏi "Lê Đình Hùng làm nghề gì?" khi đang ẩn → "được ẩn theo cài đặt riêng tư… xem trang hồ sơ". Web: Admin thấy thẻ đồng ý, ô chia sẻ mặc định không chọn, ô hỏi khóa; Viewer chỉ thấy lời nhắn; bật → mở ô hỏi và hiện dòng trạng thái; Viewer tải lại thì hỏi được, không có nút tắt; Admin tắt (có hộp xác nhận) → quay về thẻ đồng ý; màn hình 390 px không tràn ngang; trang chat không có lỗi console.
 - Không thuộc task này: ẩn thông tin người còn sống với người ngoài chi trên trang hồ sơ (cần phân quyền theo chi, mục 1.8 của nhận xét).
